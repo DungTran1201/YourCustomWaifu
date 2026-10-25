@@ -44,23 +44,7 @@ importers:
         specifier: ^2.2.0
         version: 2.2.12(typescript@5.9.3)
 
-  backend:
-    dependencies:
-      '@vrm/platform-contracts':
-        specifier: workspace:*
-        version: link:../frontend/packages/platform-contracts
-      '@vrm/shared':
-        specifier: workspace:*
-        version: link:../frontend/packages/shared
-    devDependencies:
-      '@types/node':
-        specifier: ^22.13.4
-        version: 22.20.5
-      typescript:
-        specifier: ^5.7.3
-        version: 5.9.3
-
-  frontend/apps/desktop:
+  apps/desktop:
     dependencies:
       '@pixiv/three-vrm':
         specifier: ^3.5.5
@@ -68,18 +52,12 @@ importers:
       '@types/three':
         specifier: ^0.186.0
         version: 0.186.0
-      '@vrm/app-core':
-        specifier: workspace:*
-        version: link:../../packages/app-core
       '@vrm/platform-contracts':
         specifier: workspace:*
         version: link:../../packages/platform-contracts
       '@vrm/shared':
         specifier: workspace:*
         version: link:../../packages/shared
-      '@vrm/ui':
-        specifier: workspace:*
-        version: link:../../packages/ui
       three:
         specifier: ^0.186.1
         version: 0.186.1
@@ -93,12 +71,18 @@ importers:
       '@vitejs/plugin-vue':
         specifier: ^5.2.1
         version: 5.2.4(vite@6.4.5(@types/node@22.20.5))(vue@3.5.44(typescript@5.9.3))
+      '@vue/test-utils':
+        specifier: ^2.4.6
+        version: 2.5.1(@vue/compiler-dom@3.5.44)(@vue/server-renderer@3.5.44)(vue@3.5.44(typescript@5.9.3))
       electron:
         specifier: ^45.0.0
         version: 45.0.0(supports-color@7.2.0)
       electron-builder:
         specifier: ^25.1.8
         version: 25.1.8(bluebird@3.7.2)(electron-builder-squirrel-windows@25.1.8)(supports-color@7.2.0)
+      jsdom:
+        specifier: ^26.0.0
+        version: 26.1.0(supports-color@7.2.0)
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
@@ -112,29 +96,13 @@ importers:
         specifier: ^2.2.0
         version: 2.2.12(typescript@5.9.3)
 
-  frontend/packages/app-core:
-    dependencies:
-      '@vrm/platform-contracts':
-        specifier: workspace:*
-        version: link:../platform-contracts
-      '@vrm/shared':
-        specifier: workspace:*
-        version: link:../shared
-      vue:
-        specifier: ^3.5.13
-        version: 3.5.44(typescript@5.9.3)
+  packages/platform-contracts:
     devDependencies:
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
 
-  frontend/packages/platform-contracts:
-    devDependencies:
-      typescript:
-        specifier: ^5.7.3
-        version: 5.9.3
-
-  frontend/packages/shared:
+  packages/shared:
     dependencies:
       '@vrm/platform-contracts':
         specifier: workspace:*
@@ -143,28 +111,6 @@ importers:
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
-
-  frontend/packages/ui:
-    dependencies:
-      '@vrm/app-core':
-        specifier: workspace:*
-        version: link:../app-core
-      '@vrm/platform-contracts':
-        specifier: workspace:*
-        version: link:../platform-contracts
-      '@vrm/shared':
-        specifier: workspace:*
-        version: link:../shared
-      vue:
-        specifier: ^3.5.13
-        version: 3.5.44(typescript@5.9.3)
-    devDependencies:
-      typescript:
-        specifier: ^5.7.3
-        version: 5.9.3
-      vue-tsc:
-        specifier: ^2.2.0
-        version: 2.2.12(typescript@5.9.3)
 
 packages:
 

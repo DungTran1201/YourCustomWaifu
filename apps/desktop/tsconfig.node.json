@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "electron",
+    "outDir": "dist-electron",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node", "electron"]
+  },
+  "include": [
+    "electron/main/**/*",
+    "electron/preload/**/*",
+    "electron/server/**/*",
+    "electron/ipc/**/*"
+  ]
+}

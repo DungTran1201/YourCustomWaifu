@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.0] - 2026-10-25
+
+### Changed — Operation Dev Desktop-Only Hard Reset
+- **Restructured Monorepo to Electron Desktop-Only Architecture**:
+  - Consolidated application under canonical `apps/desktop/` containing Electron Main, Preload, Workspace Renderer, Avatar Stage Renderer, embedded SQLite auth service, and comprehensive test suites.
+  - Migrated shared type contracts and application constants into `packages/platform-contracts/` and `packages/shared/`.
+  - Permanently removed legacy root directories `frontend/`, `backend/`, and `infra/`.
+  - Embedded local identity and authentication service powered by `node:sqlite` directly into Electron Main runtime, eliminating separate server processes.
+  - Validated independent Workspace and Avatar Stage lifecycles, bounds preservation, `safeStorage` session token encryption, and Three.js VRM rendering.
+
 ## [0.1.0] - 2026-10-22
 
 ### Changed — Comprehensive Repository Reset

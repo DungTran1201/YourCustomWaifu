@@ -1,13 +1,13 @@
 # YourCustomWaifu — Desktop-First Personal AI Companion
 
-A high-performance, type-safe monorepo delivering a unified **Native Desktop Application (Electron)** and **Web Companion Client (Vite SPA)** sharing presentation components, reactive state stores, design tokens, and typed contracts.
+A high-performance, type-safe personal AI companion desktop application powered by **Electron**, **Vue 3**, **Vite**, and **Three.js VRM**.
 
 The application features **two decoupled desktop surfaces**:
 - **Workspace**: Text-focused conversation space, Agent personalization, Memory, Skills, Rules, Tools, AI Model Connections, Avatar Settings, and Account Security.
 - **Avatar Stage**: Independent, transparent, frameless desktop window rendering 3D VRM characters with Three.js subtle idle motions (breathing, swaying, blinking) and floating controls, remaining visible above standard desktop applications even after the Workspace is closed.
 
-> **Architectural Scope Notice**
-> This repository is strictly scoped as a personal AI companion platform. All legacy experimental neural motion generation, ARDY, MotionStreamer, and PyTorch training pipelines have been permanently purged.
+> **Architectural Notice — Desktop-Only Application**
+> This repository is exclusively structured as an installable Electron desktop application under `apps/desktop/`. Standalone website targets, browser web clients, and obsolete root directories (`frontend/`, `backend/`, `infra/`) have been completely removed.
 
 ---
 
@@ -15,21 +15,24 @@ The application features **two decoupled desktop surfaces**:
 
 ```mermaid
 graph TD
-    UserWeb[Browser Client] -->|HTTP / SPA| WebApp[frontend/apps/web]
-    UserDesktop[Desktop Client] -->|Native Shell| DesktopApp[frontend/apps/desktop]
+    User[User Desktop] -->|Native Electron Shell| MainProcess[Electron Main Process: apps/desktop/electron/main]
+    MainProcess -->|IPC Preload Bridge| Workspace[Workspace Window: apps/desktop/src/workspace]
+    MainProcess -->|IPC Preload Bridge| Stage[Avatar Stage Window: apps/desktop/src/avatar-stage]
+    MainProcess -->|Embedded SQLite Engine| AuthService[Identity & Auth Service: apps/desktop/server]
 
-    subgraph "Frontend Monorepo (pnpm workspace)"
-        WebApp --> SharedUI[packages/ui]
-        DesktopApp --> SharedUI
-        SharedUI --> AppCore[packages/app-core]
-        DesktopApp -.->|Preload IPC| PlatformContracts[packages/platform-contracts]
-        AppCore --> PlatformContracts
-        AppCore --> SharedUtils[packages/shared]
-        SharedUI --> SharedUtils
+    subgraph "Desktop Application (apps/desktop)"
+        Workspace --> VueComponents[UI Components: src/components]
+        Workspace --> AppStore[State Stores: src/stores]
+        Stage --> ThreeVRM[Three.js & @pixiv/three-vrm]
     end
 
-    subgraph "System Schemas"
-        PlatformContracts -.-> Schemas[schemas/]
+    subgraph "Shared Packages (packages/)"
+        PlatformContracts[packages/platform-contracts]
+        SharedConstants[packages/shared]
+        Workspace -.-> PlatformContracts
+        MainProcess -.-> PlatformContracts
+        Workspace -.-> SharedConstants
+        MainProcess -.-> SharedConstants
     end
 ```
 
@@ -38,8 +41,8 @@ graph TD
 ## Workspace Layout
 
 ```text
-VRMMotionGeneration/
-├── .agents/                    # Agent harness (roles, rules, actionable skills, workflows)
+YourCustomWaifu/
+├── .agents/                    # Agent governance library (roles, rules, skills, workflows)
 ├── .github/workflows/          # CI quality gates (lint, typecheck, test, build)
 ├── .gitignore                  # Environment, cache, and artifact exclusions
 ├── .npmrc                      # Strict pnpm workspace configuration
@@ -48,46 +51,48 @@ VRMMotionGeneration/
 ├── README.md                   # Project overview and operational guide
 ├── CHANGELOG.md                # Version history and reset notes
 ├── LICENSE                     # MIT License
-├── package.json                # Workspace scripts and root test harness
-├── pnpm-workspace.yaml         # Monorepo package declarations
+├── package.json                # Root workspace scripts and testing harness
+├── pnpm-workspace.yaml         # Monorepo declarations (apps/*, packages/*)
 ├── tsconfig.base.json          # Root TypeScript strict compiler settings
-├── frontend/                   # Client presentation domain
-│   ├── apps/
-│   │   ├── web/                # Browser client (Vite SPA)
-│   │   └── desktop/            # Native desktop client (Electron 34+)
-│   └── packages/
-│       ├── platform-contracts/ # Pure TypeScript interfaces (DesktopAPI, Diagnostics)
-│       ├── shared/             # Application constants and helpers
-│       ├── app-core/           # Platform detection, state stores, and fallbacks
-│       └── ui/                 # Vue 3 components, views, and CSS design tokens
-├── backend/                    # Server domain (Explicitly NOT IMPLEMENTED / OPTIONAL)
-├── infra/                      # CI workflows and Windows packaging specifications
-├── docs/                       # Lifecycle documentation (Discovery, Architecture, Security)
-├── diagrams/                   # Derived visual Mermaid projections
-└── schemas/                    # Versioned machine-readable JSON Schema contracts
+├── vitest.config.ts            # Root Vitest test configuration
+├── apps/
+│   └── desktop/                # Canonical Desktop Application
+│       ├── package.json        # Desktop Electron package manifest
+│       ├── electron/           # Main process, preload bridge, and embedded server
+│       │   ├── main/           # Window lifecycles, bounds safety, hardening
+│       │   ├── preload/        # contextBridge safe desktopAPI exposure
+│       │   ├── ipc/            # Typed IPC channels and interfaces
+│       │   └── server/         # Embedded SQLite identity & auth service
+│       ├── src/                # Vue 3 Renderer Application
+│       │   ├── workspace/      # Shell App.vue, main.ts, and 19 companion views
+│       │   ├── avatar-stage/   # stage-main.ts Three.js VRM renderer
+│       │   ├── components/     # NavigationBar, ShellLayout, StatusBadge, StateView
+│       │   ├── stores/         # Pinia / reactive state stores and platform bridge
+│       │   ├── assets/         # Dark graphite tokens (tokens.css) & reset (base.css)
+│       │   ├── index.html      # Workspace window HTML entry point
+│       │   └── stage.html      # Transparent Avatar Stage HTML entry point
+│       ├── server/             # Re-exported local identity & authentication engine
+│       ├── resources/          # Windows packaging specifications and installer assets
+│       └── tests/              # Full unit, lifecycle, security, ui, and auth test suites
+├── packages/                   # Shared Type Contracts and Constants
+│   ├── platform-contracts/     # Pure TypeScript interfaces (DesktopAPI, StageStatus, IPC)
+│   └── shared/                 # Application metadata, default settings, and helpers
+└── schemas/                    # JSON Schema specifications for settings and IPC
 ```
 
 ---
 
 ## Technology Stack
 
+- **Desktop Shell**: [Electron 34+](https://www.electronjs.org/) (Context Isolation, Sandboxed, strict CSP, nodeIntegration disabled)
 - **Framework**: [Vue 3](https://vuejs.org/) (Composition API, `<script setup lang="ts">`)
 - **Language**: [TypeScript 5.7+](https://www.typescriptlang.org/) (strict mode enforced across all packages)
 - **Bundler & Dev Server**: [Vite 6+](https://vite.dev/)
-- **Desktop Shell**: [Electron 34+](https://www.electronjs.org/) (Hardened security: Context Isolation, Sandboxed, nodeIntegration disabled)
+- **3D Avatar Rendering**: [Three.js](https://threejs.org/) + [@pixiv/three-vrm](https://github.com/pixiv/three-vrm)
+- **Local Identity & Auth**: Node.js `node:sqlite` (DatabaseSync, WAL mode, PBKDF2 hashing, `safeStorage` session encryption)
 - **Monorepo & Package Management**: [pnpm](https://pnpm.io/) workspaces
-- **Testing**: [Vitest 3+](https://vitest.dev/) with JSDOM
-- **Code Quality**: [Prettier](https://prettier.io/) + ESLint
-
----
-
-## Prerequisites
-
-- **Node.js**: `v20.x`, `v22.x`, or `v24.x` (Verified with `v24.18.0`)
-- **pnpm**: `v10+` or `v12+` (Verified with `12.14.0`)
-- **Git**: 2.30+
-
----
+- **Testing**: [Vitest 4+](https://vitest.dev/) with JSDOM
+- **Code Quality**: [Prettier](https://prettier.io/)
 
 ---
 
@@ -132,7 +137,7 @@ graph TD
 ### 2. Avatar Stage
 - Dedicated frameless, transparent window rendering user-selected `.vrm` avatars with Three.js.
 - Always-on-top mode: remains visible above standard desktop applications (e.g. Chrome, VS Code).
-- Click-through mode: forward mouse events to underlying windows, restored via `Ctrl+Shift+M` or System Tray.
+- Click-through mode: forward mouse events to underlying windows, toggled via `Ctrl+Shift+M` or System Tray.
 - Minimal floating toolbar: Drag handle, avatar scale adjust, pause/resume animation, open Workspace, hide Stage.
 - Idle animation: subtle procedural breathing, head sway, and natural periodic eye blinking.
 
@@ -149,42 +154,21 @@ graph TD
 # 1. Install all monorepo dependencies
 pnpm install
 
-# 2. Run backend auth & identity server
-pnpm dev:backend
+# 2. Run the Electron Desktop application (Workspace + Avatar Stage + Embedded Auth)
+pnpm dev
 
-# 3. Run the Web application in local development mode
-pnpm dev:web
-
-# 4. Run the Electron Desktop application (Workspace + Avatar Stage)
-pnpm dev:desktop
-
-# 5. Run TypeScript strict typecheck across all packages
+# 3. Run TypeScript strict typecheck across all modules
 pnpm typecheck
 
-# 6. Run lint formatting check
+# 4. Run lint code style check
 pnpm lint
 
-# 7. Run automated test suites (Vitest)
+# 5. Run automated test suites (37 tests across 7 suites)
 pnpm test
 
-# 8. Build Web production distribution
-pnpm build:web
-
-# 9. Build Electron Desktop production distribution (both Workspace and Stage HTMLs)
-pnpm build:desktop
+# 6. Build production desktop bundles
+pnpm build
 ```
-
----
-
-## Windows Manual Verification Steps
-
-1. **Launch**: Run `pnpm dev:desktop`. Verify Workspace opens and the System Tray icon appears.
-2. **Launch Stage**: Click **"Show Stage"** on the top header or in Avatar Settings. Verify the transparent frameless Avatar Stage window appears floating on the desktop.
-3. **Workspace Independence**: Close the Workspace window by clicking the `X` button. Verify the Avatar Stage **remains visible and animating** above desktop apps.
-4. **Tray Reopening**: Right-click the system tray icon and click **"Open Workspace"**. Verify Workspace re-opens instantly with session, conversation history, and stage status intact.
-5. **Global Shortcut**: Press `Ctrl+Shift+A` (or `Cmd+Shift+A`). Verify Avatar Stage toggles between hidden and visible without recreating extra windows.
-6. **Click-Through Mode**: Press `Ctrl+Shift+M` or toggle in toolbar. Verify clicks pass directly to desktop applications below. Press `Ctrl+Shift+M` to restore interaction.
-7. **Quit**: Right-click the System Tray icon and select **"Quit YourCustomWaifu"**. Verify all windows and processes terminate cleanly.
 
 ---
 
@@ -196,20 +180,8 @@ In compliance with the [Official Electron Security Checklist](https://www.electr
 2. **`nodeIntegration = false`**: Node.js APIs are completely inaccessible in the renderer.
 3. **`sandbox = true`**: Renderer processes run inside an OS sandbox.
 4. **`webSecurity = true`**: Standard same-origin policy is strictly enforced.
-5. **Typed IPC Bridge**: Only strongly typed channels (`stage:*`, `workspace:*`, `app:*`) are exposed through `window.desktopAPI`.
+5. **Typed IPC Bridge**: Only strongly typed channels (`stage:*`, `workspace:*`, `app:*`, `auth:*`) are exposed through `window.desktopAPI`.
 6. **Navigation Guard**: External URLs are intercepted and opened exclusively via `shell.openExternal`.
-
----
-
-## Desktop Documentation
-- [Desktop Architecture](file:///c:/Users/PC/Project/VRMMotionGeneration/docs/desktop/ARCHITECTURE.md)
-- [Window Lifecycle & Multi-Display Specification](file:///c:/Users/PC/Project/VRMMotionGeneration/docs/desktop/WINDOW-LIFECYCLE.md)
-- [Security Baseline & Hardening](file:///c:/Users/PC/Project/VRMMotionGeneration/docs/desktop/SECURITY.md)
-- [Authentication & Account Integration](file:///c:/Users/PC/Project/VRMMotionGeneration/docs/desktop/AUTH-INTEGRATION.md)
-- [Avatar Stage & VRM 3D Rendering](file:///c:/Users/PC/Project/VRMMotionGeneration/docs/desktop/VRM-STAGE.md)
-- [Testing & Release Verification](file:///c:/Users/PC/Project/VRMMotionGeneration/docs/desktop/TESTING-AND-RELEASE.md)
-- [Implementation Plan](file:///c:/Users/PC/Project/VRMMotionGeneration/docs/desktop/IMPLEMENTATION-PLAN.md)
-- [Codebase Audit & Feature Inventory](file:///c:/Users/PC/Project/VRMMotionGeneration/docs/desktop/CODEBASE-AUDIT.md)
 
 ---
 

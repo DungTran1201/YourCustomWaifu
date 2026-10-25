@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "jsx": "preserve",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@vrm/app-core": ["src/stores/index.ts"],
+      "@vrm/ui": ["src/components/index.ts"],
+      "@vrm/backend": ["server/index.ts"]
+    }
+  },
+  "include": ["src/**/*", "src/**/*.vue", "tests/**/*"]
+}

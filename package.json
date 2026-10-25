@@ -4,16 +4,15 @@
   "private": true,
   "description": "Desktop-First Personal AI Companion powered by Electron",
   "scripts": {
-    "dev": "pnpm dev:desktop",
-    "dev:backend": "pnpm --filter @vrm/backend dev",
-    "dev:desktop": "pnpm --filter @vrm/platform-contracts build && pnpm --filter @vrm/shared build && pnpm --filter @vrm/desktop dev",
+    "dev": "pnpm --filter @vrm/desktop dev",
+    "build": "pnpm --filter @vrm/desktop build",
     "build:desktop": "pnpm --filter @vrm/desktop build",
-    "build": "pnpm -r run build",
-    "typecheck": "pnpm -r run typecheck",
-    "lint": "prettier --check \"frontend/**/*.{ts,vue,json}\" \"schemas/**/*.json\"",
-    "lint:fix": "prettier --write \"frontend/**/*.{ts,vue,json}\" \"schemas/**/*.json\"",
+    "typecheck": "pnpm --filter @vrm/desktop typecheck",
+    "lint": "prettier --check \"apps/**/*.{ts,vue,json}\" \"packages/**/*.{ts,vue,json}\" \"schemas/**/*.json\"",
+    "lint:fix": "prettier --write \"apps/**/*.{ts,vue,json}\" \"packages/**/*.{ts,vue,json}\" \"schemas/**/*.json\"",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "package": "pnpm --filter @vrm/desktop package"
   },
   "devDependencies": {
     "@types/node": "^22.13.4",
