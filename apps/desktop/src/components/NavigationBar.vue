@@ -1,328 +1,213 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useAppStore, type NavigationTab } from "@vrm/app-core";
-import { APP_METADATA } from "@vrm/shared";
-import StatusBadge from "./StatusBadge.vue";
 
 const store = useAppStore();
 
-const activeTabs = computed<{ id: NavigationTab; label: string }[]>(() => {
+interface TabDef {
+  id: NavigationTab;
+  label: string;
+  icon: string;
+}
+
+interface TabGroup {
+  name: string;
+  tabs: TabDef[];
+}
+
+const tabGroups = computed<TabGroup[]>(() => {
   if (store.state.isAuthenticated) {
     return [
-      { id: "chat", label: "Chat" },
-      { id: "avatar", label: "Avatar Stage" },
-      { id: "agents", label: "Agents" },
-      { id: "skills", label: "Skills" },
-      { id: "rules", label: "Rules" },
-      { id: "tools", label: "Tools" },
-      { id: "connections", label: "Connections" },
-      { id: "memory", label: "Memory" },
-      { id: "overview", label: "Overview" },
-      { id: "profile", label: "Profile" },
-      { id: "security", label: "Security" },
-      { id: "secrets", label: "AI Keys" },
-      { id: "settings", label: "Settings" },
-      { id: "diagnostics", label: "Diagnostics" },
+      {
+        name: "Companion",
+        tabs: [
+          { id: "chat", label: "Chat", icon: "💬" },
+          { id: "avatar", label: "Avatar Stage", icon: "🎭" },
+        ],
+      },
+      {
+        name: "Intelligence",
+        tabs: [
+          { id: "agents", label: "Agents", icon: "🤖" },
+          { id: "skills", label: "Skills", icon: "⚡" },
+          { id: "rules", label: "Rules", icon: "📜" },
+          { id: "tools", label: "Tools", icon: "🛠️" },
+          { id: "connections", label: "Connections", icon: "🔌" },
+          { id: "memory", label: "Memory", icon: "🧠" },
+        ],
+      },
+      {
+        name: "System",
+        tabs: [
+          { id: "overview", label: "Overview", icon: "📊" },
+          { id: "profile", label: "Profile", icon: "👤" },
+          { id: "security", label: "Security", icon: "🛡️" },
+          { id: "secrets", label: "AI Keys", icon: "🔑" },
+          { id: "settings", label: "Settings", icon: "⚙️" },
+          { id: "diagnostics", label: "Diagnostics", icon: "🩺" },
+        ],
+      },
     ];
   }
+
   return [
-    { id: "overview", label: "Overview" },
-    { id: "settings", label: "Settings" },
-    { id: "diagnostics", label: "Diagnostics" },
+    {
+      name: "Public",
+      tabs: [
+        { id: "overview", label: "Overview", icon: "📊" },
+        { id: "settings", label: "Settings", icon: "⚙️" },
+        { id: "diagnostics", label: "Diagnostics", icon: "🩺" },
+      ],
+    },
   ];
 });
-
-const platformLabel = computed(() =>
-  store.platform.value === "electron" ? "Desktop App" : "Web Client",
-);
 </script>
 
 <template>
-  <header class="navbar" role="banner">
-    <div class="brand">
-      <div class="logo-mark">⚡</div>
-      <div class="brand-text">
-        <span class="app-name">{{ APP_METADATA.shortName }}</span>
-        <span class="app-version">v{{ APP_METADATA.version }}</span>
+  <aside
+    :class="['workspace-sidebar', { collapsed: store.state.sidebarCollapsed }]"
+    role="navigation"
+    aria-label="Sidebar Navigation"
+  >
+    <div class="sidebar-scroll">
+      <div v-for="group in tabGroups" :key="group.name" class="nav-group">
+        <div v-if="!store.state.sidebarCollapsed" class="group-title">
+          {{ group.name }}
+        </div>
+        <div v-else class="group-divider"></div>
+
+        <button
+          v-for="tab in group.tabs"
+          :key="tab.id"
+          :id="`nav-tab-${tab.id}`"
+          :class="[
+            'sidebar-nav-btn',
+            { active: store.state.currentTab === tab.id },
+          ]"
+          :title="tab.label"
+          @click="store.setTab(tab.id)"
+        >
+          <span class="nav-icon">{{ tab.icon }}</span>
+          <span v-if="!store.state.sidebarCollapsed" class="nav-label">
+            {{ tab.label }}
+          </span>
+          <span
+            v-if="store.state.currentTab === tab.id"
+            class="active-indicator"
+          ></span>
+        </button>
       </div>
-      <StatusBadge status="ready" :label="platformLabel" />
     </div>
-
-    <nav class="nav-links" aria-label="Main Navigation">
-      <button
-        v-for="tab in activeTabs"
-        :key="tab.id"
-        :id="`nav-tab-${tab.id}`"
-        :class="['nav-btn', { active: store.state.currentTab === tab.id }]"
-        @click="store.setTab(tab.id)"
-      >
-        {{ tab.label }}
-      </button>
-    </nav>
-
-    <div class="nav-actions">
-      <!-- Stage Quick-Toggle Button -->
-      <button
-        id="nav-stage-toggle-btn"
-        :class="[
-          'stage-pill-btn',
-          store.state.stageStatus.stageVisible
-            ? 'stage-active'
-            : 'stage-inactive',
-        ]"
-        :title="
-          store.state.stageStatus.stageVisible
-            ? 'Avatar Stage is visible (Click to hide)'
-            : 'Avatar Stage is hidden (Click to launch)'
-        "
-        @click="store.toggleStage()"
-      >
-        <span class="stage-dot"></span>
-        <span class="stage-label">{{
-          store.state.stageStatus.stageVisible ? "Stage Active" : "Show Stage"
-        }}</span>
-      </button>
-
-      <!-- Auth Actions -->
-      <template v-if="store.state.isAuthenticated">
-        <button
-          id="nav-user-pill"
-          class="user-pill-btn"
-          title="Account Profile"
-          @click="store.setTab('profile')"
-        >
-          <span class="user-pill-icon">👤</span>
-          <span class="user-pill-name">{{
-            store.state.user?.displayName ||
-            store.state.user?.email?.split("@")[0]
-          }}</span>
-        </button>
-        <button
-          id="nav-signout-btn"
-          class="nav-auth-btn"
-          title="Sign Out"
-          @click="store.logout()"
-        >
-          Sign Out
-        </button>
-      </template>
-      <template v-else>
-        <button
-          id="nav-signin-btn"
-          class="nav-auth-btn"
-          @click="store.setTab('signin')"
-        >
-          Sign In
-        </button>
-        <button
-          id="nav-signup-btn"
-          class="nav-auth-primary-btn"
-          @click="store.setTab('signup')"
-        >
-          Register
-        </button>
-      </template>
-
-      <button
-        id="theme-toggle-btn"
-        class="action-icon-btn"
-        title="Toggle Theme"
-        @click="
-          store.updateSettings({
-            theme: store.state.settings.theme === 'dark' ? 'light' : 'dark',
-          })
-        "
-      >
-        {{ store.state.settings.theme === "dark" ? "☀️" : "🌙" }}
-      </button>
-    </div>
-  </header>
+  </aside>
 </template>
 
 <style scoped>
-.navbar {
-  height: 64px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 24px;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-subtle);
-  user-select: none;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.logo-mark {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, var(--accent-cyan), var(--accent-indigo));
-  border-radius: var(--radius-sm);
-  font-size: 1.1rem;
-}
-
-.brand-text {
+.workspace-sidebar {
+  width: 220px;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
-}
-
-.app-name {
-  font-weight: 700;
-  font-size: 0.95rem;
-  color: var(--text-primary);
-}
-
-.app-version {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  font-family: var(--font-family-mono);
-}
-
-.nav-links {
-  display: flex;
-  gap: 8px;
-}
-
-.nav-btn {
-  padding: 8px 16px;
-  border-radius: var(--radius-sm);
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-  transition: all var(--transition-fast);
-}
-
-.nav-btn:hover {
-  color: var(--text-primary);
-  background: var(--border-subtle);
-}
-
-.nav-btn.active {
-  color: var(--accent-cyan);
-  background: rgba(6, 182, 212, 0.12);
-  border: 1px solid rgba(6, 182, 212, 0.3);
-}
-
-.nav-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.user-pill-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-subtle);
-  border-radius: 9999px;
-  color: var(--text-primary);
-  font-size: 0.825rem;
-  font-weight: 500;
-  transition: all var(--transition-fast);
-}
-
-.user-pill-btn:hover {
-  border-color: var(--accent-cyan);
-}
-
-.user-pill-icon {
-  font-size: 0.85rem;
-}
-
-.user-pill-name {
-  max-width: 120px;
+  user-select: none;
+  transition: width 180ms cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  flex-shrink: 0;
 }
 
-.nav-auth-btn {
-  padding: 6px 12px;
+.workspace-sidebar.collapsed {
+  width: 62px;
+}
+
+.sidebar-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.group-title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding: 6px 10px 4px 10px;
+}
+
+.group-divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 6px 4px;
+}
+
+.sidebar-nav-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
   background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
   color: var(--text-secondary);
   font-size: 0.85rem;
   font-weight: 500;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-subtle);
-  transition: all var(--transition-fast);
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+  width: 100%;
 }
 
-.nav-auth-btn:hover {
+.workspace-sidebar.collapsed .sidebar-nav-btn {
+  justify-content: center;
+  padding: 9px 0;
+}
+
+.sidebar-nav-btn:hover {
+  background: var(--bg-hover);
   color: var(--text-primary);
-  background: var(--border-subtle);
 }
 
-.nav-auth-primary-btn {
-  padding: 6px 14px;
-  background: var(--accent-cyan);
-  color: #000;
-  font-size: 0.85rem;
+.sidebar-nav-btn.active {
+  background: var(--bg-selected);
+  color: var(--text-primary);
   font-weight: 600;
-  border-radius: var(--radius-sm);
-  transition: all var(--transition-fast);
 }
 
-.nav-auth-primary-btn:hover {
-  background: #22d3ee;
-  box-shadow: 0 0 10px var(--accent-cyan-glow);
-}
-
-.action-icon-btn {
-  width: 36px;
-  height: 36px;
+.nav-icon {
+  font-size: 1rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-sm);
-  background: var(--border-subtle);
-  font-size: 1.1rem;
-  transition: background var(--transition-fast);
+  flex-shrink: 0;
+  width: 20px;
 }
 
-.action-icon-btn:hover {
-  background: var(--bg-tertiary);
+.nav-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.stage-pill-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  border-radius: var(--radius-sm);
-  font-size: 0.825rem;
-  font-weight: 600;
-  border: 1px solid var(--border-subtle);
-  transition: all var(--transition-fast);
-}
-
-.stage-pill-btn.stage-active {
-  background: rgba(16, 185, 129, 0.12);
-  color: #10b981;
-  border-color: rgba(16, 185, 129, 0.4);
-}
-
-.stage-pill-btn.stage-inactive {
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
-}
-
-.stage-pill-btn:hover {
-  border-color: var(--text-secondary);
-}
-
-.stage-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: currentColor;
+.active-indicator {
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  background: var(--accent-cyan);
+  border-radius: 0 2px 2px 0;
 }
 </style>

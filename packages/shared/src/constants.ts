@@ -28,6 +28,17 @@ export const DEFAULT_AVATAR_CONFIG = {
   animationPaused: false,
   showStageOnStartup: false,
   currentAnimation: "idle",
+  lookAtEnabled: true,
+  lookAtMode: "head_and_eyes" as const,
+  lookAtIntensity: 1.0,
+};
+
+export const DEFAULT_WORKSPACE_BOUNDS = {
+  width: 1100,
+  height: 740,
+  x: undefined as number | undefined,
+  y: undefined as number | undefined,
+  isMaximized: false,
 };
 
 export const INITIAL_STAGE_STATUS = {

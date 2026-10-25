@@ -82,10 +82,13 @@ export interface AppState {
   chatInput: string;
   chatSending: boolean;
   chatError: string | null;
+  // UI Layout state
+  sidebarCollapsed: boolean;
 }
 
 const state = reactive<AppState>({
   currentTab: "overview",
+  sidebarCollapsed: false,
   settings: { ...DEFAULT_SETTINGS },
   diagnostics: null,
   isLoading: false,
@@ -952,10 +955,19 @@ export function useAppStore() {
     state.memories = [];
   }
 
+  function toggleSidebar(collapsed?: boolean) {
+    if (typeof collapsed === "boolean") {
+      state.sidebarCollapsed = collapsed;
+    } else {
+      state.sidebarCollapsed = !state.sidebarCollapsed;
+    }
+  }
+
   return {
     state,
     platform,
     setTab,
+    toggleSidebar,
     updateSettings,
     loadDiagnostics,
     executePing,

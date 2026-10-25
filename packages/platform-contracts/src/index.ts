@@ -72,6 +72,32 @@ export interface AvatarConfig {
   animationPaused: boolean;
   showStageOnStartup: boolean;
   currentAnimation: string;
+  lookAtEnabled?: boolean;
+  lookAtMode?: "head_and_eyes" | "eyes_only" | "disabled";
+  lookAtIntensity?: number;
+}
+
+export interface WorkspaceBounds {
+  x?: number;
+  y?: number;
+  width: number;
+  height: number;
+  isMaximized?: boolean;
+}
+
+export interface GazeData {
+  screenX: number;
+  screenY: number;
+  relX: number;
+  relY: number;
+  stageX: number;
+  stageY: number;
+  stageWidth: number;
+  stageHeight: number;
+  normalizedX: number;
+  normalizedY: number;
+  isInsideStage: boolean;
+  timestamp: number;
 }
 
 export interface StageStatus {
@@ -192,6 +218,7 @@ export interface DesktopStageAPI {
   ) => Promise<{ data: ArrayBuffer; name: string }>;
   onStatusChanged?: (callback: (status: StageStatus) => void) => () => void;
   onConfigChanged?: (callback: (config: AvatarConfig) => void) => () => void;
+  onCursorMove?: (callback: (data: GazeData) => void) => () => void;
 }
 
 export interface DesktopWorkspaceAPI {
@@ -231,6 +258,7 @@ export const IPC_CHANNELS = {
   STAGE_LOAD_VRM_BUFFER: "stage:load-vrm-buffer",
   STAGE_STATUS_CHANGED: "stage:status-changed",
   STAGE_CONFIG_CHANGED: "stage:config-changed",
+  STAGE_CURSOR_MOVE: "stage:cursor-move",
 
   // Workspace channels
   WORKSPACE_SHOW: "workspace:show",

@@ -60,6 +60,13 @@ const desktopAPI: DesktopAPI = {
         ipcRenderer.removeListener(IPC_CHANNELS.STAGE_CONFIG_CHANGED, handler);
       };
     },
+    onCursorMove: (callback: (data: any) => void) => {
+      const handler = (_: any, data: any) => callback(data);
+      ipcRenderer.on(IPC_CHANNELS.STAGE_CURSOR_MOVE, handler);
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.STAGE_CURSOR_MOVE, handler);
+      };
+    },
   },
   workspace: {
     show: (tab?: string): Promise<void> =>

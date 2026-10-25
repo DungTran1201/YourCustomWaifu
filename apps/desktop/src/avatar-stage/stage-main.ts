@@ -30,6 +30,9 @@ const btnClickThrough = document.getElementById(
 const btnPauseAnimation = document.getElementById(
   "btn-pause-animation",
 ) as HTMLButtonElement;
+const btnToggleLookAt = document.getElementById(
+  "btn-toggle-lookat",
+) as HTMLButtonElement | null;
 const btnOpenWorkspace = document.getElementById(
   "btn-open-workspace",
 ) as HTMLButtonElement;
@@ -55,6 +58,16 @@ let fallbackGroup: THREE.Group | null = null;
 let currentConfig: AvatarConfig | null = null;
 let isAnimationPaused = false;
 let currentScale = 1.0;
+
+// Global Eye / Gaze Tracking State
+let lookAtTarget: THREE.Object3D;
+const currentGazeTarget = new THREE.Vector3(0.0, 1.35, 1.6);
+const desiredGazeTarget = new THREE.Vector3(0.0, 1.35, 1.6);
+let targetGazeYaw = 0;
+let targetGazePitch = 0;
+let currentGazeYaw = 0;
+let currentGazePitch = 0;
+let isLookAtEnabled = true;
 
 function initScene() {
   const width = window.innerWidth;
@@ -91,6 +104,11 @@ function initScene() {
   const fillLight = new THREE.DirectionalLight(0x90b0ff, 0.5);
   fillLight.position.set(-1.0, 1.0, -1.0).normalize();
   scene.add(fillLight);
+
+  // Global Look-at Gaze Target Object
+  lookAtTarget = new THREE.Object3D();
+  lookAtTarget.position.set(0.0, 1.35, 1.6);
+  scene.add(lookAtTarget);
 
   // Resize handler
   window.addEventListener("resize", handleResize);
@@ -259,6 +277,12 @@ async function loadVrmModel(filePath?: string) {
         vrm.scene.rotation.y = Math.PI;
         applyScale(currentScale);
 
+        // Connect VRM lookAt system to global gaze target
+        if (vrm.lookAt) {
+          vrm.lookAt.target = lookAtTarget;
+          vrm.lookAt.autoUpdate = true;
+        }
+
         hideLoading();
       },
       (err) => {
@@ -286,8 +310,27 @@ function animate() {
   const delta = clock.getDelta();
   const elapsed = clock.getElapsedTime();
 
+  // Smooth gaze interpolation with human-like damping
+  const lerpSpeed = Math.min(1.0, delta * 12.0);
+  currentGazeTarget.lerp(desiredGazeTarget, lerpSpeed);
+  if (lookAtTarget) {
+    lookAtTarget.position.copy(currentGazeTarget);
+  }
+
+  currentGazeYaw = THREE.MathUtils.lerp(
+    currentGazeYaw,
+    targetGazeYaw,
+    lerpSpeed,
+  );
+  currentGazePitch = THREE.MathUtils.lerp(
+    currentGazePitch,
+    targetGazePitch,
+    lerpSpeed,
+  );
+
   if (!isAnimationPaused) {
     if (currentVrm) {
+      // VRM internal update (includes lookAt evaluation if lookAt.target is bound)
       currentVrm.update(delta);
 
       // Natural subtle idle breathing motion
@@ -296,11 +339,35 @@ function animate() {
         spine.rotation.x = Math.sin(elapsed * 1.8) * 0.02;
       }
 
-      // Subtle head sway
+      // Blend subtle head sway with head gaze tracking
       const head = currentVrm.humanoid?.getNormalizedBoneNode("head");
       if (head) {
-        head.rotation.y = Math.sin(elapsed * 0.7) * 0.035;
+        head.rotation.y =
+          Math.sin(elapsed * 0.7) * 0.035 +
+          (isLookAtEnabled ? currentGazeYaw : 0);
+        head.rotation.x =
+          Math.sin(elapsed * 1.2) * 0.01 +
+          (isLookAtEnabled ? currentGazePitch : 0);
         head.rotation.z = Math.sin(elapsed * 0.9) * 0.012;
+      }
+
+      // Eye bone fallback if VRMLookAt was not attached in model
+      if (
+        isLookAtEnabled &&
+        (!currentVrm.lookAt || !currentVrm.lookAt.target)
+      ) {
+        const leftEye = currentVrm.humanoid?.getNormalizedBoneNode("leftEye");
+        const rightEye = currentVrm.humanoid?.getNormalizedBoneNode("rightEye");
+        const eyeYaw = Math.max(-0.4, Math.min(0.4, currentGazeYaw * 1.8));
+        const eyePitch = Math.max(-0.3, Math.min(0.3, currentGazePitch * 1.8));
+        if (leftEye) {
+          leftEye.rotation.y = eyeYaw;
+          leftEye.rotation.x = eyePitch;
+        }
+        if (rightEye) {
+          rightEye.rotation.y = eyeYaw;
+          rightEye.rotation.x = eyePitch;
+        }
       }
 
       // Natural periodic blinking
@@ -314,7 +381,18 @@ function animate() {
     } else if (fallbackGroup && fallbackGroup.visible) {
       // Procedural floating for fallback mannequin
       fallbackGroup.position.y = Math.sin(elapsed * 1.6) * 0.025;
-      fallbackGroup.rotation.y = Math.sin(elapsed * 0.6) * 0.08;
+      const head = fallbackGroup.children[0] as THREE.Mesh;
+      const visor = fallbackGroup.children[1] as THREE.Mesh;
+      if (head && visor) {
+        const sway = Math.sin(elapsed * 0.6) * 0.08;
+        head.rotation.y = sway + (isLookAtEnabled ? currentGazeYaw * 1.5 : 0);
+        head.rotation.x = isLookAtEnabled ? currentGazePitch * 1.2 : 0;
+        visor.rotation.y =
+          Math.PI / 2 + sway + (isLookAtEnabled ? currentGazeYaw * 1.5 : 0);
+        visor.rotation.x = isLookAtEnabled ? currentGazePitch * 1.2 : 0;
+      } else {
+        fallbackGroup.rotation.y = Math.sin(elapsed * 0.6) * 0.08;
+      }
     }
   }
 
@@ -355,6 +433,17 @@ function setupToolbarListeners() {
     await desktopAPI.stage?.setAnimationPaused(isAnimationPaused);
   });
 
+  btnToggleLookAt?.addEventListener("click", async () => {
+    isLookAtEnabled = !isLookAtEnabled;
+    btnToggleLookAt.classList.toggle("active", isLookAtEnabled);
+    if (!isLookAtEnabled) {
+      desiredGazeTarget.set(0.0, 1.35, 1.6);
+      targetGazeYaw = 0;
+      targetGazePitch = 0;
+    }
+    await desktopAPI.stage?.updateConfig({ lookAtEnabled: isLookAtEnabled });
+  });
+
   btnOpenWorkspace.addEventListener("click", () => {
     desktopAPI.workspace?.show("chat");
   });
@@ -382,6 +471,10 @@ async function setupStageSync() {
     if (currentConfig.scale) {
       applyScale(currentConfig.scale);
     }
+    if (currentConfig.lookAtEnabled !== undefined) {
+      isLookAtEnabled = currentConfig.lookAtEnabled;
+      btnToggleLookAt?.classList.toggle("active", isLookAtEnabled);
+    }
     if (currentConfig.avatarPath) {
       await loadVrmModel(currentConfig.avatarPath);
     }
@@ -392,10 +485,42 @@ async function setupStageSync() {
     btnAlwaysOnTop.classList.toggle("active", status.alwaysOnTop);
     btnClickThrough.classList.toggle("active", status.clickThrough);
 
+    // Subscribe to global cursor / gaze updates from Electron main process
+    desktopAPI.stage.onCursorMove?.((data) => {
+      if (!isLookAtEnabled) return;
+
+      // Clamp normalized coordinates so the character doesn't over-rotate
+      const clampedX = Math.max(-2.5, Math.min(2.5, data.normalizedX));
+      const clampedY = Math.max(-2.0, Math.min(2.0, data.normalizedY));
+
+      // Map to 3D world space in front of avatar (+X right, +Y up, +Z towards screen)
+      const worldX = clampedX * 0.85;
+      const worldY = 1.35 - clampedY * 0.7;
+      const worldZ = 1.5;
+
+      desiredGazeTarget.set(worldX, worldY, worldZ);
+
+      // Subtle natural head yaw and pitch
+      targetGazeYaw = Math.max(-0.25, Math.min(0.25, -clampedX * 0.12));
+      targetGazePitch = Math.max(-0.18, Math.min(0.18, -clampedY * 0.1));
+    });
+
     // Subscribe to broadcast events
     desktopAPI.stage.onConfigChanged?.((cfg) => {
       if (cfg.scale !== undefined && cfg.scale !== currentScale) {
         applyScale(cfg.scale);
+      }
+      if (
+        cfg.lookAtEnabled !== undefined &&
+        cfg.lookAtEnabled !== isLookAtEnabled
+      ) {
+        isLookAtEnabled = cfg.lookAtEnabled;
+        btnToggleLookAt?.classList.toggle("active", isLookAtEnabled);
+        if (!isLookAtEnabled) {
+          desiredGazeTarget.set(0.0, 1.35, 1.6);
+          targetGazeYaw = 0;
+          targetGazePitch = 0;
+        }
       }
       if (cfg.avatarPath && cfg.avatarPath !== currentConfig?.avatarPath) {
         currentConfig = cfg;

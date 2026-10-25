@@ -179,6 +179,32 @@ function handleStartupToggle(e: Event) {
 
       <div class="setting-row">
         <div class="setting-info">
+          <label class="setting-label">Global Eye & Gaze Tracking</label>
+          <span class="setting-desc">
+            Avatar eyes follow desktop cursor globally across Workspace, Chrome,
+            VS Code, and background windows
+          </span>
+        </div>
+        <div class="setting-control">
+          <label class="switch">
+            <input
+              id="avatar-lookat-toggle"
+              type="checkbox"
+              :checked="store.state.avatarConfig.lookAtEnabled !== false"
+              @change="
+                (e) =>
+                  store.updateAvatarConfig({
+                    lookAtEnabled: (e.target as HTMLInputElement).checked,
+                  })
+              "
+            />
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
           <label class="setting-label">Pause Animation</label>
           <span class="setting-desc"
             >Freezes motion loop to eliminate GPU/CPU overhead</span

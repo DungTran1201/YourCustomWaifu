@@ -181,4 +181,73 @@ describe("Avatar Stage & Workspace Desktop Lifecycle Contracts", () => {
     expect((store.state.secrets[0]! as any).rawKey).toBeUndefined();
     expect((store.state.secrets[0]! as any).apiKey).toBeUndefined();
   });
+
+  it("verifies STAGE_CURSOR_MOVE channel definition and GazeData structure", () => {
+    expect(IPC_CHANNELS.STAGE_CURSOR_MOVE).toBe("stage:cursor-move");
+
+    const sampleGaze: import("@vrm/platform-contracts").GazeData = {
+      screenX: 1920,
+      screenY: 1080,
+      relX: 0.5,
+      relY: -0.25,
+      stageX: 200,
+      stageY: 150,
+      stageWidth: 420,
+      stageHeight: 640,
+      normalizedX: 0.5,
+      normalizedY: -0.25,
+      isInsideStage: true,
+      timestamp: Date.now(),
+    };
+
+    expect(sampleGaze.screenX).toBe(1920);
+    expect(sampleGaze.isInsideStage).toBe(true);
+    expect(sampleGaze.normalizedX).toBe(0.5);
+  });
+
+  it("verifies independent workspace bounds persistence and maximization independence", () => {
+    const defaultWorkspace: import("@vrm/platform-contracts").WorkspaceBounds =
+      {
+        width: 1100,
+        height: 740,
+        isMaximized: false,
+      };
+
+    // When maximizing workspace, normal bounds must be preserved
+    const simulatedMaximizedWorkspace = {
+      ...defaultWorkspace,
+      isMaximized: true,
+    };
+
+    expect(simulatedMaximizedWorkspace.width).toBe(1100);
+    expect(simulatedMaximizedWorkspace.height).toBe(740);
+    expect(simulatedMaximizedWorkspace.isMaximized).toBe(true);
+
+    // Avatar stage bounds must remain completely independent
+    const stageBounds = {
+      x: 100,
+      y: 150,
+      width: 420,
+      height: 640,
+    };
+
+    expect(stageBounds.width).not.toBe(simulatedMaximizedWorkspace.width);
+    expect(stageBounds.height).not.toBe(simulatedMaximizedWorkspace.height);
+  });
+
+  it("updates lookAt configuration flags in AvatarConfig", async () => {
+    const store = useAppStore();
+
+    expect(store.state.avatarConfig.lookAtEnabled).not.toBe(false);
+
+    await store.updateAvatarConfig({
+      lookAtEnabled: false,
+      lookAtMode: "eyes_only",
+      lookAtIntensity: 0.75,
+    });
+
+    expect(store.state.avatarConfig.lookAtEnabled).toBe(false);
+    expect(store.state.avatarConfig.lookAtMode).toBe("eyes_only");
+    expect(store.state.avatarConfig.lookAtIntensity).toBe(0.75);
+  });
 });

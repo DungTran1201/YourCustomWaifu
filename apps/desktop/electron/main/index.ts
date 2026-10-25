@@ -18,10 +18,13 @@ import {
   type DiagnosticsInfo,
   type AvatarConfig,
   type StageStatus,
+  type WorkspaceBounds,
+  type GazeData,
 } from "@vrm/platform-contracts";
 import {
   APP_METADATA,
   DEFAULT_AVATAR_CONFIG,
+  DEFAULT_WORKSPACE_BOUNDS,
   INITIAL_STAGE_STATUS,
 } from "@vrm/shared";
 import {
@@ -39,9 +42,11 @@ let mainWindow: BrowserWindow | null = null;
 let stageWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
+let cursorTrackingTimer: NodeJS.Timeout | null = null;
 
 // Shared State & Persistence
 let avatarConfig: AvatarConfig = { ...DEFAULT_AVATAR_CONFIG };
+let workspaceBounds: WorkspaceBounds = { ...DEFAULT_WORKSPACE_BOUNDS };
 let stageStatus: StageStatus = { ...INITIAL_STAGE_STATUS };
 
 const CONFIG_FILE_NAME = "waifu-stage-config.json";
@@ -54,21 +59,39 @@ async function loadPersistedConfig(): Promise<void> {
   try {
     const raw = await fs.readFile(getConfigFilePath(), "utf-8");
     const parsed = JSON.parse(raw);
-    avatarConfig = { ...DEFAULT_AVATAR_CONFIG, ...parsed };
+    if (parsed.avatarConfig || parsed.workspaceBounds) {
+      avatarConfig = {
+        ...DEFAULT_AVATAR_CONFIG,
+        ...(parsed.avatarConfig || {}),
+      };
+      workspaceBounds = {
+        ...DEFAULT_WORKSPACE_BOUNDS,
+        ...(parsed.workspaceBounds || {}),
+      };
+    } else {
+      // Backward-compatibility: flat avatarConfig
+      avatarConfig = { ...DEFAULT_AVATAR_CONFIG, ...parsed };
+      workspaceBounds = { ...DEFAULT_WORKSPACE_BOUNDS };
+    }
   } catch {
     avatarConfig = { ...DEFAULT_AVATAR_CONFIG };
+    workspaceBounds = { ...DEFAULT_WORKSPACE_BOUNDS };
   }
 }
 
 async function savePersistedConfig(): Promise<void> {
   try {
+    const payload = {
+      avatarConfig,
+      workspaceBounds,
+    };
     await fs.writeFile(
       getConfigFilePath(),
-      JSON.stringify(avatarConfig, null, 2),
+      JSON.stringify(payload, null, 2),
       "utf-8",
     );
   } catch (err) {
-    console.error("Failed to persist avatar stage config:", err);
+    console.error("Failed to persist stage/workspace config:", err);
   }
 }
 
@@ -95,6 +118,67 @@ function broadcastStageConfig(): void {
   }
 }
 
+// --- Global Cursor & Gaze Tracking Loop (30Hz) ---
+
+function startCursorTracking(): void {
+  if (cursorTrackingTimer) return;
+
+  cursorTrackingTimer = setInterval(() => {
+    if (!stageWindow || stageWindow.isDestroyed() || !stageWindow.isVisible()) {
+      return;
+    }
+    if (avatarConfig.lookAtEnabled === false) {
+      return;
+    }
+
+    try {
+      const cursor = screen.getCursorScreenPoint();
+      const bounds = stageWindow.getBounds();
+
+      const halfW = Math.max(bounds.width / 2, 1);
+      const halfH = Math.max(bounds.height / 2, 1);
+      const centerX = bounds.x + halfW;
+      const centerY = bounds.y + halfH;
+
+      // Normalized coordinates relative to stage center (-1 to 1 at stage borders)
+      const relX = (cursor.x - centerX) / halfW;
+      const relY = (cursor.y - centerY) / halfH;
+
+      const isInsideStage =
+        cursor.x >= bounds.x &&
+        cursor.x <= bounds.x + bounds.width &&
+        cursor.y >= bounds.y &&
+        cursor.y <= bounds.y + bounds.height;
+
+      const gazeData: GazeData = {
+        screenX: cursor.x,
+        screenY: cursor.y,
+        relX,
+        relY,
+        stageX: cursor.x - bounds.x,
+        stageY: cursor.y - bounds.y,
+        stageWidth: bounds.width,
+        stageHeight: bounds.height,
+        normalizedX: Math.max(-4, Math.min(4, relX)),
+        normalizedY: Math.max(-4, Math.min(4, relY)),
+        isInsideStage,
+        timestamp: Date.now(),
+      };
+
+      stageWindow.webContents.send(IPC_CHANNELS.STAGE_CURSOR_MOVE, gazeData);
+    } catch {
+      // Ignored if window is in the middle of closing
+    }
+  }, 33);
+}
+
+function stopCursorTracking(): void {
+  if (cursorTrackingTimer) {
+    clearInterval(cursorTrackingTimer);
+    cursorTrackingTimer = null;
+  }
+}
+
 // --- Window Factories ---
 
 function createWorkspaceWindow(): BrowserWindow {
@@ -105,13 +189,48 @@ function createWorkspaceWindow(): BrowserWindow {
     return mainWindow;
   }
 
+  const displays = screen.getAllDisplays().map((d) => ({
+    bounds: d.bounds,
+    workArea: d.workArea,
+  }));
+
+  const initialWidth = workspaceBounds.width || 1100;
+  const initialHeight = workspaceBounds.height || 740;
+
+  let validatedX = workspaceBounds.x;
+  let validatedY = workspaceBounds.y;
+
+  // Center on primary display if no previous coordinates
+  if (typeof validatedX !== "number" || typeof validatedY !== "number") {
+    const primary = displays[0]?.workArea || {
+      x: 0,
+      y: 0,
+      width: 1920,
+      height: 1080,
+    };
+    validatedX = Math.round(primary.x + (primary.width - initialWidth) / 2);
+    validatedY = Math.round(primary.y + (primary.height - initialHeight) / 2);
+  }
+
+  const bounds = validateWindowBounds(
+    {
+      x: validatedX,
+      y: validatedY,
+      width: initialWidth,
+      height: initialHeight,
+    },
+    displays,
+  );
+
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: bounds.height,
     minWidth: 800,
-    minHeight: 600,
+    minHeight: 560,
     title: APP_METADATA.name,
-    backgroundColor: "#101114",
+    backgroundColor: "#0d0e12",
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       contextIsolation: true,
@@ -132,11 +251,46 @@ function createWorkspaceWindow(): BrowserWindow {
     mainWindow.loadFile(join(__dirname, "../../dist/index.html"));
   }
 
+  if (workspaceBounds.isMaximized) {
+    mainWindow.maximize();
+  }
+
   mainWindow.on("close", (event) => {
     if (!isQuitting) {
       event.preventDefault();
       mainWindow?.hide();
     }
+  });
+
+  // Track normal bounds without overwriting during maximization
+  mainWindow.on("resize", () => {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isMaximized()) {
+      const size = mainWindow.getSize();
+      if (typeof size[0] === "number") workspaceBounds.width = size[0];
+      if (typeof size[1] === "number") workspaceBounds.height = size[1];
+      savePersistedConfig();
+    }
+  });
+
+  mainWindow.on("move", () => {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isMaximized()) {
+      const pos = mainWindow.getPosition();
+      if (typeof pos[0] === "number" && typeof pos[1] === "number") {
+        workspaceBounds.x = pos[0];
+        workspaceBounds.y = pos[1];
+        savePersistedConfig();
+      }
+    }
+  });
+
+  mainWindow.on("maximize", () => {
+    workspaceBounds.isMaximized = true;
+    savePersistedConfig();
+  });
+
+  mainWindow.on("unmaximize", () => {
+    workspaceBounds.isMaximized = false;
+    savePersistedConfig();
   });
 
   return mainWindow;
@@ -147,6 +301,7 @@ function createStageWindow(): BrowserWindow {
     stageWindow.show();
     stageStatus.stageVisible = true;
     broadcastStageStatus();
+    startCursorTracking();
     return stageWindow;
   }
 
@@ -208,6 +363,7 @@ function createStageWindow(): BrowserWindow {
       event.preventDefault();
       stageWindow?.hide();
       stageStatus.stageVisible = false;
+      stopCursorTracking();
       broadcastStageStatus();
     }
   });
@@ -238,6 +394,7 @@ function createStageWindow(): BrowserWindow {
   stageStatus.clickThrough = !!avatarConfig.clickThrough;
   stageStatus.animationPaused = !!avatarConfig.animationPaused;
   broadcastStageStatus();
+  startCursorTracking();
 
   return stageWindow;
 }
@@ -269,6 +426,7 @@ function showStage(): StageStatus {
   createStageWindow();
   stageStatus.stageVisible = true;
   broadcastStageStatus();
+  startCursorTracking();
   return { ...stageStatus };
 }
 
@@ -277,6 +435,7 @@ function hideStage(): StageStatus {
     stageWindow.hide();
   }
   stageStatus.stageVisible = false;
+  stopCursorTracking();
   broadcastStageStatus();
   return { ...stageStatus };
 }
@@ -323,6 +482,7 @@ function setAnimationPaused(paused: boolean): StageStatus {
 
 function quitApplication(): void {
   isQuitting = true;
+  stopCursorTracking();
   globalShortcut.unregisterAll();
   if (tray) {
     tray.destroy();
@@ -762,6 +922,7 @@ if (!gotSingleInstanceLock) {
   });
 
   app.on("will-quit", () => {
+    stopCursorTracking();
     globalShortcut.unregisterAll();
     if (embeddedAuthServer) {
       try {

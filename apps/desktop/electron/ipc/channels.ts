@@ -5,4 +5,6 @@ export type {
   StageStatus,
   UserProfile,
   UserSession,
+  GazeData,
+  WorkspaceBounds,
 } from "@vrm/platform-contracts";
