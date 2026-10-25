@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { VRMLoaderPlugin, type VRM } from "@pixiv/three-vrm";
 import type { AvatarConfig, StageStatus } from "@vrm/platform-contracts";
+import { VRMPoseController } from "./pose-controller.js";
 
 // HTML Elements
 const canvas = document.getElementById("stage-canvas") as HTMLCanvasElement;
@@ -63,6 +64,8 @@ let clock = new THREE.Clock();
 
 // VRM / Model State
 let currentVrm: VRM | null = null;
+let modelRoot: THREE.Group;
+const poseController = new VRMPoseController();
 let fallbackGroup: THREE.Group | null = null;
 let currentConfig: AvatarConfig | null = null;
 let isAnimationPaused = false;
@@ -84,6 +87,11 @@ function initScene() {
 
   // Scene
   scene = new THREE.Scene();
+
+  // Model Root Group for VRM transforms and orientation
+  modelRoot = new THREE.Group();
+  modelRoot.name = "VRMModelRoot";
+  scene.add(modelRoot);
 
   // Camera
   camera = new THREE.PerspectiveCamera(30, width / height, 0.1, 20.0);
@@ -286,13 +294,17 @@ async function loadVrmModel(filePath?: string) {
 
         // Dispose existing VRM if loaded
         if (currentVrm) {
-          scene.remove(currentVrm.scene);
+          modelRoot.remove(currentVrm.scene);
           disposeHierarchy(currentVrm.scene);
+          poseController.dispose();
           currentVrm = null;
         }
 
         currentVrm = vrm;
-        scene.add(vrm.scene);
+        modelRoot.add(vrm.scene);
+
+        // Apply natural A-pose to humanoid rig
+        poseController.setup(vrm);
 
         // Hide fallback mannequin ONLY after successful VRM scene attachment
         if (fallbackGroup) {
@@ -301,8 +313,10 @@ async function loadVrmModel(filePath?: string) {
         isFallbackActive = false;
         updateFallbackNotice(false);
 
-        // Standard VRM orientation & scaling
-        vrm.scene.rotation.y = Math.PI;
+        // Model orientation: Default 0 faces the viewer/camera directly
+        // Respects per-avatar rotation configuration if specified
+        const modelYaw = currentConfig?.rotationY ?? 0;
+        modelRoot.rotation.y = modelYaw;
         applyScale(currentScale);
 
         // Connect VRM lookAt system to global gaze target
@@ -337,8 +351,8 @@ async function loadVrmModel(filePath?: string) {
 
 function applyScale(scaleValue: number) {
   currentScale = scaleValue;
-  if (currentVrm) {
-    currentVrm.scene.scale.set(scaleValue, scaleValue, scaleValue);
+  if (modelRoot) {
+    modelRoot.scale.set(scaleValue, scaleValue, scaleValue);
   }
   if (fallbackGroup) {
     fallbackGroup.scale.set(scaleValue, scaleValue, scaleValue);
@@ -371,7 +385,10 @@ function animate() {
 
   if (!isAnimationPaused) {
     if (currentVrm) {
-      // VRM internal update (includes lookAt evaluation if lookAt.target is bound)
+      // Re-assert target A-pose to keep bones stable across updates
+      poseController.applyPose();
+
+      // VRM internal update (evaluates spring bones, expressions, humanoid rig)
       currentVrm.update(delta);
 
       // Natural subtle idle breathing motion
@@ -572,8 +589,8 @@ async function setupStageSync() {
 
       desiredGazeTarget.set(worldX, worldY, worldZ);
 
-      // Subtle natural head yaw and pitch
-      targetGazeYaw = Math.max(-0.25, Math.min(0.25, -clampedX * 0.12));
+      // Subtle natural head yaw and pitch (turning towards cursor in front of avatar)
+      targetGazeYaw = Math.max(-0.25, Math.min(0.25, clampedX * 0.12));
       targetGazePitch = Math.max(-0.18, Math.min(0.18, -clampedY * 0.1));
     });
 
@@ -581,6 +598,9 @@ async function setupStageSync() {
     desktopAPI.stage.onConfigChanged?.((cfg) => {
       if (cfg.scale !== undefined && cfg.scale !== currentScale) {
         applyScale(cfg.scale);
+      }
+      if (cfg.rotationY !== undefined && modelRoot) {
+        modelRoot.rotation.y = cfg.rotationY;
       }
       if (
         cfg.lookAtEnabled !== undefined &&

@@ -76,6 +76,7 @@ export interface AvatarConfig {
   lookAtEnabled?: boolean;
   lookAtMode?: "head_and_eyes" | "eyes_only" | "disabled";
   lookAtIntensity?: number;
+  rotationY?: number;
 }
 
 export interface WorkspaceBounds {

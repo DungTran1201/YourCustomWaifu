@@ -306,6 +306,32 @@ function handleStartupToggle(e: Event) {
           />
         </div>
       </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <label class="setting-label">Facing Orientation</label>
+          <span class="setting-desc"
+            >Adjust avatar yaw to face camera directly (0°) or flip (180°)</span
+          >
+        </div>
+        <div class="setting-control">
+          <button
+            id="avatar-flip-facing-btn"
+            class="pill-btn"
+            @click="
+              store.updateAvatarConfig({
+                rotationY: store.state.avatarConfig.rotationY ? 0 : Math.PI,
+              })
+            "
+          >
+            {{
+              store.state.avatarConfig.rotationY
+                ? "Flipped (180°)"
+                : "Front Facing (0°)"
+            }}
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- Architecture & Platform Verification Card -->

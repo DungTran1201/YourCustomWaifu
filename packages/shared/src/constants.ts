@@ -31,6 +31,7 @@ export const DEFAULT_AVATAR_CONFIG = {
   lookAtEnabled: true,
   lookAtMode: "head_and_eyes" as const,
   lookAtIntensity: 1.0,
+  rotationY: 0,
 };
 
 export const DEFAULT_WORKSPACE_BOUNDS = {
