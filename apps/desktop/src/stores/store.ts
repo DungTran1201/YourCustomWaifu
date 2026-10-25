@@ -25,6 +25,7 @@ import {
   detectPlatform,
   getPlatformAPI,
   isElectronEnvironment,
+  hasPreloadBridgeError,
 } from "./platform.js";
 
 export type NavigationTab =
@@ -37,7 +38,6 @@ export type NavigationTab =
   | "memory"
   | "avatar"
   | "activity"
-  | "overview"
   | "profile"
   | "security"
   | "secrets"
@@ -87,7 +87,7 @@ export interface AppState {
 }
 
 const state = reactive<AppState>({
-  currentTab: "overview",
+  currentTab: "signin",
   sidebarCollapsed: false,
   settings: { ...DEFAULT_SETTINGS },
   diagnostics: null,
@@ -323,6 +323,7 @@ async function apiRequest(
 
 export function useAppStore() {
   const platform = computed<PlatformType>(() => detectPlatform());
+  const hasBridgeError = computed<boolean>(() => hasPreloadBridgeError());
 
   function setTab(tab: NavigationTab) {
     state.currentTab = tab;
@@ -375,6 +376,7 @@ export function useAppStore() {
         if (stored) {
           state.user = stored;
           state.isAuthenticated = true;
+          state.currentTab = "chat";
           return;
         }
       }
@@ -384,10 +386,32 @@ export function useAppStore() {
       if (profile && profile.id) {
         state.user = profile;
         state.isAuthenticated = true;
+        state.currentTab = "chat";
+      } else {
+        state.user = null;
+        state.isAuthenticated = false;
+        if (
+          state.currentTab !== "signup" &&
+          state.currentTab !== "forgot-password" &&
+          state.currentTab !== "reset-password" &&
+          state.currentTab !== "settings" &&
+          state.currentTab !== "diagnostics"
+        ) {
+          state.currentTab = "signin";
+        }
       }
     } catch {
       state.user = null;
       state.isAuthenticated = false;
+      if (
+        state.currentTab !== "signup" &&
+        state.currentTab !== "forgot-password" &&
+        state.currentTab !== "reset-password" &&
+        state.currentTab !== "settings" &&
+        state.currentTab !== "diagnostics"
+      ) {
+        state.currentTab = "signin";
+      }
     } finally {
       state.authLoading = false;
     }
@@ -405,7 +429,7 @@ export function useAppStore() {
         });
         state.user = res.user;
         state.isAuthenticated = true;
-        setTab("overview");
+        setTab("chat");
         return;
       }
 
@@ -416,7 +440,7 @@ export function useAppStore() {
       state.user = res.user;
       state.isAuthenticated = true;
       if (res.csrfToken) state.csrfToken = res.csrfToken;
-      setTab("overview");
+      setTab("chat");
     } catch (err: any) {
       state.authError = err?.message || "Invalid email or password";
       throw err;
@@ -445,7 +469,7 @@ export function useAppStore() {
       state.user = res.user;
       state.isAuthenticated = true;
       if (res.csrfToken) state.csrfToken = res.csrfToken;
-      setTab("overview");
+      setTab("chat");
     } catch (err: any) {
       state.authError = err?.message || "Registration failed";
       throw err;
@@ -966,6 +990,7 @@ export function useAppStore() {
   return {
     state,
     platform,
+    hasBridgeError,
     setTab,
     toggleSidebar,
     updateSettings,

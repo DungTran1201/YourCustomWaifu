@@ -22,13 +22,13 @@ const tabGroups = computed<TabGroup[]>(() => {
         name: "Companion",
         tabs: [
           { id: "chat", label: "Chat", icon: "💬" },
-          { id: "avatar", label: "Avatar Stage", icon: "🎭" },
+          { id: "avatar", label: "Avatar", icon: "🎭" },
+          { id: "agents", label: "Agents", icon: "🤖" },
         ],
       },
       {
         name: "Intelligence",
         tabs: [
-          { id: "agents", label: "Agents", icon: "🤖" },
           { id: "skills", label: "Skills", icon: "⚡" },
           { id: "rules", label: "Rules", icon: "📜" },
           { id: "tools", label: "Tools", icon: "🛠️" },
@@ -39,7 +39,6 @@ const tabGroups = computed<TabGroup[]>(() => {
       {
         name: "System",
         tabs: [
-          { id: "overview", label: "Overview", icon: "📊" },
           { id: "profile", label: "Profile", icon: "👤" },
           { id: "security", label: "Security", icon: "🛡️" },
           { id: "secrets", label: "AI Keys", icon: "🔑" },
@@ -52,9 +51,15 @@ const tabGroups = computed<TabGroup[]>(() => {
 
   return [
     {
-      name: "Public",
+      name: "Authentication",
       tabs: [
-        { id: "overview", label: "Overview", icon: "📊" },
+        { id: "signin", label: "Sign In", icon: "🔑" },
+        { id: "signup", label: "Register", icon: "✨" },
+      ],
+    },
+    {
+      name: "System",
+      tabs: [
         { id: "settings", label: "Settings", icon: "⚙️" },
         { id: "diagnostics", label: "Diagnostics", icon: "🩺" },
       ],

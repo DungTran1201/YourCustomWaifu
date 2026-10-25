@@ -11,12 +11,26 @@ import {
   INITIAL_STAGE_STATUS,
 } from "@vrm/shared";
 
+export function isRunningInElectron(): boolean {
+  if (typeof window === "undefined") return false;
+  return (
+    typeof (window as any).desktopAPI?.getDiagnostics === "function" ||
+    (typeof navigator !== "undefined" &&
+      navigator.userAgent.includes("Electron")) ||
+    typeof (process as any)?.versions?.electron !== "undefined"
+  );
+}
+
 export function isElectronEnvironment(): boolean {
   return (
     typeof window !== "undefined" &&
     window.desktopAPI !== undefined &&
     typeof window.desktopAPI.getDiagnostics === "function"
   );
+}
+
+export function hasPreloadBridgeError(): boolean {
+  return isRunningInElectron() && !isElectronEnvironment();
 }
 
 export function detectPlatform(): PlatformType {
@@ -96,6 +110,7 @@ export function createWebFallbackAPI(): DesktopAPI {
       },
       onStatusChanged: () => () => {},
       onConfigChanged: () => () => {},
+      onCursorMove: () => () => {},
     },
     workspace: {
       show: async () => {},
@@ -108,6 +123,11 @@ export function createWebFallbackAPI(): DesktopAPI {
 export function getPlatformAPI(): DesktopAPI {
   if (isElectronEnvironment() && window.desktopAPI) {
     return window.desktopAPI;
+  }
+  if (hasPreloadBridgeError()) {
+    throw new Error(
+      "Desktop IPC Preload Bridge missing or failed to initialize in native Electron environment.",
+    );
   }
   return createWebFallbackAPI();
 }

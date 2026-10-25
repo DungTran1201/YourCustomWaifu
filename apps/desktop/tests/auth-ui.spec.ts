@@ -6,7 +6,7 @@ import { useAppStore } from "@vrm/app-core";
 describe("Workspace Desktop Authentication UI & Navigation Flow", () => {
   beforeEach(() => {
     const store = useAppStore();
-    store.setTab("overview");
+    store.setTab("signin");
     store.state.isAuthenticated = false;
     store.state.user = null;
     store.state.sessions = [];
@@ -15,15 +15,22 @@ describe("Workspace Desktop Authentication UI & Navigation Flow", () => {
     store.state.authNotice = null;
   });
 
-  it("renders unauthenticated state on overview with sign in and register buttons", () => {
+  it("renders unauthenticated state on startup with sign in form and no legacy overview", () => {
     const wrapper = mount(App);
     const store = useAppStore();
 
     expect(store.state.isAuthenticated).toBe(false);
-    expect(wrapper.find("#overview-signin-btn").exists()).toBe(true);
-    expect(wrapper.find("#overview-signup-btn").exists()).toBe(true);
+    expect(wrapper.find("#signin-email").exists()).toBe(true);
+    expect(wrapper.find("#signin-password").exists()).toBe(true);
     expect(wrapper.find("#nav-signin-btn").exists()).toBe(true);
     expect(wrapper.find("#nav-signup-btn").exists()).toBe(true);
+
+    // Strict regression assertion: legacy overview marketing strings must not exist
+    expect(wrapper.text()).not.toContain("Architecture Reset Complete");
+    expect(wrapper.text()).not.toContain("Monorepo Topology");
+    expect(wrapper.text()).not.toContain("Unified Presentation");
+    expect(wrapper.text()).not.toContain("Shared Web & Desktop Authentication");
+    expect(wrapper.find("#overview-signin-btn").exists()).toBe(false);
   });
 
   it("navigates to Sign In view and verifies form elements", async () => {

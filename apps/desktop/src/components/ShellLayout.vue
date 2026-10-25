@@ -4,7 +4,6 @@ import { useAppStore } from "@vrm/app-core";
 import { APP_METADATA } from "@vrm/shared";
 import NavigationBar from "./NavigationBar.vue";
 import StatusBadge from "./StatusBadge.vue";
-import OverviewView from "../workspace/views/OverviewView.vue";
 import SettingsView from "../workspace/views/SettingsView.vue";
 import DiagnosticsView from "../workspace/views/DiagnosticsView.vue";
 import SignInView from "../workspace/views/SignInView.vue";
@@ -50,8 +49,6 @@ const activeTabTitle = computed(() => {
       return "Companion Memory";
     case "activity":
       return "System Activity";
-    case "overview":
-      return "System Overview";
     case "profile":
       return "Account Profile";
     case "security":
@@ -107,7 +104,19 @@ onMounted(() => {
             <span class="app-version">v{{ APP_METADATA.version }}</span>
           </div>
         </div>
-        <StatusBadge status="ready" :label="platformLabel" />
+        <StatusBadge
+          v-if="!store.hasBridgeError.value"
+          status="ready"
+          :label="platformLabel"
+        />
+        <span
+          v-else
+          id="bridge-error-badge"
+          class="bridge-error-badge"
+          title="Electron IPC Bridge missing. Check preload script."
+        >
+          BRIDGE ERROR
+        </span>
       </div>
 
       <div class="topbar-center">
@@ -198,29 +207,44 @@ onMounted(() => {
       <NavigationBar />
 
       <main class="shell-main" role="main">
-        <ChatView v-if="store.state.currentTab === 'chat'" />
-        <AvatarSettingsView v-else-if="store.state.currentTab === 'avatar'" />
-        <AgentsView v-else-if="store.state.currentTab === 'agents'" />
-        <SkillsView v-else-if="store.state.currentTab === 'skills'" />
-        <RulesView v-else-if="store.state.currentTab === 'rules'" />
-        <ToolsView v-else-if="store.state.currentTab === 'tools'" />
-        <ConnectionsView v-else-if="store.state.currentTab === 'connections'" />
-        <MemoryView v-else-if="store.state.currentTab === 'memory'" />
-        <ActivityView v-else-if="store.state.currentTab === 'activity'" />
-        <OverviewView v-else-if="store.state.currentTab === 'overview'" />
-        <ProfileView v-else-if="store.state.currentTab === 'profile'" />
-        <SecurityView v-else-if="store.state.currentTab === 'security'" />
-        <SecretsView v-else-if="store.state.currentTab === 'secrets'" />
-        <SignInView v-else-if="store.state.currentTab === 'signin'" />
-        <SignUpView v-else-if="store.state.currentTab === 'signup'" />
-        <ForgotPasswordView
-          v-else-if="store.state.currentTab === 'forgot-password'"
-        />
-        <ResetPasswordView
-          v-else-if="store.state.currentTab === 'reset-password'"
-        />
-        <SettingsView v-else-if="store.state.currentTab === 'settings'" />
-        <DiagnosticsView v-else-if="store.state.currentTab === 'diagnostics'" />
+        <!-- Unauthenticated routing: display SignInView by default unless on explicit auth/system views -->
+        <template v-if="!store.state.isAuthenticated">
+          <SignUpView v-if="store.state.currentTab === 'signup'" />
+          <ForgotPasswordView
+            v-else-if="store.state.currentTab === 'forgot-password'"
+          />
+          <ResetPasswordView
+            v-else-if="store.state.currentTab === 'reset-password'"
+          />
+          <SettingsView v-else-if="store.state.currentTab === 'settings'" />
+          <DiagnosticsView
+            v-else-if="store.state.currentTab === 'diagnostics'"
+          />
+          <SignInView v-else />
+        </template>
+
+        <!-- Authenticated routing: display Chatspace by default -->
+        <template v-else>
+          <ChatView v-if="store.state.currentTab === 'chat'" />
+          <AvatarSettingsView v-else-if="store.state.currentTab === 'avatar'" />
+          <AgentsView v-else-if="store.state.currentTab === 'agents'" />
+          <SkillsView v-else-if="store.state.currentTab === 'skills'" />
+          <RulesView v-else-if="store.state.currentTab === 'rules'" />
+          <ToolsView v-else-if="store.state.currentTab === 'tools'" />
+          <ConnectionsView
+            v-else-if="store.state.currentTab === 'connections'"
+          />
+          <MemoryView v-else-if="store.state.currentTab === 'memory'" />
+          <ActivityView v-else-if="store.state.currentTab === 'activity'" />
+          <ProfileView v-else-if="store.state.currentTab === 'profile'" />
+          <SecurityView v-else-if="store.state.currentTab === 'security'" />
+          <SecretsView v-else-if="store.state.currentTab === 'secrets'" />
+          <SettingsView v-else-if="store.state.currentTab === 'settings'" />
+          <DiagnosticsView
+            v-else-if="store.state.currentTab === 'diagnostics'"
+          />
+          <ChatView v-else />
+        </template>
       </main>
     </div>
 
@@ -273,6 +297,17 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.bridge-error-badge {
+  padding: 3px 8px;
+  background: rgba(239, 68, 68, 0.18);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  border-radius: var(--radius-sm);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
 }
 
 .sidebar-toggle-btn {

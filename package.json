@@ -12,6 +12,7 @@
     "lint:fix": "prettier --write \"apps/**/*.{ts,vue,json}\" \"packages/**/*.{ts,vue,json}\" \"schemas/**/*.json\"",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:smoke": "pnpm --filter @vrm/desktop test:smoke",
     "package": "pnpm --filter @vrm/desktop package"
   },
   "devDependencies": {

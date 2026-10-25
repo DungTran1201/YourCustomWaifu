@@ -2,7 +2,6 @@ export { default as ShellLayout } from "./ShellLayout.vue";
 export { default as NavigationBar } from "./NavigationBar.vue";
 export { default as StatusBadge } from "./StatusBadge.vue";
 export { default as StateView } from "./StateView.vue";
-export { default as OverviewView } from "../workspace/views/OverviewView.vue";
 export { default as SettingsView } from "../workspace/views/SettingsView.vue";
 export { default as DiagnosticsView } from "../workspace/views/DiagnosticsView.vue";
 export { default as SignInView } from "../workspace/views/SignInView.vue";
