@@ -45,6 +45,15 @@ const btnHideStage = document.getElementById(
 const errorSettingsBtn = document.getElementById(
   "stage-error-settings-btn",
 ) as HTMLButtonElement;
+const errorRetryBtn = document.getElementById(
+  "stage-error-retry-btn",
+) as HTMLButtonElement | null;
+const fallbackNotice = document.getElementById(
+  "stage-fallback-notice",
+) as HTMLDivElement | null;
+
+let lastRequestedVrmPath: string | undefined = undefined;
+let isFallbackActive = true;
 
 // Three.js Core
 let renderer: THREE.WebGLRenderer;
@@ -216,6 +225,16 @@ function hideError() {
   errorOverlay.classList.add("hidden");
 }
 
+function updateFallbackNotice(show: boolean) {
+  if (fallbackNotice) {
+    if (show && isFallbackActive) {
+      fallbackNotice.classList.remove("hidden");
+    } else {
+      fallbackNotice.classList.add("hidden");
+    }
+  }
+}
+
 function disposeHierarchy(obj: THREE.Object3D) {
   obj.traverse((child) => {
     if ((child as THREE.Mesh).isMesh) {
@@ -233,7 +252,8 @@ function disposeHierarchy(obj: THREE.Object3D) {
 }
 
 async function loadVrmModel(filePath?: string) {
-  showLoading();
+  lastRequestedVrmPath = filePath;
+  showLoading("Loading VRM Avatar...");
   hideError();
 
   try {
@@ -252,6 +272,18 @@ async function loadVrmModel(filePath?: string) {
       data,
       "",
       (gltf) => {
+        const vrm = gltf.userData.vrm as VRM;
+        if (!vrm) {
+          showError("Invalid VRM: No VRM data found in glTF file");
+          if (fallbackGroup) {
+            fallbackGroup.visible = true;
+          }
+          isFallbackActive = true;
+          updateFallbackNotice(true);
+          hideLoading();
+          return;
+        }
+
         // Dispose existing VRM if loaded
         if (currentVrm) {
           scene.remove(currentVrm.scene);
@@ -259,19 +291,15 @@ async function loadVrmModel(filePath?: string) {
           currentVrm = null;
         }
 
-        // Hide fallback mannequin when real VRM is present
+        currentVrm = vrm;
+        scene.add(vrm.scene);
+
+        // Hide fallback mannequin ONLY after successful VRM scene attachment
         if (fallbackGroup) {
           fallbackGroup.visible = false;
         }
-
-        const vrm = gltf.userData.vrm as VRM;
-        if (!vrm) {
-          showError("Invalid VRM: No VRM data found in glTF file");
-          return;
-        }
-
-        currentVrm = vrm;
-        scene.add(vrm.scene);
+        isFallbackActive = false;
+        updateFallbackNotice(false);
 
         // Standard VRM orientation & scaling
         vrm.scene.rotation.y = Math.PI;
@@ -284,13 +312,26 @@ async function loadVrmModel(filePath?: string) {
         }
 
         hideLoading();
+        hideError();
       },
       (err) => {
         showError(`Failed to parse VRM: ${err.message}`);
+        if (fallbackGroup) {
+          fallbackGroup.visible = true;
+        }
+        isFallbackActive = true;
+        updateFallbackNotice(true);
+        hideLoading();
       },
     );
   } catch (err: any) {
     showError(err.message || "Failed to load VRM model");
+    if (fallbackGroup) {
+      fallbackGroup.visible = true;
+    }
+    isFallbackActive = true;
+    updateFallbackNotice(true);
+    hideLoading();
   }
 }
 
@@ -456,6 +497,15 @@ function setupToolbarListeners() {
     desktopAPI.workspace?.show("avatar");
   });
 
+  errorRetryBtn?.addEventListener("click", () => {
+    hideError();
+    if (lastRequestedVrmPath) {
+      loadVrmModel(lastRequestedVrmPath);
+    } else {
+      setupStageSync();
+    }
+  });
+
   btnHideStage.addEventListener("click", () => {
     desktopAPI.stage?.hide();
   });
@@ -477,6 +527,28 @@ async function setupStageSync() {
     }
     if (currentConfig.avatarPath) {
       await loadVrmModel(currentConfig.avatarPath);
+    } else {
+      const isGuestAvailable = await desktopAPI
+        .isGuestPreviewAvailable?.()
+        .catch(() => false);
+      if (isGuestAvailable) {
+        showLoading("Fetching Development Sample VRM...");
+        const sampleRes = await desktopAPI.stage.ensureSampleVrm();
+        if (sampleRes.success && sampleRes.filePath) {
+          await loadVrmModel(sampleRes.filePath);
+        } else {
+          showError(sampleRes.error || "Failed to download sample VRM");
+          if (fallbackGroup) fallbackGroup.visible = true;
+          isFallbackActive = true;
+          updateFallbackNotice(true);
+          hideLoading();
+        }
+      } else {
+        if (fallbackGroup) fallbackGroup.visible = true;
+        isFallbackActive = true;
+        updateFallbackNotice(true);
+        hideLoading();
+      }
     }
 
     const status: StageStatus = await desktopAPI.stage.getStatus();

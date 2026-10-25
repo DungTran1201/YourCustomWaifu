@@ -65,11 +65,27 @@ app.whenReady().then(async () => {
       "window.desktopAPI ? Object.keys(window.desktopAPI) : []"
     );
     log("window.desktopAPI keys:", apiKeys);
-    const requiredKeys = ["getAppVersion", "getDiagnostics", "ping", "auth", "stage", "workspace"];
+    const requiredKeys = [
+      "getAppVersion",
+      "getDiagnostics",
+      "ping",
+      "auth",
+      "stage",
+      "workspace",
+      "isGuestPreviewAvailable",
+    ];
     for (const k of requiredKeys) {
       if (!apiKeys.includes(k)) {
         error(`FAILED: missing desktopAPI method: ${k}`);
       }
+    }
+
+    const hasEnsureSampleVrm = await win.webContents.executeJavaScript(
+      "typeof window.desktopAPI?.stage?.ensureSampleVrm === 'function'"
+    );
+    log("stage.ensureSampleVrm function exists:", hasEnsureSampleVrm);
+    if (!hasEnsureSampleVrm) {
+      error("FAILED: stage.ensureSampleVrm is not exposed on desktopAPI.stage!");
     }
 
     // 3. Verify status badge text in DOM
@@ -113,7 +129,7 @@ app.whenReady().then(async () => {
       error("FAILED: Unauthenticated startup did not display Sign In form!");
     }
 
-    // 5. Verify Stage window creation
+    // 5. Verify Stage window creation and elements
     log("Testing Stage window creation...");
     const stagePreload = path.resolve(__dirname, "../dist-electron/preload/index.cjs");
     const stageWin = new BrowserWindow({
@@ -136,6 +152,14 @@ app.whenReady().then(async () => {
     log("Stage window.desktopAPI exists:", stageHasDesktopAPI);
     if (!stageHasDesktopAPI) {
       error("FAILED: stage window.desktopAPI is not exposed!");
+    }
+
+    const stageHasNoticeElements = await stageWin.webContents.executeJavaScript(
+      "document.querySelector('#stage-fallback-notice') !== null && document.querySelector('#stage-error-retry-btn') !== null"
+    );
+    log("Stage fallback notice & retry elements present:", stageHasNoticeElements);
+    if (!stageHasNoticeElements) {
+      error("FAILED: stage.html missing #stage-fallback-notice or #stage-error-retry-btn!");
     }
 
     clearTimeout(timeout);

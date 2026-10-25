@@ -70,6 +70,7 @@ export function createWebFallbackAPI(): DesktopAPI {
       };
     },
     ping: async () => "pong:web-fallback",
+    isGuestPreviewAvailable: async () => false,
     stage: {
       getStatus: async () => ({ ...webFallbackStageStatus }),
       getConfig: async () => ({ ...webFallbackAvatarConfig }),
@@ -108,6 +109,13 @@ export function createWebFallbackAPI(): DesktopAPI {
           "Local file system direct loading requires Desktop Electron application",
         );
       },
+      ensureSampleVrm: async () => ({
+        success: false,
+        filePath: "",
+        fileName: "AvatarSample_B.vrm",
+        cached: false,
+        error: "Sample VRM download requires native desktop environment",
+      }),
       onStatusChanged: () => () => {},
       onConfigChanged: () => () => {},
       onCursorMove: () => () => {},

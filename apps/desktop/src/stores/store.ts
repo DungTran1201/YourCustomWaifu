@@ -84,6 +84,9 @@ export interface AppState {
   chatError: string | null;
   // UI Layout state
   sidebarCollapsed: boolean;
+  // Guest Preview state
+  isGuest: boolean;
+  isGuestPreviewAvailable: boolean;
 }
 
 const state = reactive<AppState>({
@@ -108,6 +111,9 @@ const state = reactive<AppState>({
   avatarConfig: { ...DEFAULT_AVATAR_CONFIG },
   stageLoading: false,
   stageError: null,
+  // Guest Preview initial state
+  isGuest: false,
+  isGuestPreviewAvailable: false,
   // Companion default profiles
   agents: [
     {
@@ -391,6 +397,7 @@ export function useAppStore() {
         state.user = null;
         state.isAuthenticated = false;
         if (
+          !state.isGuest &&
           state.currentTab !== "signup" &&
           state.currentTab !== "forgot-password" &&
           state.currentTab !== "reset-password" &&
@@ -404,6 +411,7 @@ export function useAppStore() {
       state.user = null;
       state.isAuthenticated = false;
       if (
+        !state.isGuest &&
         state.currentTab !== "signup" &&
         state.currentTab !== "forgot-password" &&
         state.currentTab !== "reset-password" &&
@@ -414,6 +422,7 @@ export function useAppStore() {
       }
     } finally {
       state.authLoading = false;
+      await checkGuestPreviewAvailable();
     }
   }
 
@@ -805,6 +814,83 @@ export function useAppStore() {
     }
   }
 
+  async function loadSampleVrm(): Promise<{
+    success: boolean;
+    filePath?: string;
+    error?: string;
+  }> {
+    state.stageLoading = true;
+    state.stageError = null;
+    try {
+      const api = getPlatformAPI();
+      if (!api.stage?.ensureSampleVrm) {
+        throw new Error("Sample VRM downloader unavailable");
+      }
+      const res = await api.stage.ensureSampleVrm();
+      if (!res.success || !res.filePath) {
+        throw new Error(res.error || "Failed to download sample VRM");
+      }
+
+      if (state.isGuest) {
+        state.avatarConfig.avatarPath = res.filePath;
+        state.avatarConfig.avatarName = res.fileName || "AvatarSample_B.vrm";
+        state.stageStatus.avatarLoaded = true;
+        state.stageStatus.currentAvatarName =
+          res.fileName || "AvatarSample_B.vrm";
+        if (api.stage.updateConfig) {
+          await api.stage.updateConfig({
+            avatarPath: res.filePath,
+            avatarName: res.fileName,
+          });
+        }
+      } else {
+        await updateAvatarConfig({
+          avatarPath: res.filePath,
+          avatarName: res.fileName || "AvatarSample_B.vrm",
+        });
+      }
+      return { success: true, filePath: res.filePath };
+    } catch (err: any) {
+      const errMsg = err?.message || "Failed to load sample VRM";
+      state.stageError = errMsg;
+      return { success: false, error: errMsg };
+    } finally {
+      state.stageLoading = false;
+    }
+  }
+
+  async function checkGuestPreviewAvailable(): Promise<boolean> {
+    try {
+      const api = getPlatformAPI();
+      if (typeof api.isGuestPreviewAvailable === "function") {
+        const available = await api.isGuestPreviewAvailable();
+        state.isGuestPreviewAvailable = !!available;
+        return state.isGuestPreviewAvailable;
+      }
+      state.isGuestPreviewAvailable = false;
+      return false;
+    } catch {
+      state.isGuestPreviewAvailable = false;
+      return false;
+    }
+  }
+
+  async function enterGuestPreview() {
+    state.isGuest = true;
+    state.isAuthenticated = false;
+    state.user = null;
+    setTab("avatar");
+    await showStage();
+    if (!state.avatarConfig.avatarPath) {
+      await loadSampleVrm();
+    }
+  }
+
+  function exitGuestPreview() {
+    state.isGuest = false;
+    setTab("signin");
+  }
+
   // --- Chat & Companion Runtime Actions ---
   async function sendChatMessage(customContent?: string) {
     const content = (customContent || state.chatInput || "").trim();
@@ -1021,6 +1107,10 @@ export function useAppStore() {
     setStageAnimationPaused,
     updateAvatarConfig,
     selectVrmFile,
+    loadSampleVrm,
+    checkGuestPreviewAvailable,
+    enterGuestPreview,
+    exitGuestPreview,
     // Companion & Chat exports
     sendChatMessage,
     clearChatMessages,

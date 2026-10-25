@@ -16,6 +16,22 @@ interface TabGroup {
 }
 
 const tabGroups = computed<TabGroup[]>(() => {
+  if (store.state.isGuest) {
+    return [
+      {
+        name: "Guest Preview",
+        tabs: [{ id: "avatar", label: "Avatar Stage", icon: "🎭" }],
+      },
+      {
+        name: "System",
+        tabs: [
+          { id: "settings", label: "Settings", icon: "⚙️" },
+          { id: "diagnostics", label: "Diagnostics", icon: "🩺" },
+        ],
+      },
+    ];
+  }
+
   if (store.state.isAuthenticated) {
     return [
       {

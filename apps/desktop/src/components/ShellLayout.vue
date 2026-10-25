@@ -117,6 +117,14 @@ onMounted(() => {
         >
           BRIDGE ERROR
         </span>
+        <span
+          v-if="store.state.isGuest"
+          id="guest-preview-badge"
+          class="guest-preview-badge"
+          title="Running in local development preview mode"
+        >
+          GUEST PREVIEW
+        </span>
       </div>
 
       <div class="topbar-center">
@@ -146,8 +154,20 @@ onMounted(() => {
           }}</span>
         </button>
 
+        <!-- Guest Actions -->
+        <template v-if="store.state.isGuest">
+          <button
+            id="exit-guest-preview-btn"
+            class="nav-auth-btn guest-exit-btn"
+            title="Exit Guest Preview"
+            @click="store.exitGuestPreview()"
+          >
+            Exit Guest Preview
+          </button>
+        </template>
+
         <!-- Auth Actions -->
-        <template v-if="store.state.isAuthenticated">
+        <template v-else-if="store.state.isAuthenticated">
           <button
             id="nav-user-pill"
             class="user-pill-btn"
@@ -207,8 +227,18 @@ onMounted(() => {
       <NavigationBar />
 
       <main class="shell-main" role="main">
+        <!-- Guest Preview routing: focus on Avatar Stage and settings -->
+        <template v-if="store.state.isGuest">
+          <AvatarSettingsView v-if="store.state.currentTab === 'avatar'" />
+          <SettingsView v-else-if="store.state.currentTab === 'settings'" />
+          <DiagnosticsView
+            v-else-if="store.state.currentTab === 'diagnostics'"
+          />
+          <AvatarSettingsView v-else />
+        </template>
+
         <!-- Unauthenticated routing: display SignInView by default unless on explicit auth/system views -->
-        <template v-if="!store.state.isAuthenticated">
+        <template v-else-if="!store.state.isAuthenticated">
           <SignUpView v-if="store.state.currentTab === 'signup'" />
           <ForgotPasswordView
             v-else-if="store.state.currentTab === 'forgot-password'"
@@ -308,6 +338,27 @@ onMounted(() => {
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.05em;
+}
+
+.guest-preview-badge {
+  padding: 3px 8px;
+  background: rgba(6, 182, 212, 0.18);
+  color: var(--accent-cyan);
+  border: 1px solid rgba(6, 182, 212, 0.45);
+  border-radius: var(--radius-sm);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.guest-exit-btn {
+  border-color: rgba(6, 182, 212, 0.4);
+  color: var(--accent-cyan);
+}
+
+.guest-exit-btn:hover {
+  background: rgba(6, 182, 212, 0.15);
+  color: #fff;
 }
 
 .sidebar-toggle-btn {

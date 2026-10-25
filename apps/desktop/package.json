@@ -6,6 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm build && electron .",
+    "dev:guest": "node ./scripts/dev-guest.cjs",
+    "download:sample-vrm": "node ./scripts/download-sample-vrm.cjs",
     "build:preload": "vite build --config vite.preload.config.ts",
     "build:main": "tsc -p tsconfig.node.json && pnpm build:preload",
     "build:renderer": "vite build",
@@ -13,6 +15,7 @@
     "typecheck": "tsc -p tsconfig.node.json --noEmit && vue-tsc --noEmit",
     "test": "vitest run",
     "test:smoke": "node ./node_modules/electron/cli.js scripts/electron-smoke.cjs",
+    "test:guest": "node ./node_modules/electron/cli.js scripts/guest-smoke.cjs",
     "package": "electron-builder --win"
   },
   "dependencies": {

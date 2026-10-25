@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
 import { useAppStore } from "@vrm/app-core";
 
 const store = useAppStore();
@@ -23,6 +23,14 @@ async function handleSubmit() {
   } finally {
     isSubmitting.value = false;
   }
+}
+
+onMounted(async () => {
+  await store.checkGuestPreviewAvailable();
+});
+
+async function handleGuestPreview() {
+  await store.enterGuestPreview();
 }
 </script>
 
@@ -101,6 +109,24 @@ async function handleSubmit() {
           <span>{{ isSubmitting ? "Signing in..." : "Sign In" }}</span>
         </button>
       </form>
+
+      <!-- Development Guest Preview Action -->
+      <div
+        v-if="store.state.isGuestPreviewAvailable"
+        class="guest-preview-container"
+      >
+        <div class="guest-divider">
+          <span>or development preview</span>
+        </div>
+        <button
+          id="signin-guest-btn"
+          type="button"
+          class="btn btn-guest-preview"
+          @click="handleGuestPreview"
+        >
+          Continue as Guest — Development Preview
+        </button>
+      </div>
 
       <div class="auth-footer">
         <span class="text-muted">Don't have an account?</span>
@@ -264,6 +290,52 @@ async function handleSubmit() {
 
 .link-btn:hover {
   text-decoration: underline;
+}
+
+.guest-preview-container {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.guest-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.guest-divider::before,
+.guest-divider::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.guest-divider span {
+  padding: 0 10px;
+}
+
+.btn-guest-preview {
+  background: rgba(6, 182, 212, 0.1);
+  color: var(--accent-cyan);
+  border: 1px solid rgba(6, 182, 212, 0.35);
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-guest-preview:hover {
+  background: rgba(6, 182, 212, 0.2);
+  border-color: var(--accent-cyan);
+  transform: translateY(-1px);
 }
 
 .auth-footer {

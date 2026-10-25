@@ -11,8 +11,24 @@ const isAnimationPaused = computed(
   () => store.state.stageStatus.animationPaused,
 );
 
+const modelStatus = computed(() => {
+  if (store.state.stageLoading) return "Loading";
+  if (store.state.stageError) return "Error";
+  if (
+    store.state.stageStatus.avatarLoaded &&
+    store.state.avatarConfig.avatarPath
+  ) {
+    return "Loaded";
+  }
+  return "Fallback";
+});
+
 async function handleSelectVrm() {
   await store.selectVrmFile();
+}
+
+async function handleLoadSampleVrm() {
+  await store.loadSampleVrm();
 }
 
 function handleScaleChange(e: Event) {
@@ -28,6 +44,27 @@ function handleStartupToggle(e: Event) {
 
 <template>
   <div class="view-container">
+    <!-- Guest Preview Banner if active -->
+    <div v-if="store.state.isGuest" class="guest-banner">
+      <div class="guest-banner-content">
+        <div class="guest-banner-header">
+          <span class="guest-banner-badge">GUEST PREVIEW</span>
+          <span class="guest-banner-subtitle">Development Mode</span>
+        </div>
+        <p>
+          Testing local VRM avatar rendering on desktop Avatar Stage without
+          creating an account. Cloud chat and provider features are disabled.
+        </p>
+      </div>
+      <button
+        id="avatar-guest-exit-btn"
+        class="btn-guest-exit"
+        @click="store.exitGuestPreview()"
+      >
+        Exit Guest Preview
+      </button>
+    </div>
+
     <div class="section-header">
       <div class="header-content">
         <h2>Avatar & Stage Configuration</h2>
@@ -57,7 +94,20 @@ function handleStartupToggle(e: Event) {
     <!-- Active Model Status Card -->
     <div class="status-overview-card">
       <div class="model-meta">
-        <span class="section-badge">CURRENT AVATAR</span>
+        <div class="model-header-row">
+          <span class="section-badge">CURRENT AVATAR</span>
+          <span :class="['model-status-pill', modelStatus.toLowerCase()]">
+            <span class="status-dot"></span>
+            {{ modelStatus }}
+          </span>
+          <span
+            v-if="store.state.stageStatus.vrmVersion"
+            class="vrm-version-pill"
+          >
+            VRM {{ store.state.stageStatus.vrmVersion }}
+          </span>
+        </div>
+
         <h3 class="model-title">{{ store.state.avatarConfig.avatarName }}</h3>
         <p
           class="model-path"
@@ -65,18 +115,29 @@ function handleStartupToggle(e: Event) {
         >
           {{
             store.state.avatarConfig.avatarPath ||
-            "Default internal holographic avatar"
+            "No VRM loaded — displaying fallback mannequin"
           }}
         </p>
       </div>
 
       <div class="model-actions">
         <button
+          id="avatar-load-sample-btn"
+          class="btn-secondary"
+          :disabled="store.state.stageLoading"
+          @click="handleLoadSampleVrm"
+        >
+          <span v-if="store.state.stageLoading" class="mini-spinner"></span>
+          <span>Load Sample VRM</span>
+        </button>
+
+        <button
           id="avatar-select-file-btn"
           class="btn-secondary"
+          :disabled="store.state.stageLoading"
           @click="handleSelectVrm"
         >
-          Select .VRM File
+          Choose Local VRM
         </button>
       </div>
     </div>
@@ -267,6 +328,64 @@ function handleStartupToggle(e: Event) {
   padding: 40px 24px;
 }
 
+.guest-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  margin-bottom: 28px;
+}
+
+.guest-banner-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.guest-banner-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  background: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.guest-banner-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.guest-banner p {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.btn-guest-exit {
+  padding: 8px 14px;
+  background: transparent;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #f59e0b;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+
+.btn-guest-exit:hover {
+  background: rgba(245, 158, 11, 0.15);
+}
+
 .section-header {
   display: flex;
   align-items: flex-start;
@@ -329,6 +448,19 @@ function handleStartupToggle(e: Event) {
   border-radius: var(--radius-md);
   padding: 24px;
   margin-bottom: 28px;
+  gap: 20px;
+}
+
+.model-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.model-header-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
 }
 
 .section-badge {
@@ -336,6 +468,59 @@ function handleStartupToggle(e: Event) {
   font-weight: 600;
   letter-spacing: 0.05em;
   color: var(--text-muted);
+}
+
+.model-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.model-status-pill .status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.model-status-pill.loaded {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.model-status-pill.loading {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.model-status-pill.error {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.model-status-pill.fallback {
+  background: rgba(156, 163, 175, 0.15);
+  color: #9ca3af;
+  border: 1px solid rgba(156, 163, 175, 0.3);
+}
+
+.vrm-version-pill {
+  font-size: 0.72rem;
+  font-weight: 500;
+  padding: 2px 7px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  color: var(--text-secondary);
 }
 
 .model-title {
@@ -355,7 +540,17 @@ function handleStartupToggle(e: Event) {
   white-space: nowrap;
 }
 
+.model-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
 .btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 9px 18px;
   background: var(--bg-elevated);
   border: 1px solid var(--border-subtle);
@@ -363,11 +558,32 @@ function handleStartupToggle(e: Event) {
   color: var(--text-primary);
   font-size: 0.85rem;
   font-weight: 500;
+  cursor: pointer;
   transition: all var(--transition-fast);
 }
 
-.btn-secondary:hover {
+.btn-secondary:hover:not(:disabled) {
   background: var(--bg-hover);
+}
+
+.btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.mini-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: var(--text-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .stage-error-banner {

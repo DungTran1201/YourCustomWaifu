@@ -17,6 +17,9 @@ const desktopAPI: DesktopAPI = {
   ping: (): Promise<string> => {
     return ipcRenderer.invoke(IPC_CHANNELS.PING);
   },
+  isGuestPreviewAvailable: (): Promise<boolean> => {
+    return ipcRenderer.invoke(IPC_CHANNELS.GUEST_PREVIEW_AVAILABLE);
+  },
   auth: {
     login: (credentials) =>
       ipcRenderer.invoke(IPC_CHANNELS.AUTH_LOGIN, credentials),
@@ -46,6 +49,8 @@ const desktopAPI: DesktopAPI = {
     selectVrmFile: () => ipcRenderer.invoke(IPC_CHANNELS.STAGE_SELECT_VRM_FILE),
     loadVrmBuffer: (filePath?: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.STAGE_LOAD_VRM_BUFFER, filePath),
+    ensureSampleVrm: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.STAGE_ENSURE_SAMPLE_VRM),
     onStatusChanged: (callback: (status: StageStatus) => void) => {
       const handler = (_: any, status: StageStatus) => callback(status);
       ipcRenderer.on(IPC_CHANNELS.STAGE_STATUS_CHANGED, handler);

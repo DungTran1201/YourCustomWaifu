@@ -5,6 +5,8 @@
   "description": "Desktop-First Personal AI Companion powered by Electron",
   "scripts": {
     "dev": "pnpm --filter @vrm/desktop dev",
+    "dev:guest": "pnpm --filter @vrm/desktop dev:guest",
+    "download:sample-vrm": "pnpm --filter @vrm/desktop download:sample-vrm",
     "build": "pnpm --filter @vrm/desktop build",
     "build:desktop": "pnpm --filter @vrm/desktop build",
     "typecheck": "pnpm --filter @vrm/desktop typecheck",
@@ -13,6 +15,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:smoke": "pnpm --filter @vrm/desktop test:smoke",
+    "test:guest": "pnpm --filter @vrm/desktop test:guest",
     "package": "pnpm --filter @vrm/desktop package"
   },
   "devDependencies": {

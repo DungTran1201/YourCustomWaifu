@@ -33,6 +33,8 @@ import {
   validateIpcSender,
 } from "./security.js";
 import { validateWindowBounds } from "./bounds.js";
+import { ensureSampleVrm } from "./sample-vrm.js";
+import { isGuestPreviewAllowed } from "./guest-preview.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -578,6 +580,16 @@ function registerIpcHandlers(): void {
     return APP_METADATA.version;
   });
 
+  ipcMain.handle(IPC_CHANNELS.GUEST_PREVIEW_AVAILABLE, (event): boolean => {
+    if (!validateIpcSender(event.sender, allowedWindows())) {
+      throw new Error("Unauthorized IPC sender");
+    }
+    return isGuestPreviewAllowed(
+      app.isPackaged,
+      process.env["YCW_ENABLE_GUEST_PREVIEW"],
+    );
+  });
+
   ipcMain.handle(IPC_CHANNELS.GET_DIAGNOSTICS, (event): DiagnosticsInfo => {
     if (!validateIpcSender(event.sender, allowedWindows())) {
       throw new Error("Unauthorized IPC sender");
@@ -597,6 +609,10 @@ function registerIpcHandlers(): void {
         arch: os.arch(),
         release: os.release(),
       },
+      guestPreviewEnabled: isGuestPreviewAllowed(
+        app.isPackaged,
+        process.env["YCW_ENABLE_GUEST_PREVIEW"],
+      ),
     };
   });
 
@@ -811,9 +827,23 @@ function registerIpcHandlers(): void {
       if (!validateIpcSender(event.sender, allowedWindows())) {
         throw new Error("Unauthorized IPC sender");
       }
-      const targetPath = customPath || avatarConfig.avatarPath;
+      let targetPath = customPath || avatarConfig.avatarPath;
+      if (
+        !targetPath &&
+        isGuestPreviewAllowed(
+          app.isPackaged,
+          process.env["YCW_ENABLE_GUEST_PREVIEW"],
+        )
+      ) {
+        const sample = await ensureSampleVrm();
+        if (sample.success && sample.filePath) {
+          targetPath = sample.filePath;
+        }
+      }
       if (!targetPath) {
-        throw new Error("No avatar file specified");
+        throw new Error(
+          "No avatar file specified and sample model unavailable",
+        );
       }
 
       const buffer = await fs.readFile(targetPath);
@@ -826,6 +856,13 @@ function registerIpcHandlers(): void {
       };
     },
   );
+
+  ipcMain.handle(IPC_CHANNELS.STAGE_ENSURE_SAMPLE_VRM, async (event) => {
+    if (!validateIpcSender(event.sender, allowedWindows())) {
+      throw new Error("Unauthorized IPC sender");
+    }
+    return await ensureSampleVrm();
+  });
 
   // 4. Workspace Window Control Handlers
   ipcMain.handle(IPC_CHANNELS.WORKSPACE_SHOW, (event, tab?: string) => {

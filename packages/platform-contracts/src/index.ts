@@ -21,6 +21,7 @@ export interface DiagnosticsInfo {
   timestamp: string;
   capabilities: PlatformCapabilities;
   os?: OperatingSystemInfo;
+  guestPreviewEnabled?: boolean;
 }
 
 export interface AppSettings {
@@ -105,6 +106,8 @@ export interface StageStatus {
   stageReady: boolean;
   avatarLoaded: boolean;
   currentAvatarName: string | null;
+  vrmVersion?: string | null;
+  isFallbackActive?: boolean;
   loading: boolean;
   error: string | null;
   animationPaused: boolean;
@@ -216,6 +219,13 @@ export interface DesktopStageAPI {
   loadVrmBuffer: (
     filePath?: string,
   ) => Promise<{ data: ArrayBuffer; name: string }>;
+  ensureSampleVrm: () => Promise<{
+    success: boolean;
+    filePath: string;
+    fileName: string;
+    cached: boolean;
+    error?: string;
+  }>;
   onStatusChanged?: (callback: (status: StageStatus) => void) => () => void;
   onConfigChanged?: (callback: (config: AvatarConfig) => void) => () => void;
   onCursorMove?: (callback: (data: GazeData) => void) => () => void;
@@ -231,6 +241,7 @@ export interface DesktopAPI {
   getAppVersion: () => Promise<string>;
   getDiagnostics: () => Promise<DiagnosticsInfo>;
   ping: () => Promise<string>;
+  isGuestPreviewAvailable?: () => Promise<boolean>;
   auth?: DesktopAuthAPI;
   stage?: DesktopStageAPI;
   workspace?: DesktopWorkspaceAPI;
@@ -240,6 +251,7 @@ export const IPC_CHANNELS = {
   GET_VERSION: "app:get-version",
   GET_DIAGNOSTICS: "app:get-diagnostics",
   PING: "app:ping",
+  GUEST_PREVIEW_AVAILABLE: "app:guest-preview-available",
   AUTH_LOGIN: "app:auth-login",
   AUTH_LOGOUT: "app:auth-logout",
   AUTH_GET_STORED_SESSION: "app:auth-get-stored-session",
@@ -256,6 +268,7 @@ export const IPC_CHANNELS = {
   STAGE_UPDATE_CONFIG: "stage:update-config",
   STAGE_SELECT_VRM_FILE: "stage:select-vrm-file",
   STAGE_LOAD_VRM_BUFFER: "stage:load-vrm-buffer",
+  STAGE_ENSURE_SAMPLE_VRM: "stage:ensure-sample-vrm",
   STAGE_STATUS_CHANGED: "stage:status-changed",
   STAGE_CONFIG_CHANGED: "stage:config-changed",
   STAGE_CURSOR_MOVE: "stage:cursor-move",
