@@ -51,6 +51,18 @@ const desktopAPI: DesktopAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.STAGE_LOAD_VRM_BUFFER, filePath),
     ensureSampleVrm: () =>
       ipcRenderer.invoke(IPC_CHANNELS.STAGE_ENSURE_SAMPLE_VRM),
+    triggerTestBlink: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.STAGE_TRIGGER_TEST_BLINK),
+    onTriggerTestBlink: (callback: () => void) => {
+      const handler = () => callback();
+      ipcRenderer.on(IPC_CHANNELS.STAGE_TRIGGER_TEST_BLINK, handler);
+      return () => {
+        ipcRenderer.removeListener(
+          IPC_CHANNELS.STAGE_TRIGGER_TEST_BLINK,
+          handler,
+        );
+      };
+    },
     onStatusChanged: (callback: (status: StageStatus) => void) => {
       const handler = (_: any, status: StageStatus) => callback(status);
       ipcRenderer.on(IPC_CHANNELS.STAGE_STATUS_CHANGED, handler);

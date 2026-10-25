@@ -40,6 +40,13 @@ function handleStartupToggle(e: Event) {
   const val = (e.target as HTMLInputElement).checked;
   store.updateAvatarConfig({ showStageOnStartup: val });
 }
+
+async function handleTestBlink() {
+  const desktopAPI = window.desktopAPI;
+  if (desktopAPI?.stage?.triggerTestBlink) {
+    await desktopAPI.stage.triggerTestBlink();
+  }
+}
 </script>
 
 <template>
@@ -330,6 +337,43 @@ function handleStartupToggle(e: Event) {
                 : "Front Facing (0°)"
             }}
           </button>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <label class="setting-label">Natural Eye Blinking</label>
+          <span class="setting-desc"
+            >Human-like variable blink intervals with spontaneous double
+            blinks</span
+          >
+        </div>
+        <div
+          class="setting-control"
+          style="display: flex; align-items: center; gap: 10px"
+        >
+          <button
+            id="avatar-test-blink-btn"
+            class="pill-btn"
+            title="Trigger an immediate eye blink test"
+            @click="handleTestBlink"
+          >
+            Test Blink
+          </button>
+          <label class="switch">
+            <input
+              id="avatar-autoblink-toggle"
+              type="checkbox"
+              :checked="store.state.avatarConfig.autoBlinkEnabled !== false"
+              @change="
+                (e) =>
+                  store.updateAvatarConfig({
+                    autoBlinkEnabled: (e.target as HTMLInputElement).checked,
+                  })
+              "
+            />
+            <span class="slider"></span>
+          </label>
         </div>
       </div>
     </div>

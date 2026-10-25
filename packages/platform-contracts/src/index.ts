@@ -77,6 +77,37 @@ export interface AvatarConfig {
   lookAtMode?: "head_and_eyes" | "eyes_only" | "disabled";
   lookAtIntensity?: number;
   rotationY?: number;
+  autoBlinkEnabled?: boolean;
+  customBlinkExpression?: string;
+}
+
+export type BlinkMode =
+  | "blink"
+  | "bilateral"
+  | "blinkLeftOnly"
+  | "blinkRightOnly"
+  | "custom"
+  | "unsupported";
+
+export const BlinkState = {
+  Open: "Open",
+  Closing: "Closing",
+  Closed: "Closed",
+  Opening: "Opening",
+} as const;
+export type BlinkState = (typeof BlinkState)[keyof typeof BlinkState];
+
+export interface BlinkDiagnostic {
+  mode: BlinkMode;
+  targetExpressions: string[];
+  availableExpressions: string[];
+  supported: boolean;
+  state: BlinkState;
+  currentWeight: number;
+  autoBlinkEnabled: boolean;
+  isPaused: boolean;
+  isTestBlinkActive: boolean;
+  totalBlinks: number;
 }
 
 export interface WorkspaceBounds {
@@ -114,6 +145,7 @@ export interface StageStatus {
   animationPaused: boolean;
   clickThrough: boolean;
   alwaysOnTop: boolean;
+  blinkDiagnostic?: BlinkDiagnostic;
 }
 
 export interface AgentProfile {
@@ -227,6 +259,13 @@ export interface DesktopStageAPI {
     cached: boolean;
     error?: string;
   }>;
+  triggerTestBlink?: () => Promise<{
+    success: boolean;
+    mode?: string;
+    error?: string;
+  }>;
+  getBlinkDiagnostic?: () => Promise<BlinkDiagnostic | null>;
+  onTriggerTestBlink?: (callback: () => void) => () => void;
   onStatusChanged?: (callback: (status: StageStatus) => void) => () => void;
   onConfigChanged?: (callback: (config: AvatarConfig) => void) => () => void;
   onCursorMove?: (callback: (data: GazeData) => void) => () => void;
@@ -270,6 +309,8 @@ export const IPC_CHANNELS = {
   STAGE_SELECT_VRM_FILE: "stage:select-vrm-file",
   STAGE_LOAD_VRM_BUFFER: "stage:load-vrm-buffer",
   STAGE_ENSURE_SAMPLE_VRM: "stage:ensure-sample-vrm",
+  STAGE_TRIGGER_TEST_BLINK: "stage:trigger-test-blink",
+  STAGE_GET_BLINK_DIAGNOSTIC: "stage:get-blink-diagnostic",
   STAGE_STATUS_CHANGED: "stage:status-changed",
   STAGE_CONFIG_CHANGED: "stage:config-changed",
   STAGE_CURSOR_MOVE: "stage:cursor-move",

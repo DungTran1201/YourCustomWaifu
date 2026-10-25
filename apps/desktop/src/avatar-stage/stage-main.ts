@@ -3,6 +3,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { VRMLoaderPlugin, type VRM } from "@pixiv/three-vrm";
 import type { AvatarConfig, StageStatus } from "@vrm/platform-contracts";
 import { VRMPoseController } from "./pose-controller.js";
+import { VRMBlinkController } from "./blink-controller.js";
 
 // HTML Elements
 const canvas = document.getElementById("stage-canvas") as HTMLCanvasElement;
@@ -33,6 +34,9 @@ const btnPauseAnimation = document.getElementById(
 ) as HTMLButtonElement;
 const btnToggleLookAt = document.getElementById(
   "btn-toggle-lookat",
+) as HTMLButtonElement | null;
+const btnTestBlink = document.getElementById(
+  "btn-test-blink",
 ) as HTMLButtonElement | null;
 const btnOpenWorkspace = document.getElementById(
   "btn-open-workspace",
@@ -66,6 +70,7 @@ let clock = new THREE.Clock();
 let currentVrm: VRM | null = null;
 let modelRoot: THREE.Group;
 const poseController = new VRMPoseController();
+const blinkController = new VRMBlinkController();
 let fallbackGroup: THREE.Group | null = null;
 let currentConfig: AvatarConfig | null = null;
 let isAnimationPaused = false;
@@ -297,6 +302,7 @@ async function loadVrmModel(filePath?: string) {
           modelRoot.remove(currentVrm.scene);
           disposeHierarchy(currentVrm.scene);
           poseController.dispose();
+          blinkController.dispose();
           currentVrm = null;
         }
 
@@ -305,6 +311,12 @@ async function loadVrmModel(filePath?: string) {
 
         // Apply natural A-pose to humanoid rig
         poseController.setup(vrm);
+
+        // Initialize natural human-like blinking controller
+        blinkController.setup(vrm, {
+          autoBlinkEnabled: currentConfig?.autoBlinkEnabled ?? true,
+          customExpressionName: currentConfig?.customBlinkExpression,
+        });
 
         // Hide fallback mannequin ONLY after successful VRM scene attachment
         if (fallbackGroup) {
@@ -388,6 +400,11 @@ function animate() {
       // Re-assert target A-pose to keep bones stable across updates
       poseController.applyPose();
 
+      // Natural human-like blinking state machine:
+      // Evaluated before vrm.update(delta) so expression weights are processed and
+      // applied to morph targets within the current render frame
+      blinkController.update(delta);
+
       // VRM internal update (evaluates spring bones, expressions, humanoid rig)
       currentVrm.update(delta);
 
@@ -426,15 +443,6 @@ function animate() {
           rightEye.rotation.y = eyeYaw;
           rightEye.rotation.x = eyePitch;
         }
-      }
-
-      // Natural periodic blinking
-      const blinkCycle = elapsed % 4.0;
-      if (blinkCycle < 0.18) {
-        const blinkVal = Math.sin((blinkCycle / 0.18) * Math.PI);
-        currentVrm.expressionManager?.setValue("blink", blinkVal);
-      } else {
-        currentVrm.expressionManager?.setValue("blink", 0.0);
       }
     } else if (fallbackGroup && fallbackGroup.visible) {
       // Procedural floating for fallback mannequin
@@ -488,6 +496,11 @@ function setupToolbarListeners() {
   btnPauseAnimation.addEventListener("click", async () => {
     isAnimationPaused = !isAnimationPaused;
     btnPauseAnimation.classList.toggle("active", isAnimationPaused);
+    if (isAnimationPaused) {
+      blinkController.pause();
+    } else {
+      blinkController.resume();
+    }
     await desktopAPI.stage?.setAnimationPaused(isAnimationPaused);
   });
 
@@ -500,6 +513,13 @@ function setupToolbarListeners() {
       targetGazePitch = 0;
     }
     await desktopAPI.stage?.updateConfig({ lookAtEnabled: isLookAtEnabled });
+  });
+
+  btnTestBlink?.addEventListener("click", () => {
+    const res = blinkController.triggerTestBlink();
+    if (!res.success) {
+      console.warn("[Stage] Test blink unavailable:", res.error);
+    }
   });
 
   btnOpenWorkspace.addEventListener("click", () => {
@@ -614,6 +634,9 @@ async function setupStageSync() {
           targetGazePitch = 0;
         }
       }
+      if (cfg.autoBlinkEnabled !== undefined) {
+        blinkController.setAutoBlinkEnabled(cfg.autoBlinkEnabled);
+      }
       if (cfg.avatarPath && cfg.avatarPath !== currentConfig?.avatarPath) {
         currentConfig = cfg;
         loadVrmModel(cfg.avatarPath);
@@ -622,9 +645,18 @@ async function setupStageSync() {
 
     desktopAPI.stage.onStatusChanged?.((st) => {
       isAnimationPaused = st.animationPaused;
+      if (isAnimationPaused) {
+        blinkController.pause();
+      } else {
+        blinkController.resume();
+      }
       btnPauseAnimation.classList.toggle("active", isAnimationPaused);
       btnAlwaysOnTop.classList.toggle("active", st.alwaysOnTop);
       btnClickThrough.classList.toggle("active", st.clickThrough);
+    });
+
+    desktopAPI.stage.onTriggerTestBlink?.(() => {
+      blinkController.triggerTestBlink();
     });
   } catch (err: any) {
     showError(err.message || "Failed to synchronize Stage state");

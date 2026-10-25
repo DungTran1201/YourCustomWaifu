@@ -17,6 +17,7 @@
     "test:smoke": "node ./node_modules/electron/cli.js scripts/electron-smoke.cjs",
     "test:guest": "node ./node_modules/electron/cli.js scripts/guest-smoke.cjs",
     "test:stage": "node ./node_modules/electron/cli.js scripts/visual-verify-stage.cjs",
+    "test:blink": "node ./node_modules/electron/cli.js scripts/visual-verify-blink.cjs",
     "package": "electron-builder --win"
   },
   "dependencies": {

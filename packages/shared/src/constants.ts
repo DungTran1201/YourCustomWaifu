@@ -32,6 +32,8 @@ export const DEFAULT_AVATAR_CONFIG = {
   lookAtMode: "head_and_eyes" as const,
   lookAtIntensity: 1.0,
   rotationY: 0,
+  autoBlinkEnabled: true,
+  customBlinkExpression: undefined as string | undefined,
 };
 
 export const DEFAULT_WORKSPACE_BOUNDS = {

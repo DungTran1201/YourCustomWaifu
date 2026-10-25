@@ -864,6 +864,17 @@ function registerIpcHandlers(): void {
     return await ensureSampleVrm();
   });
 
+  ipcMain.handle(IPC_CHANNELS.STAGE_TRIGGER_TEST_BLINK, async (event) => {
+    if (!validateIpcSender(event.sender, allowedWindows())) {
+      throw new Error("Unauthorized IPC sender");
+    }
+    if (stageWindow && !stageWindow.isDestroyed()) {
+      stageWindow.webContents.send(IPC_CHANNELS.STAGE_TRIGGER_TEST_BLINK);
+      return { success: true };
+    }
+    return { success: false, error: "Avatar Stage window is not active" };
+  });
+
   // 4. Workspace Window Control Handlers
   ipcMain.handle(IPC_CHANNELS.WORKSPACE_SHOW, (event, tab?: string) => {
     if (!validateIpcSender(event.sender, allowedWindows())) {
