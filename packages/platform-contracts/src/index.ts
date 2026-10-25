@@ -60,6 +60,8 @@ export interface ProviderSecretItem {
   updatedAt: string;
 }
 
+export type AvatarOrientationMode = "auto" | "0deg" | "180deg";
+
 export interface AvatarConfig {
   avatarPath: string | null;
   avatarName: string;
@@ -77,6 +79,7 @@ export interface AvatarConfig {
   lookAtMode?: "head_and_eyes" | "eyes_only" | "disabled";
   lookAtIntensity?: number;
   rotationY?: number;
+  orientationMode?: AvatarOrientationMode;
   autoBlinkEnabled?: boolean;
   customBlinkExpression?: string;
 }
@@ -139,6 +142,7 @@ export interface StageStatus {
   avatarLoaded: boolean;
   currentAvatarName: string | null;
   vrmVersion?: string | null;
+  orientationMode?: AvatarOrientationMode;
   isFallbackActive?: boolean;
   loading: boolean;
   error: string | null;
@@ -265,6 +269,12 @@ export interface DesktopStageAPI {
     error?: string;
   }>;
   getBlinkDiagnostic?: () => Promise<BlinkDiagnostic | null>;
+  reportModelStatus?: (status: {
+    avatarLoaded: boolean;
+    currentAvatarName?: string;
+    vrmVersion?: string;
+    orientationMode?: AvatarOrientationMode;
+  }) => Promise<void>;
   onTriggerTestBlink?: (callback: () => void) => () => void;
   onStatusChanged?: (callback: (status: StageStatus) => void) => () => void;
   onConfigChanged?: (callback: (config: AvatarConfig) => void) => () => void;
@@ -311,6 +321,7 @@ export const IPC_CHANNELS = {
   STAGE_ENSURE_SAMPLE_VRM: "stage:ensure-sample-vrm",
   STAGE_TRIGGER_TEST_BLINK: "stage:trigger-test-blink",
   STAGE_GET_BLINK_DIAGNOSTIC: "stage:get-blink-diagnostic",
+  STAGE_REPORT_MODEL_STATUS: "stage:report-model-status",
   STAGE_STATUS_CHANGED: "stage:status-changed",
   STAGE_CONFIG_CHANGED: "stage:config-changed",
   STAGE_CURSOR_MOVE: "stage:cursor-move",

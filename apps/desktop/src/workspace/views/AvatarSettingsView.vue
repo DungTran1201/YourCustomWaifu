@@ -47,6 +47,23 @@ async function handleTestBlink() {
     await desktopAPI.stage.triggerTestBlink();
   }
 }
+
+const currentOrientationMode = computed(
+  () => store.state.avatarConfig.orientationMode || "auto",
+);
+
+const detectedVrmVersionBadge = computed(() => {
+  const ver = store.state.stageStatus.vrmVersion;
+  if (!ver) return null;
+  return `VRM ${ver}`;
+});
+
+function handleOrientationChange(mode: "auto" | "0deg" | "180deg") {
+  store.updateAvatarConfig({
+    orientationMode: mode,
+    rotationY: mode === "180deg" ? Math.PI : 0,
+  });
+}
 </script>
 
 <template>
@@ -317,25 +334,40 @@ async function handleTestBlink() {
       <div class="setting-row">
         <div class="setting-info">
           <label class="setting-label">Facing Orientation</label>
-          <span class="setting-desc"
-            >Adjust avatar yaw to face camera directly (0°) or flip (180°)</span
-          >
+          <span class="setting-desc">
+            Universal orientation handling for loaded avatar.
+            <span v-if="detectedVrmVersionBadge" class="detected-badge">
+              Detected {{ detectedVrmVersionBadge }}
+            </span>
+          </span>
         </div>
-        <div class="setting-control">
+        <div class="setting-control btn-group-pills">
           <button
-            id="avatar-flip-facing-btn"
-            class="pill-btn"
-            @click="
-              store.updateAvatarConfig({
-                rotationY: store.state.avatarConfig.rotationY ? 0 : Math.PI,
-              })
-            "
+            id="avatar-orientation-auto-btn"
+            :class="['pill-btn', { active: currentOrientationMode === 'auto' }]"
+            @click="handleOrientationChange('auto')"
+            title="Auto (Recommended): Detects VRM version (VRM 0.x rotated 180°, VRM 1.0 faces front)"
           >
-            {{
-              store.state.avatarConfig.rotationY
-                ? "Flipped (180°)"
-                : "Front Facing (0°)"
-            }}
+            Auto
+          </button>
+          <button
+            id="avatar-orientation-0deg-btn"
+            :class="['pill-btn', { active: currentOrientationMode === '0deg' }]"
+            @click="handleOrientationChange('0deg')"
+            title="Standard 0° Facing (Front)"
+          >
+            0°
+          </button>
+          <button
+            id="avatar-orientation-180deg-btn"
+            :class="[
+              'pill-btn',
+              { active: currentOrientationMode === '180deg' },
+            ]"
+            @click="handleOrientationChange('180deg')"
+            title="Flipped 180° Facing"
+          >
+            180°
           </button>
         </div>
       </div>
@@ -804,5 +836,22 @@ input:checked + .slider:before {
 .info-card h4 {
   color: var(--text-primary);
   margin-bottom: 6px;
+}
+
+.btn-group-pills {
+  display: flex;
+  gap: 8px;
+}
+
+.detected-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 6px;
+  background: rgba(6, 182, 212, 0.15);
+  border: 1px solid rgba(6, 182, 212, 0.3);
+  color: var(--accent-cyan);
+  font-size: 0.75rem;
+  border-radius: var(--radius-sm);
+  font-weight: 500;
 }
 </style>

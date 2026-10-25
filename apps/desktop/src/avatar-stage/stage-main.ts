@@ -4,6 +4,11 @@ import { VRMLoaderPlugin, type VRM } from "@pixiv/three-vrm";
 import type { AvatarConfig, StageStatus } from "@vrm/platform-contracts";
 import { VRMPoseController } from "./pose-controller.js";
 import { VRMBlinkController } from "./blink-controller.js";
+import {
+  prepareVrmForStage,
+  applyOrientation,
+  type DetectedVrmVersion,
+} from "./stage-pipeline.js";
 
 // HTML Elements
 const canvas = document.getElementById("stage-canvas") as HTMLCanvasElement;
@@ -68,6 +73,7 @@ let clock = new THREE.Clock();
 
 // VRM / Model State
 let currentVrm: VRM | null = null;
+let currentDetectedVrmVersion: DetectedVrmVersion = "unknown";
 let modelRoot: THREE.Group;
 const poseController = new VRMPoseController();
 const blinkController = new VRMBlinkController();
@@ -248,22 +254,6 @@ function updateFallbackNotice(show: boolean) {
   }
 }
 
-function disposeHierarchy(obj: THREE.Object3D) {
-  obj.traverse((child) => {
-    if ((child as THREE.Mesh).isMesh) {
-      const mesh = child as THREE.Mesh;
-      if (mesh.geometry) mesh.geometry.dispose();
-      if (mesh.material) {
-        if (Array.isArray(mesh.material)) {
-          mesh.material.forEach((m) => m.dispose());
-        } else {
-          mesh.material.dispose();
-        }
-      }
-    }
-  });
-}
-
 async function loadVrmModel(filePath?: string) {
   lastRequestedVrmPath = filePath;
   showLoading("Loading VRM Avatar...");
@@ -284,79 +274,89 @@ async function loadVrmModel(filePath?: string) {
     loader.parse(
       data,
       "",
-      (gltf) => {
-        const vrm = gltf.userData.vrm as VRM;
-        if (!vrm) {
-          showError("Invalid VRM: No VRM data found in glTF file");
-          if (fallbackGroup) {
-            fallbackGroup.visible = true;
+      async (gltf) => {
+        try {
+          const vrm = gltf.userData.vrm as VRM;
+          if (!vrm) {
+            throw new Error("Invalid VRM: No VRM data found in glTF file");
           }
-          isFallbackActive = true;
-          updateFallbackNotice(true);
+
+          // Invoke shared VRM preparation pipeline:
+          // 1. Validates parsed VRM and humanoid data
+          // 2. Determines VRM version (0.0 vs 1.0) and applies orientation
+          // 3. Applies natural A-pose to humanoid rig
+          // 4. Sets root transform, grounding, and display scale
+          // 5. Connects lookAt target and facial blink controllers
+          // 6. Attaches prepared avatar to modelRoot
+          // 7. Safely disposes previous avatar ONLY after replacement succeeds
+          const result = prepareVrmForStage({
+            newVrm: vrm,
+            currentVrm,
+            modelRoot,
+            poseController,
+            blinkController,
+            config: currentConfig,
+            lookAtTarget,
+            scale: currentScale,
+          });
+
+          currentVrm = result.vrm;
+          currentDetectedVrmVersion = result.detectedVersion;
+          console.log(
+            `[Stage] Successfully prepared avatar. VRM Version: ${currentDetectedVrmVersion}, Orientation: ${result.orientationMode}`,
+          );
+
+          // Hide fallback mannequin ONLY after successful VRM attachment
+          if (fallbackGroup) {
+            fallbackGroup.visible = false;
+          }
+          isFallbackActive = false;
+          updateFallbackNotice(false);
+
+          // Report model status back to Main so Workspace displays detected version
+          if (desktopAPI?.stage?.reportModelStatus) {
+            const avatarName =
+              currentConfig?.avatarName ||
+              (filePath ? filePath.split(/[/\\]/).pop() : "Avatar");
+            await desktopAPI.stage.reportModelStatus({
+              avatarLoaded: true,
+              currentAvatarName: avatarName,
+              vrmVersion: currentDetectedVrmVersion,
+              orientationMode: result.orientationMode,
+            });
+          }
+
           hideLoading();
-          return;
+          hideError();
+        } catch (prepErr: any) {
+          console.error("[Stage] Error preparing VRM:", prepErr);
+          showError(`Failed to prepare VRM avatar: ${prepErr.message}`);
+          // Preserve current active avatar if one was already displaying
+          if (!currentVrm && fallbackGroup) {
+            fallbackGroup.visible = true;
+            isFallbackActive = true;
+            updateFallbackNotice(true);
+          }
+          hideLoading();
         }
-
-        // Dispose existing VRM if loaded
-        if (currentVrm) {
-          modelRoot.remove(currentVrm.scene);
-          disposeHierarchy(currentVrm.scene);
-          poseController.dispose();
-          blinkController.dispose();
-          currentVrm = null;
-        }
-
-        currentVrm = vrm;
-        modelRoot.add(vrm.scene);
-
-        // Apply natural A-pose to humanoid rig
-        poseController.setup(vrm);
-
-        // Initialize natural human-like blinking controller
-        blinkController.setup(vrm, {
-          autoBlinkEnabled: currentConfig?.autoBlinkEnabled ?? true,
-          customExpressionName: currentConfig?.customBlinkExpression,
-        });
-
-        // Hide fallback mannequin ONLY after successful VRM scene attachment
-        if (fallbackGroup) {
-          fallbackGroup.visible = false;
-        }
-        isFallbackActive = false;
-        updateFallbackNotice(false);
-
-        // Model orientation: Default 0 faces the viewer/camera directly
-        // Respects per-avatar rotation configuration if specified
-        const modelYaw = currentConfig?.rotationY ?? 0;
-        modelRoot.rotation.y = modelYaw;
-        applyScale(currentScale);
-
-        // Connect VRM lookAt system to global gaze target
-        if (vrm.lookAt) {
-          vrm.lookAt.target = lookAtTarget;
-          vrm.lookAt.autoUpdate = true;
-        }
-
-        hideLoading();
-        hideError();
       },
       (err) => {
         showError(`Failed to parse VRM: ${err.message}`);
-        if (fallbackGroup) {
+        if (!currentVrm && fallbackGroup) {
           fallbackGroup.visible = true;
+          isFallbackActive = true;
+          updateFallbackNotice(true);
         }
-        isFallbackActive = true;
-        updateFallbackNotice(true);
         hideLoading();
       },
     );
   } catch (err: any) {
     showError(err.message || "Failed to load VRM model");
-    if (fallbackGroup) {
+    if (!currentVrm && fallbackGroup) {
       fallbackGroup.visible = true;
+      isFallbackActive = true;
+      updateFallbackNotice(true);
     }
-    isFallbackActive = true;
-    updateFallbackNotice(true);
     hideLoading();
   }
 }
@@ -610,16 +610,34 @@ async function setupStageSync() {
       desiredGazeTarget.set(worldX, worldY, worldZ);
 
       // Subtle natural head yaw and pitch (turning towards cursor in front of avatar)
-      targetGazeYaw = Math.max(-0.25, Math.min(0.25, clampedX * 0.12));
+      // Account for avatar root yaw so horizontal head turning direction remains consistent
+      const effectiveYawSign =
+        Math.cos(modelRoot ? modelRoot.rotation.y : 0) >= 0 ? 1 : -1;
+      targetGazeYaw = Math.max(
+        -0.25,
+        Math.min(0.25, clampedX * 0.12 * effectiveYawSign),
+      );
       targetGazePitch = Math.max(-0.18, Math.min(0.18, -clampedY * 0.1));
     });
 
     // Subscribe to broadcast events
     desktopAPI.stage.onConfigChanged?.((cfg) => {
+      currentConfig = { ...(currentConfig || {}), ...cfg } as AvatarConfig;
       if (cfg.scale !== undefined && cfg.scale !== currentScale) {
         applyScale(cfg.scale);
       }
-      if (cfg.rotationY !== undefined && modelRoot) {
+      if (
+        (cfg.orientationMode !== undefined || cfg.rotationY !== undefined) &&
+        currentVrm &&
+        modelRoot
+      ) {
+        applyOrientation(
+          currentVrm,
+          modelRoot,
+          cfg.orientationMode ?? currentConfig.orientationMode,
+          cfg.rotationY ?? currentConfig.rotationY,
+        );
+      } else if (cfg.rotationY !== undefined && modelRoot) {
         modelRoot.rotation.y = cfg.rotationY;
       }
       if (
@@ -637,8 +655,7 @@ async function setupStageSync() {
       if (cfg.autoBlinkEnabled !== undefined) {
         blinkController.setAutoBlinkEnabled(cfg.autoBlinkEnabled);
       }
-      if (cfg.avatarPath && cfg.avatarPath !== currentConfig?.avatarPath) {
-        currentConfig = cfg;
+      if (cfg.avatarPath && cfg.avatarPath !== lastRequestedVrmPath) {
         loadVrmModel(cfg.avatarPath);
       }
     });

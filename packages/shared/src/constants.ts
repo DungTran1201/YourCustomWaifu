@@ -32,6 +32,7 @@ export const DEFAULT_AVATAR_CONFIG = {
   lookAtMode: "head_and_eyes" as const,
   lookAtIntensity: 1.0,
   rotationY: 0,
+  orientationMode: "auto" as const,
   autoBlinkEnabled: true,
   customBlinkExpression: undefined as string | undefined,
 };
@@ -49,6 +50,8 @@ export const INITIAL_STAGE_STATUS = {
   stageReady: false,
   avatarLoaded: false,
   currentAvatarName: null as string | null,
+  vrmVersion: null as string | null,
+  orientationMode: "auto" as const,
   loading: false,
   error: null as string | null,
   animationPaused: false,

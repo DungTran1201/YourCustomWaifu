@@ -10,13 +10,14 @@ import {
   screen,
 } from "electron";
 import { fileURLToPath } from "node:url";
-import { dirname, join, basename } from "node:path";
+import { dirname, join, basename, normalize } from "node:path";
 import os from "node:os";
 import fs from "node:fs/promises";
 import {
   IPC_CHANNELS,
   type DiagnosticsInfo,
   type AvatarConfig,
+  type AvatarOrientationMode,
   type StageStatus,
   type WorkspaceBounds,
   type GazeData,
@@ -46,6 +47,19 @@ let tray: Tray | null = null;
 let isQuitting = false;
 let cursorTrackingTimer: NodeJS.Timeout | null = null;
 
+// Per-avatar presentation settings overrides
+export interface AvatarModelOverride {
+  orientationMode?: AvatarOrientationMode;
+  rotationY?: number;
+  scale?: number;
+}
+let avatarOverrides: Record<string, AvatarModelOverride> = {};
+
+function getAvatarStorageKey(avatarPath?: string | null): string {
+  if (!avatarPath) return "default";
+  return normalize(avatarPath).toLowerCase();
+}
+
 // Shared State & Persistence
 let avatarConfig: AvatarConfig = { ...DEFAULT_AVATAR_CONFIG };
 let workspaceBounds: WorkspaceBounds = { ...DEFAULT_WORKSPACE_BOUNDS };
@@ -70,6 +84,12 @@ async function loadPersistedConfig(): Promise<void> {
         ...DEFAULT_WORKSPACE_BOUNDS,
         ...(parsed.workspaceBounds || {}),
       };
+      if (
+        parsed.avatarOverrides &&
+        typeof parsed.avatarOverrides === "object"
+      ) {
+        avatarOverrides = parsed.avatarOverrides;
+      }
     } else {
       // Backward-compatibility: flat avatarConfig
       avatarConfig = { ...DEFAULT_AVATAR_CONFIG, ...parsed };
@@ -78,6 +98,7 @@ async function loadPersistedConfig(): Promise<void> {
   } catch {
     avatarConfig = { ...DEFAULT_AVATAR_CONFIG };
     workspaceBounds = { ...DEFAULT_WORKSPACE_BOUNDS };
+    avatarOverrides = {};
   }
 }
 
@@ -86,6 +107,7 @@ async function savePersistedConfig(): Promise<void> {
     const payload = {
       avatarConfig,
       workspaceBounds,
+      avatarOverrides,
     };
     await fs.writeFile(
       getConfigFilePath(),
@@ -777,7 +799,43 @@ function registerIpcHandlers(): void {
       if (!validateIpcSender(event.sender, allowedWindows())) {
         throw new Error("Unauthorized IPC sender");
       }
+
+      // Check if avatarPath is switching to a different model
+      if (
+        partial.avatarPath &&
+        partial.avatarPath !== avatarConfig.avatarPath
+      ) {
+        const key = getAvatarStorageKey(partial.avatarPath);
+        const saved = avatarOverrides[key];
+        if (saved) {
+          avatarConfig.orientationMode = saved.orientationMode ?? "auto";
+          avatarConfig.rotationY = saved.rotationY ?? 0;
+          avatarConfig.scale = saved.scale ?? 1.0;
+        } else {
+          avatarConfig.orientationMode = "auto";
+          avatarConfig.rotationY = 0;
+          avatarConfig.scale = 1.0;
+        }
+      }
+
       Object.assign(avatarConfig, partial);
+
+      // Save per-avatar presentation overrides if avatarPath is assigned
+      if (avatarConfig.avatarPath) {
+        const key = getAvatarStorageKey(avatarConfig.avatarPath);
+        const existing = avatarOverrides[key] || {};
+        if (partial.orientationMode !== undefined) {
+          existing.orientationMode = partial.orientationMode;
+        }
+        if (partial.rotationY !== undefined) {
+          existing.rotationY = partial.rotationY;
+        }
+        if (partial.scale !== undefined) {
+          existing.scale = partial.scale;
+        }
+        avatarOverrides[key] = existing;
+      }
+
       if (partial.alwaysOnTop !== undefined) {
         setAlwaysOnTop(partial.alwaysOnTop);
       }
@@ -810,16 +868,60 @@ function registerIpcHandlers(): void {
 
     const filePath = res.filePaths[0];
     const fileName = basename(filePath);
+    const key = getAvatarStorageKey(filePath);
+    const saved = avatarOverrides[key];
+
     avatarConfig.avatarPath = filePath;
     avatarConfig.avatarName = fileName;
+
+    // Apply per-avatar saved presentation settings or default to auto
+    if (saved) {
+      avatarConfig.orientationMode = saved.orientationMode ?? "auto";
+      avatarConfig.rotationY = saved.rotationY ?? 0;
+      avatarConfig.scale = saved.scale ?? 1.0;
+    } else {
+      avatarConfig.orientationMode = "auto";
+      avatarConfig.rotationY = 0;
+      avatarConfig.scale = 1.0;
+    }
+
     stageStatus.avatarLoaded = true;
     stageStatus.currentAvatarName = fileName;
+    stageStatus.orientationMode = avatarConfig.orientationMode;
     await savePersistedConfig();
     broadcastStageConfig();
     broadcastStageStatus();
 
     return { canceled: false, filePath, fileName };
   });
+
+  ipcMain.handle(
+    IPC_CHANNELS.STAGE_REPORT_MODEL_STATUS,
+    async (
+      event,
+      status: {
+        avatarLoaded: boolean;
+        currentAvatarName?: string;
+        vrmVersion?: string;
+        orientationMode?: AvatarOrientationMode;
+      },
+    ) => {
+      if (!validateIpcSender(event.sender, allowedWindows())) {
+        throw new Error("Unauthorized IPC sender");
+      }
+      stageStatus.avatarLoaded = status.avatarLoaded;
+      if (status.currentAvatarName) {
+        stageStatus.currentAvatarName = status.currentAvatarName;
+      }
+      if (status.vrmVersion) {
+        stageStatus.vrmVersion = status.vrmVersion;
+      }
+      if (status.orientationMode) {
+        stageStatus.orientationMode = status.orientationMode;
+      }
+      broadcastStageStatus();
+    },
+  );
 
   ipcMain.handle(
     IPC_CHANNELS.STAGE_LOAD_VRM_BUFFER,
