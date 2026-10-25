@@ -1,11 +1,13 @@
-# VRMMotionGeneration — Web + Electron Desktop Foundation
+# YourCustomWaifu — Desktop-First Personal AI Companion
 
-A high-performance, type-safe monorepo foundation delivering a unified **Web application (SPA)** and **Native Desktop application (Electron)** sharing presentation components, reactive state stores, design tokens, and typed contracts.
+A high-performance, type-safe monorepo delivering a unified **Native Desktop Application (Electron)** and **Web Companion Client (Vite SPA)** sharing presentation components, reactive state stores, design tokens, and typed contracts.
 
-> **Important Architectural Scope Notice**
-> This repository underwent a complete architectural reset on **2026-10-22** (via branch `chore/web-electron-foundation-reset`).
-> All prior experimental lines for neural motion generation, ARDY, MotionStreamer, DiP, kinematic retargeting, model training scripts, PyTorch/CUDA dependencies, and avatar checkpoints have been **permanently purged** from the active scope.
-> The sole focus of this repository is a production-grade, secure **Web and Electron Desktop platform**.
+The application features **two decoupled desktop surfaces**:
+- **Workspace**: Text-focused conversation space, Agent personalization, Memory, Skills, Rules, Tools, AI Model Connections, Avatar Settings, and Account Security.
+- **Avatar Stage**: Independent, transparent, frameless desktop window rendering 3D VRM characters with Three.js subtle idle motions (breathing, swaying, blinking) and floating controls, remaining visible above standard desktop applications even after the Workspace is closed.
+
+> **Architectural Scope Notice**
+> This repository is strictly scoped as a personal AI companion platform. All legacy experimental neural motion generation, ARDY, MotionStreamer, and PyTorch training pipelines have been permanently purged.
 
 ---
 
@@ -87,33 +89,102 @@ VRMMotionGeneration/
 
 ---
 
+---
+
+## Desktop Architecture: Two Independent Windows
+
+YourCustomWaifu operates via two decoupled native desktop windows in Electron:
+
+```mermaid
+graph TD
+    MainProcess[Electron Main Process / Lifecycle Manager] -->|Tray & Global Shortcuts| User[User OS Interaction]
+    MainProcess -->|Independent Window 1| WorkspaceWindow[Workspace Window: Chat, Config, Settings]
+    MainProcess -->|Independent Window 2| StageWindow[Avatar Stage: Frameless, Transparent, VRM 3D]
+
+    subgraph "Workspace Window Context"
+        WorkspaceWindow --> VueUI[Vue 3 Application Shell]
+        VueUI --> ChatView[Chatspace: Text-Focused Companion]
+        VueUI --> AgentsView[Agent Personalization & Prompts]
+        VueUI --> SkillsView[Modular Skills Library]
+        VueUI --> RulesView[Operational Constraints & Scopes]
+        VueUI --> ToolsView[Permission-Isolated Tools]
+        VueUI --> ConnectionsView[AI Model Key Vault]
+        VueUI --> MemoryView[Local Memory & Privacy]
+        VueUI --> AvatarSettingsView[VRM Loader & Stage Config]
+    end
+
+    subgraph "Avatar Stage Context"
+        StageWindow --> ThreeWebGL[Three.js WebGL Transparent Canvas]
+        ThreeWebGL --> VRMLoader[@pixiv/three-vrm Loader Plugin]
+        ThreeWebGL --> IdleEngine[Procedural Breathing & Blink Motion]
+        StageWindow --> FloatingToolbar[Hover Floating Controls & Drag Handle]
+    end
+
+    MainProcess -->|Typed IPC Events| WorkspaceWindow
+    MainProcess -->|Typed IPC Events| StageWindow
+```
+
+### 1. Workspace
+- Main desktop hub for user interaction, personality editing, and account security.
+- Text-focused conversation area: strictly free of anime illustrations or avatar banners.
+- Independent lifecycle: closing or minimizing Workspace **does not terminate** Avatar Stage or reset companion runtime state.
+
+### 2. Avatar Stage
+- Dedicated frameless, transparent window rendering user-selected `.vrm` avatars with Three.js.
+- Always-on-top mode: remains visible above standard desktop applications (e.g. Chrome, VS Code).
+- Click-through mode: forward mouse events to underlying windows, restored via `Ctrl+Shift+M` or System Tray.
+- Minimal floating toolbar: Drag handle, avatar scale adjust, pause/resume animation, open Workspace, hide Stage.
+- Idle animation: subtle procedural breathing, head sway, and natural periodic eye blinking.
+
+### 3. System Tray & Global Shortcuts
+- **System Tray Menu**: Open Workspace, Show / Hide Avatar Stage, Pause / Resume Motion, Avatar Settings, Application Settings, Quit Application.
+- **`Ctrl+Shift+A`** (`CommandOrControl+Shift+A`): Toggle Avatar Stage visibility globally.
+- **`Ctrl+Shift+M`** (`CommandOrControl+Shift+M`): Toggle Stage click-through mode globally.
+
+---
+
 ## Getting Started
 
 ```bash
 # 1. Install all monorepo dependencies
 pnpm install
 
-# 2. Run the Web application in local development mode
+# 2. Run backend auth & identity server
+pnpm dev:backend
+
+# 3. Run the Web application in local development mode
 pnpm dev:web
 
-# 3. Run the Electron Desktop application in development mode
+# 4. Run the Electron Desktop application (Workspace + Avatar Stage)
 pnpm dev:desktop
 
-# 4. Run TypeScript typecheck across all packages
+# 5. Run TypeScript strict typecheck across all packages
 pnpm typecheck
 
-# 5. Run lint formatting check
+# 6. Run lint formatting check
 pnpm lint
 
-# 6. Run automated test suites (Vitest)
+# 7. Run automated test suites (Vitest)
 pnpm test
 
-# 7. Build Web production distribution
+# 8. Build Web production distribution
 pnpm build:web
 
-# 8. Build Electron Desktop production distribution
+# 9. Build Electron Desktop production distribution (both Workspace and Stage HTMLs)
 pnpm build:desktop
 ```
+
+---
+
+## Windows Manual Verification Steps
+
+1. **Launch**: Run `pnpm dev:desktop`. Verify Workspace opens and the System Tray icon appears.
+2. **Launch Stage**: Click **"Show Stage"** on the top header or in Avatar Settings. Verify the transparent frameless Avatar Stage window appears floating on the desktop.
+3. **Workspace Independence**: Close the Workspace window by clicking the `X` button. Verify the Avatar Stage **remains visible and animating** above desktop apps.
+4. **Tray Reopening**: Right-click the system tray icon and click **"Open Workspace"**. Verify Workspace re-opens instantly with session, conversation history, and stage status intact.
+5. **Global Shortcut**: Press `Ctrl+Shift+A` (or `Cmd+Shift+A`). Verify Avatar Stage toggles between hidden and visible without recreating extra windows.
+6. **Click-Through Mode**: Press `Ctrl+Shift+M` or toggle in toolbar. Verify clicks pass directly to desktop applications below. Press `Ctrl+Shift+M` to restore interaction.
+7. **Quit**: Right-click the System Tray icon and select **"Quit YourCustomWaifu"**. Verify all windows and processes terminate cleanly.
 
 ---
 
@@ -125,10 +196,20 @@ In compliance with the [Official Electron Security Checklist](https://www.electr
 2. **`nodeIntegration = false`**: Node.js APIs are completely inaccessible in the renderer.
 3. **`sandbox = true`**: Renderer processes run inside an OS sandbox.
 4. **`webSecurity = true`**: Standard same-origin policy is strictly enforced.
-5. **Typed IPC Bridge**: Only strongly typed channels (`app:get-version`, `app:get-diagnostics`, `app:ping`) are exposed through `window.desktopAPI`.
+5. **Typed IPC Bridge**: Only strongly typed channels (`stage:*`, `workspace:*`, `app:*`) are exposed through `window.desktopAPI`.
 6. **Navigation Guard**: External URLs are intercepted and opened exclusively via `shell.openExternal`.
 
-For details, see [Electron Security Baseline](file:///c:/Users/PC/Project/VRMMotionGeneration/docs/04-security/electron-security-baseline.md).
+---
+
+## Desktop Documentation
+- [Desktop Architecture](file:///c:/Users/PC/Project/VRMMotionGeneration/docs/desktop/ARCHITECTURE.md)
+- [Window Lifecycle & Multi-Display Specification](file:///c:/Users/PC/Project/VRMMotionGeneration/docs/desktop/WINDOW-LIFECYCLE.md)
+- [Security Baseline & Hardening](file:///c:/Users/PC/Project/VRMMotionGeneration/docs/desktop/SECURITY.md)
+- [Authentication & Account Integration](file:///c:/Users/PC/Project/VRMMotionGeneration/docs/desktop/AUTH-INTEGRATION.md)
+- [Avatar Stage & VRM 3D Rendering](file:///c:/Users/PC/Project/VRMMotionGeneration/docs/desktop/VRM-STAGE.md)
+- [Testing & Release Verification](file:///c:/Users/PC/Project/VRMMotionGeneration/docs/desktop/TESTING-AND-RELEASE.md)
+- [Implementation Plan](file:///c:/Users/PC/Project/VRMMotionGeneration/docs/desktop/IMPLEMENTATION-PLAN.md)
+- [Codebase Audit & Feature Inventory](file:///c:/Users/PC/Project/VRMMotionGeneration/docs/desktop/CODEBASE-AUDIT.md)
 
 ---
 

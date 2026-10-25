@@ -6,7 +6,7 @@ import { useAppStore } from "@vrm/app-core";
 describe("Web Application Foundation Mount", () => {
   it("renders successfully and displays platform as Web Client", () => {
     const wrapper = mount(App);
-    expect(wrapper.text()).toContain("VRM Platform");
+    expect(wrapper.text()).toContain("YourCustomWaifu");
     expect(wrapper.text()).toContain("Web Client");
   });
 

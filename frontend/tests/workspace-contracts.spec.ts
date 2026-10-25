@@ -4,7 +4,8 @@ import { detectPlatform, createWebFallbackAPI } from "@vrm/app-core";
 
 describe("Workspace Contracts and Architecture Integrity", () => {
   it("defines valid application metadata and defaults", () => {
-    expect(APP_METADATA.name).toBe("VRMMotionGeneration Platform");
+    expect(APP_METADATA.name).toBe("YourCustomWaifu — Desktop AI Companion");
+    expect(APP_METADATA.shortName).toBe("YourCustomWaifu");
     expect(APP_METADATA.license).toBe("MIT");
     expect(DEFAULT_SETTINGS.theme).toBe("dark");
   });

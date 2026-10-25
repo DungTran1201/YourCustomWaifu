@@ -21,5 +21,11 @@ export default defineConfig({
     outDir: resolve(__dirname, "dist"),
     emptyOutDir: true,
     sourcemap: true,
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, "src/renderer/index.html"),
+        stage: resolve(__dirname, "src/renderer/stage.html"),
+      },
+    },
   },
 });

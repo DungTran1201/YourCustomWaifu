@@ -1,29 +1,21 @@
-# ADR-XXXX: [Short Title of Architectural Decision]
+# ADR-NNN: <decision title>
 
-- **Status**: [Draft | Proposed | Accepted | Rejected | Superseded]
-- **Deciders**: [List of decision makers]
-- **Date**: [YYYY-MM-DD]
-- **Technical Context**: [Brief description of the context]
+- Status: Proposed | Accepted | Superseded
+- Date: YYYY-MM-DD
+- Owners: <roles>
 
----
+## Context
+What problem and constraints led to this decision?
 
-## 1. Context and Problem Statement
-[Describe the problem, context, and forces influencing the decision]
+## Decision
+What will be done, and what is explicitly out of scope?
 
-## 2. Decision Drivers
-- [Driver 1]
-- [Driver 2]
+## Options considered
+- Option A — benefits / trade-offs.
+- Option B — benefits / trade-offs.
 
-## 3. Considered Alternatives
-- **Alternative 1**: [Description, pros, cons]
-- **Alternative 2**: [Description, pros, cons]
+## Consequences
+Security, lifecycle, performance, testing, migration and maintenance effects.
 
-## 4. Decision Outcome
-[Chosen option and detailed rationale]
-
-## 5. Consequences
-- **Positive**: [Benefits achieved]
-- **Negative / Risks**: [Trade-offs or mitigations needed]
-
-## 6. Official References
-- [Reference link 1](https://example.com)
+## Verification
+Tests or evidence required to validate this decision.

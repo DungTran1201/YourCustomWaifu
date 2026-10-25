@@ -13,11 +13,21 @@ import ResetPasswordView from "../views/ResetPasswordView.vue";
 import ProfileView from "../views/ProfileView.vue";
 import SecurityView from "../views/SecurityView.vue";
 import SecretsView from "../views/SecretsView.vue";
+import ChatView from "../views/ChatView.vue";
+import AvatarSettingsView from "../views/AvatarSettingsView.vue";
+import AgentsView from "../views/AgentsView.vue";
+import SkillsView from "../views/SkillsView.vue";
+import RulesView from "../views/RulesView.vue";
+import ToolsView from "../views/ToolsView.vue";
+import ConnectionsView from "../views/ConnectionsView.vue";
+import MemoryView from "../views/MemoryView.vue";
+import ActivityView from "../views/ActivityView.vue";
 
 const store = useAppStore();
 
 onMounted(() => {
   store.initAuth();
+  store.initStageSync();
 });
 </script>
 
@@ -26,7 +36,16 @@ onMounted(() => {
     <NavigationBar />
 
     <main class="shell-main" role="main">
-      <OverviewView v-if="store.state.currentTab === 'overview'" />
+      <ChatView v-if="store.state.currentTab === 'chat'" />
+      <AvatarSettingsView v-else-if="store.state.currentTab === 'avatar'" />
+      <AgentsView v-else-if="store.state.currentTab === 'agents'" />
+      <SkillsView v-else-if="store.state.currentTab === 'skills'" />
+      <RulesView v-else-if="store.state.currentTab === 'rules'" />
+      <ToolsView v-else-if="store.state.currentTab === 'tools'" />
+      <ConnectionsView v-else-if="store.state.currentTab === 'connections'" />
+      <MemoryView v-else-if="store.state.currentTab === 'memory'" />
+      <ActivityView v-else-if="store.state.currentTab === 'activity'" />
+      <OverviewView v-else-if="store.state.currentTab === 'overview'" />
       <ProfileView v-else-if="store.state.currentTab === 'profile'" />
       <SecurityView v-else-if="store.state.currentTab === 'security'" />
       <SecretsView v-else-if="store.state.currentTab === 'secrets'" />

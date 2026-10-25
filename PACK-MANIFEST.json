@@ -1,0 +1,13 @@
+{
+  "bundle": "YourCustomWaifu Agent Skills Pack",
+  "version": "1.0.0",
+  "created": "2026-10-25",
+  "skill_count": 15,
+  "rule_count": 11,
+  "agent_profiles": 10,
+  "notes": [
+    "Project-specific original guidance",
+    "Upstream links and license notes included",
+    "No third-party SKILL.md files copied verbatim"
+  ]
+}

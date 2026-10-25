@@ -1,7 +1,7 @@
 import { session, shell, type WebContents, type BrowserWindow } from "electron";
 
 export const CSP_HEADER =
-  "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self';";
+  "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' http://localhost:5173 http://127.0.0.1:5173 http://localhost:3000 http://127.0.0.1:3000 blob: data:;";
 
 export function configureSessionSecurity(): void {
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
@@ -49,10 +49,11 @@ export function enforceWindowSecurity(mainWindow: BrowserWindow): void {
 
 export function validateIpcSender(
   contents: WebContents,
-  mainWindow: BrowserWindow | null,
+  windows: (BrowserWindow | null)[] | (BrowserWindow | null),
 ): boolean {
-  if (!mainWindow || mainWindow.isDestroyed()) {
-    return false;
-  }
-  return contents.id === mainWindow.webContents.id;
+  if (!contents) return false;
+  const list = Array.isArray(windows) ? windows : [windows];
+  return list.some(
+    (win) => win && !win.isDestroyed() && contents.id === win.webContents.id,
+  );
 }

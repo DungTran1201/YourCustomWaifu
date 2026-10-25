@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YourCustomWaifu — Avatar Stage</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: transparent !important;
+      user-select: none;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    #stage-root {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    #stage-canvas {
+      width: 100% !important;
+      height: 100% !important;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+      display: block;
+      pointer-events: auto;
+    }
+
+    /* Minimal Floating Toolbar */
+    .stage-toolbar {
+      position: absolute;
+      top: 14px;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 10px;
+      background: rgba(20, 21, 25, 0.88);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 9999px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+      opacity: 0;
+      transform: translateY(-4px);
+      transition: opacity 200ms ease, transform 200ms ease;
+      pointer-events: auto;
+    }
+
+    #stage-root:hover .stage-toolbar,
+    .stage-toolbar:focus-within,
+    .stage-toolbar.always-show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .drag-handle {
+      -webkit-app-region: drag;
+      cursor: grab;
+      padding: 4px 8px;
+      color: #A4A7AF;
+      font-size: 0.85rem;
+      border-radius: 9999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 150ms ease;
+    }
+
+    .drag-handle:hover {
+      color: #F1F2F4;
+    }
+
+    .tool-btn {
+      -webkit-app-region: no-drag;
+      cursor: pointer;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #A4A7AF;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+      transition: all 150ms ease;
+    }
+
+    .tool-btn:hover {
+      color: #F1F2F4;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .tool-btn.active {
+      color: #06b6d4;
+      background: rgba(6, 182, 212, 0.18);
+    }
+
+    .tool-separator {
+      width: 1px;
+      height: 16px;
+      background: rgba(255, 255, 255, 0.12);
+      margin: 0 2px;
+    }
+
+    /* Loading Overlay */
+    .stage-overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 50;
+      background: rgba(20, 21, 25, 0.92);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      padding: 16px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      color: #F1F2F4;
+      font-size: 0.85rem;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+    }
+
+    .stage-overlay.hidden {
+      display: none;
+    }
+
+    .spinner {
+      width: 24px;
+      height: 24px;
+      border: 2px solid rgba(255, 255, 255, 0.15);
+      border-top-color: #06b6d4;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Error Overlay */
+    .stage-error-overlay {
+      position: absolute;
+      bottom: 24px;
+      left: 16px;
+      right: 16px;
+      z-index: 60;
+      background: rgba(30, 20, 20, 0.95);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      border-radius: 10px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      color: #F1F2F4;
+      font-size: 0.825rem;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    }
+
+    .stage-error-overlay.hidden {
+      display: none;
+    }
+
+    .error-action-btn {
+      padding: 5px 12px;
+      background: #ef4444;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="stage-root">
+    <!-- 3D Canvas -->
+    <canvas id="stage-canvas"></canvas>
+
+    <!-- Floating Minimal Toolbar -->
+    <div id="stage-toolbar" class="stage-toolbar">
+      <!-- Drag Grip Handle -->
+      <div id="btn-drag-handle" class="drag-handle" title="Drag to move Stage">✥</div>
+
+      <div class="tool-separator"></div>
+
+      <!-- Scale Adjust -->
+      <button id="btn-scale-down" class="tool-btn" title="Decrease Avatar Scale">−</button>
+      <button id="btn-scale-up" class="tool-btn" title="Increase Avatar Scale">+</button>
+
+      <div class="tool-separator"></div>
+
+      <!-- Always on top toggle -->
+      <button id="btn-always-on-top" class="tool-btn active" title="Toggle Always On Top">📌</button>
+
+      <!-- Click-through toggle -->
+      <button id="btn-click-through" class="tool-btn" title="Toggle Click-Through Mode (Ctrl+Shift+M)">🖱️</button>
+
+      <!-- Pause / Resume animation -->
+      <button id="btn-pause-animation" class="tool-btn" title="Pause/Resume Motion">⏯️</button>
+
+      <div class="tool-separator"></div>
+
+      <!-- Open Workspace button -->
+      <button id="btn-open-workspace" class="tool-btn" title="Open Companion Workspace">💬</button>
+
+      <!-- Open Avatar Settings button -->
+      <button id="btn-open-settings" class="tool-btn" title="Open Avatar Settings">⚙️</button>
+
+      <div class="tool-separator"></div>
+
+      <!-- Hide Stage -->
+      <button id="btn-hide-stage" class="tool-btn" title="Hide Avatar Stage">✕</button>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="stage-loading" class="stage-overlay hidden">
+      <div class="spinner"></div>
+      <span id="stage-loading-text">Loading VRM Avatar...</span>
+    </div>
+
+    <!-- Error Banner -->
+    <div id="stage-error" class="stage-error-overlay hidden">
+      <span id="stage-error-message">Unable to load VRM model</span>
+      <button id="stage-error-settings-btn" class="error-action-btn">Settings</button>
+    </div>
+  </div>
+
+  <script type="module" src="./src/stage-main.ts"></script>
+</body>
+</html>

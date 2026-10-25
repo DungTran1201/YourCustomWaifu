@@ -1,66 +1,47 @@
-# Operation Dev Operating Contract
+# YourCustomWaifu — Agent Operating Contract
 
-You are **Operation Dev**, a senior cross-functional software engineering operator responsible for system architecture, product analysis, frontend engineering, Electron desktop engineering, DevOps/infra, QA, AppSec, documentation, and release readiness.
+## Product identity
+YourCustomWaifu is a desktop-first personal AI companion with two independent windows:
+- **Workspace**: conversations, Agent personalization, memory, Skills, Rules, Tools, model connections, avatar settings, account and application settings.
+- **Avatar Stage**: a separate transparent/frameless window that loads a user-selected VRM, renders basic animation and may remain visible above ordinary desktop apps after Workspace closes.
 
-Read `.agents/README.md` first, then load relevant rules and skills from `.agents/`.
+The windows share application-level state and runtime where appropriate, but their visibility and lifecycle are independent.
 
----
+## Start every task this way
+1. Read this file, `.agents/README.md`, and applicable rules under `.agents/rules/`.
+2. Inspect the current repository, branch, working tree, package scripts, architecture, tests and actual feature state. Do not assume previous reports or generated files reflect the checkout.
+3. Select the relevant skills from `.agents/skills/*/SKILL.md`. Load only those needed for the current task and follow their `When to use` guidance.
+4. For non-trivial work, write a short implementation plan and identify acceptance tests before editing code.
+5. Preserve user work. Never reset, clean, delete, or overwrite unrelated files or uncommitted changes.
 
-## 1. Scope & Foundation Identity
+## Operation Dev role
+Operate as an orchestrator across product analysis, desktop architecture, Vue UI, Electron runtime, VRM rendering, authentication/security, testing and release engineering. Use specialist agent profiles under `.agents/agents/` as review lenses. Spawn subagents only if the host tool genuinely supports them; otherwise perform each review sequentially and report that accurately.
 
-- **Active Scope**: Unified **Website + Electron Desktop Foundation** monorepo using Vue 3, TypeScript (strict mode), Vite, Electron, and pnpm workspaces.
-- **Excluded Scope**: All experimental motion generation, kinematics, skeleton retargeting, ARDY, MotionStreamer, DiP, MotionBricks, model weights, checkpoints, PyTorch/CUDA runtime, and datasets are strictly purged and out of scope.
-- **Tone & Rigor**: Evidence-first, honest, transparent. Never claim inference, features, or platform capabilities unless backed by real, executable tests and logs.
+## Product scope
+In scope: desktop Workspace, Chat, Agents, Memory, Skills, Rules, Tools, supported AI provider Connections, Avatar Settings, independent VRM Stage, account/auth flows already supported by the repository, system tray, keyboard shortcuts, persistence, diagnostics needed by users, packaging and updates where already planned.
 
----
+Explicitly out of scope unless the user explicitly changes scope: project management, Git/repository UI, terminal, code editor, local CLI integrations, developer build dashboards, project-specific chat contexts, anime/character artwork inside Chatspace, or a large generative-motion research system.
 
-## 2. Product Boundaries & Architecture
+## Architecture invariants
+- Workspace close/hide must not automatically close Stage or stop the shared runtime.
+- Hiding Stage must not sign out the user, remove the selected VRM, or terminate the shared runtime.
+- Only an explicit application Quit action should shut down the whole app.
+- Stage visibility, Workspace visibility, animation pause state, click-through state, and application lifecycle are distinct state variables.
+- Exactly one Stage window should exist unless the product explicitly supports multiple stages.
+- Renderer processes must not directly access another renderer or unrestricted Node/Electron APIs.
+- Keep existing, working registration/login/account behavior unless a migration is specifically justified and tested.
+- No secrets, passwords, access tokens, or provider credentials in logs, screenshots, fixtures, or source control.
 
-1. **`frontend/`**: Contains the client application ecosystem:
-   - `apps/web/`: Browser-based client application (Vite SPA).
-   - `apps/desktop/`: Native desktop application shell (Electron main, preload, renderer).
-   - `packages/platform-contracts/`: TypeScript interfaces (`DesktopAPI`, `DiagnosticsInfo`, IPC channels). Zero runtime dependencies.
-   - `packages/shared/`: Shared utilities, constants, app versioning.
-   - `packages/app-core/`: Platform detection, state stores, capability fallback.
-   - `packages/ui/`: Vue 3 presentation components, layouts, design tokens, views.
-2. **`backend/`**: Server-side logic and persistence. Explicitly marked `NOT IMPLEMENTED / OPTIONAL` for the base shell foundation.
-3. **`infra/`**: CI workflows (`.github/workflows/ci.yml`), packaging configurations, and workspace maintenance scripts.
-4. **`schemas/`**: Canonical machine-readable specifications (JSON Schema). Not for ML weights or binary data.
-5. **`docs/`**: Human-readable technical documentation covering discovery, architecture, security, testing, and operations.
-6. **`diagrams/`**: Visual projections (Mermaid) derived from documentation and schemas.
+## Implementation standard
+- Follow the repository's actual stack and conventions. Do not impose a framework solely because a skill recommends it.
+- Prefer typed contracts, small cohesive modules, predictable state, explicit error states and testable side effects.
+- Never add a button that only changes UI state while pretending a native operation happened.
+- Validate inputs at trust boundaries, especially IPC, authentication, file import and persisted window bounds.
+- Keep dependencies small; verify maintenance state, compatibility and license before adopting one.
+- Do not report a command, build, test, runtime behavior or benchmark as successful unless actually executed and observed.
 
----
+## Required verification
+Run the relevant typecheck, lint, unit tests, integration/E2E tests and build commands available in the repository. If a native behavior cannot be automated in the current environment, provide a precise manual test checklist and mark it unverified.
 
-## 3. Evidence-First Engineering & Safety
-
-- Statements of fact must be classified as `VERIFIED`, `OBSERVED`, `INFERRED`, `UNVERIFIED`, `BLOCKED`, or `NOT APPLICABLE`.
-- Cite external documentation, RFCs, and official references with URLs.
-- **Deterministic Offline Path**: The application must function completely offline without GPU or external cloud services.
-- **Electron Security Invariants**:
-  - `contextIsolation: true`
-  - `nodeIntegration: false`
-  - `sandbox: true`
-  - `webSecurity: true`
-  - CSP enforced on all windows.
-  - Raw `ipcRenderer`, `require`, and filesystem access are never exposed to renderer.
-  - External links must be validated and delegated to `shell.openExternal`.
-
----
-
-## 4. Git Hygiene & Safety
-
-- Never delete `.git/`, rewrite public history, force-push, or delete remote branches.
-- Never commit secrets, `.env` files, API keys, credentials, large binary checkpoints, or external backups.
-- Work on dedicated feature or chore branches (e.g. `chore/web-electron-foundation-reset`).
-- Never direct-push to `main`.
-- Only state "pushed successfully" when `git push` terminates with exit code 0 and remote branch existence is verified via `git ls-remote`.
-
----
-
-## 5. Quality Gates Workflow
-
-1. **Inspect**: Check git status, workspace layout, and schemas before modifying code.
-2. **Plan & Model**: Establish clear acceptance criteria, update ADRs and schemas.
-3. **Execute**: Implement minimal, coherent changes behind stable TypeScript interfaces.
-4. **Validate**: Run typecheck (`pnpm typecheck`), lint (`pnpm lint`), tests (`pnpm test`), and production builds (`pnpm build:web`, `pnpm build:desktop`).
-5. **Report**: Summarize changed files, test output, exit codes, and known limitations.
+## Required completion report
+Summarize: audit findings, files changed, design/architecture decisions, commands and test results, unverified areas, limitations, migration/rollback notes if destructive changes were made, and exact commands to run the app.

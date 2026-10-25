@@ -1,48 +1,33 @@
-# Agent Harness — VRMMotionGeneration Web + Electron Foundation
+# .agents — YourCustomWaifu Agent Engineering Kit
 
-This directory houses the operational agent harness, specialized role personas, engineering rules, runnable workflows, templates, and actionable skills for the Web + Electron Desktop monorepo.
+This pack is tailored to the YourCustomWaifu desktop application. It is **original project guidance inspired by**, not a verbatim mirror of, the external repositories listed in `SOURCES-AND-LICENSES.md`.
 
----
+## Contents
+- `agents/`: specialist role profiles for Operation Dev reviews.
+- `rules/`: always-relevant product, architecture, security and quality constraints.
+- `skills/`: task-triggered procedures; each skill has a `SKILL.md` with metadata, triggers, workflow, anti-patterns and a completion checklist.
+- `hooks/`: optional, manually wired safety/quality scripts. They are not automatically activated because agent-host hook formats differ.
+- `templates/`: ADR, implementation plan, audit and test report templates.
+- `SOURCES-AND-LICENSES.md`: upstream references and licensing notes.
+- `scripts/validate_agent_pack.py`: basic pack structure validation.
 
-## Directory Organization
+## Suggested loading flow
+1. Read root `AGENTS.md` and this file.
+2. Read the global rules (product scope, architecture, Electron security, lifecycle, data/auth, quality gates).
+3. Select skill(s) based on the task, rather than loading every skill into every prompt.
+4. Use specialist role profiles as review checklists or as subagents if supported by the host.
+5. Execute verification commands and record truthful results.
 
-```text
-.agents/
-├── README.md               # Overview of harness architecture and usage
-├── skill-sources.md        # Provenance, licensing, and attribution for skills
-├── agents/                 # Role-specific persona guides
-├── rules/                  # Mandatory engineering, architecture, and security rules
-├── skills/                 # Actionable, step-by-step technical runbooks
-├── workflows/              # Multi-step end-to-end task runbooks
-├── templates/              # Standard templates (ADR, Bug Report, Test Plan)
-└── config/                 # Policies and skill index configuration
+## Compatibility
+The file and folder layout is intentionally portable. A host may expect `.claude/skills/`, `.codex/skills/`, `.github/agents/`, or another location. Check the coding agent's supported convention before linking/copying these files; do not assume `.agents/` is auto-discovered by every tool.
+
+Each skill follows the common `SKILL.md` pattern with YAML frontmatter (`name`, `description`). Adapt names/paths if the chosen runner has stricter requirements.
+
+## Optional checks
+From the repository root, run:
+
+```powershell
+python .agents/scripts/validate_agent_pack.py
 ```
 
----
-
-## Agent Personas (`agents/`)
-
-1. **`operation-dev.md`**: Primary full-lifecycle software engineer and release operator.
-2. **`product-ba.md`**: Requirements gathering, scope definition, user stories.
-3. **`software-architect.md`**: System design, package boundaries, ADR formulation.
-4. **`frontend-engineer.md`**: Vue 3, Vite, responsive UI, design token engineering.
-5. **`electron-engineer.md`**: Desktop main process, window lifecycle, preload bridge, native packaging.
-6. **`backend-engineer.md`**: Server-side architecture, HTTP/WebSocket contracts (when active).
-7. **`qa-test-engineer.md`**: Vitest test coverage, integration tests, E2E validation.
-8. **`appsec-reviewer.md`**: Threat modeling, CSP auditing, Electron security verification.
-9. **`devops-release-engineer.md`**: GitHub Actions CI, build pipelines, Windows packaging.
-10. **`technical-writer.md`**: Architecture documentation, Mermaid diagrams, release notes.
-
----
-
-## Mandatory Engineering Rules (`rules/`)
-
-- `00-workspace-and-scope.md`: Focus on Web + Electron foundation; legacy motion ML prohibited.
-- `01-evidence-not-assumptions.md`: Evidence-based classification of facts.
-- `02-architecture-boundaries.md`: Strict separation between apps and shared packages.
-- `03-typescript-quality.md`: Strict mode, zero `any`, narrowing external data.
-- `04-electron-security.md`: Context isolation, sandboxing, disabled nodeIntegration, CSP.
-- `05-testing-and-gates.md`: Passing quality gates QG-01 through QG-08.
-- `06-dependencies-and-supply-chain.md`: Reproducible lockfiles, zero vulnerability policy.
-- `07-documentation-and-diagrams.md`: Documentation in `docs/`, diagrams in `diagrams/`, schemas in `schemas/`.
-- `08-git-and-release.md`: Branch safety, zero force-push, zero commit of secrets.
+For an actual app change, also run the real project commands from its package manifests; pack validation is not app validation.

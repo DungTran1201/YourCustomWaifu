@@ -9,6 +9,14 @@ const store = useAppStore();
 const activeTabs = computed<{ id: NavigationTab; label: string }[]>(() => {
   if (store.state.isAuthenticated) {
     return [
+      { id: "chat", label: "Chat" },
+      { id: "avatar", label: "Avatar Stage" },
+      { id: "agents", label: "Agents" },
+      { id: "skills", label: "Skills" },
+      { id: "rules", label: "Rules" },
+      { id: "tools", label: "Tools" },
+      { id: "connections", label: "Connections" },
+      { id: "memory", label: "Memory" },
       { id: "overview", label: "Overview" },
       { id: "profile", label: "Profile" },
       { id: "security", label: "Security" },
@@ -53,6 +61,28 @@ const platformLabel = computed(() =>
     </nav>
 
     <div class="nav-actions">
+      <!-- Stage Quick-Toggle Button -->
+      <button
+        id="nav-stage-toggle-btn"
+        :class="[
+          'stage-pill-btn',
+          store.state.stageStatus.stageVisible
+            ? 'stage-active'
+            : 'stage-inactive',
+        ]"
+        :title="
+          store.state.stageStatus.stageVisible
+            ? 'Avatar Stage is visible (Click to hide)'
+            : 'Avatar Stage is hidden (Click to launch)'
+        "
+        @click="store.toggleStage()"
+      >
+        <span class="stage-dot"></span>
+        <span class="stage-label">{{
+          store.state.stageStatus.stageVisible ? "Stage Active" : "Show Stage"
+        }}</span>
+      </button>
+
       <!-- Auth Actions -->
       <template v-if="store.state.isAuthenticated">
         <button
@@ -260,5 +290,39 @@ const platformLabel = computed(() =>
 
 .action-icon-btn:hover {
   background: var(--bg-tertiary);
+}
+
+.stage-pill-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.825rem;
+  font-weight: 600;
+  border: 1px solid var(--border-subtle);
+  transition: all var(--transition-fast);
+}
+
+.stage-pill-btn.stage-active {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+.stage-pill-btn.stage-inactive {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.stage-pill-btn:hover {
+  border-color: var(--text-secondary);
+}
+
+.stage-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
 }
 </style>
