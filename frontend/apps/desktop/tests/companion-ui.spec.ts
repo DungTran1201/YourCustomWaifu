@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import App from "../src/App.vue";
+import App from "../src/renderer/src/App.vue";
 import { useAppStore } from "@vrm/app-core";
 
-describe("Companion Workspace UI Navigation & Interaction", () => {
+describe("Desktop Companion Workspace UI Navigation & Interaction", () => {
   beforeEach(() => {
     const store = useAppStore();
     store.state.isAuthenticated = true;
@@ -22,7 +22,7 @@ describe("Companion Workspace UI Navigation & Interaction", () => {
     store.setTab("chat");
   });
 
-  it("renders Chat view and sends a message", async () => {
+  it("renders Chat view and sends a message without anime banners in timeline", async () => {
     const wrapper = mount(App);
     const store = useAppStore();
 

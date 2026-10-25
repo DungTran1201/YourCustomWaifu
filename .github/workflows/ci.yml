@@ -45,8 +45,5 @@ jobs:
       - name: Unit & Contract Tests
         run: pnpm test
 
-      - name: Build Web Application
-        run: pnpm build:web
-
-      - name: Build Desktop Application (Smoke)
+      - name: Build Desktop Application (Electron)
         run: pnpm build:desktop

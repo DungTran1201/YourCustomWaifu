@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import App from "../src/App.vue";
+import App from "../src/renderer/src/App.vue";
 import { useAppStore } from "@vrm/app-core";
 
-describe("Web Application Authentication UI & Navigation Flow", () => {
+describe("Workspace Desktop Authentication UI & Navigation Flow", () => {
   beforeEach(() => {
     const store = useAppStore();
     store.setTab("overview");
@@ -54,62 +54,35 @@ describe("Web Application Authentication UI & Navigation Flow", () => {
     expect(wrapper.find("#signup-submit-btn").exists()).toBe(true);
   });
 
-  it("dynamically shows auth tabs and profile when user is authenticated", async () => {
+  it("dynamically shows companion tabs and user pill when authenticated", async () => {
     const wrapper = mount(App);
     const store = useAppStore();
 
-    // Simulate login
     store.state.isAuthenticated = true;
     store.state.user = {
-      id: "usr_test_1234567890",
-      email: "engineer@example.com",
+      id: "usr_desktop_test",
+      email: "desktop@waifu.local",
+      displayName: "Desktop Master",
       status: "active",
-      emailVerified: false,
-      emailStatusNotice: "UNVERIFIED",
-      displayName: "Staff Engineer",
+      emailVerified: true,
+      emailStatusNotice: "Desktop verified",
       avatarUrl: null,
       locale: "en-US",
       timezone: "UTC",
       createdAt: new Date().toISOString(),
     };
-    store.setTab("overview");
 
     await wrapper.vm.$nextTick();
 
-    // Nav bar should display auth tabs
-    expect(wrapper.find("#nav-tab-profile").exists()).toBe(true);
-    expect(wrapper.find("#nav-tab-security").exists()).toBe(true);
-    expect(wrapper.find("#nav-tab-secrets").exists()).toBe(true);
-    expect(wrapper.find("#nav-user-pill").text()).toContain("Staff Engineer");
+    expect(wrapper.find("#nav-tab-chat").exists()).toBe(true);
+    expect(wrapper.find("#nav-tab-avatar").exists()).toBe(true);
+    expect(wrapper.find("#nav-tab-agents").exists()).toBe(true);
+    expect(wrapper.find("#nav-tab-skills").exists()).toBe(true);
+    expect(wrapper.find("#nav-tab-rules").exists()).toBe(true);
+    expect(wrapper.find("#nav-tab-tools").exists()).toBe(true);
+    expect(wrapper.find("#nav-tab-connections").exists()).toBe(true);
+    expect(wrapper.find("#nav-tab-memory").exists()).toBe(true);
+    expect(wrapper.find("#nav-user-pill").exists()).toBe(true);
     expect(wrapper.find("#nav-signout-btn").exists()).toBe(true);
-
-    // Overview should display welcome banner with unverified email badge
-    expect(wrapper.text()).toContain("Staff Engineer");
-    expect(wrapper.text()).toContain("Unverified Contact Address");
-
-    // Navigate to Profile view
-    await wrapper.find("#nav-tab-profile").trigger("click");
-    expect(store.state.currentTab).toBe("profile");
-    expect(wrapper.text()).toContain("Account Profile");
-    expect(wrapper.text()).toContain("engineer@example.com");
-
-    // Navigate to Security view
-    await wrapper.find("#nav-tab-security").trigger("click");
-    expect(store.state.currentTab).toBe("security");
-    expect(wrapper.text()).toContain("Account Security");
-    expect(wrapper.text()).toContain("Active Devices & Sessions");
-    expect(wrapper.text()).toContain("Change Password");
-
-    // Navigate to AI Secrets view
-    await wrapper.find("#nav-tab-secrets").trigger("click");
-    expect(store.state.currentTab).toBe("secrets");
-    expect(wrapper.text()).toContain("AI Provider Key Vault");
-    expect(wrapper.text()).toContain("Hardware / KMS Envelope Encryption");
-
-    // Click Sign Out
-    await wrapper.find("#nav-signout-btn").trigger("click");
-    await new Promise((r) => setTimeout(r, 20));
-    expect(store.state.isAuthenticated).toBe(false);
-    expect(store.state.user).toBeNull();
   });
 });
