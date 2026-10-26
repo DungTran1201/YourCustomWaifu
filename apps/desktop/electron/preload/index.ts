@@ -5,6 +5,7 @@ import {
   type DiagnosticsInfo,
   type StageStatus,
   type AvatarConfig,
+  type WindowBounds,
 } from "@vrm/platform-contracts";
 
 const desktopAPI: DesktopAPI = {
@@ -32,6 +33,10 @@ const desktopAPI: DesktopAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.STAGE_GET_STATUS),
     getConfig: (): Promise<AvatarConfig> =>
       ipcRenderer.invoke(IPC_CHANNELS.STAGE_GET_CONFIG),
+    getBounds: (): Promise<WindowBounds> =>
+      ipcRenderer.invoke(IPC_CHANNELS.STAGE_GET_BOUNDS),
+    setBounds: (bounds: Partial<WindowBounds>): Promise<WindowBounds> =>
+      ipcRenderer.invoke(IPC_CHANNELS.STAGE_SET_BOUNDS, bounds),
     show: (): Promise<StageStatus> =>
       ipcRenderer.invoke(IPC_CHANNELS.STAGE_SHOW),
     hide: (): Promise<StageStatus> =>

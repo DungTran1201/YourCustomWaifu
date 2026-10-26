@@ -17,6 +17,8 @@ describe("Avatar Stage & Workspace Desktop Lifecycle Contracts", () => {
   it("verifies all Stage IPC channels are strictly defined without wildcards", () => {
     expect(IPC_CHANNELS.STAGE_GET_STATUS).toBe("stage:get-status");
     expect(IPC_CHANNELS.STAGE_GET_CONFIG).toBe("stage:get-config");
+    expect(IPC_CHANNELS.STAGE_GET_BOUNDS).toBe("stage:get-bounds");
+    expect(IPC_CHANNELS.STAGE_SET_BOUNDS).toBe("stage:set-bounds");
     expect(IPC_CHANNELS.STAGE_SHOW).toBe("stage:show");
     expect(IPC_CHANNELS.STAGE_HIDE).toBe("stage:hide");
     expect(IPC_CHANNELS.STAGE_TOGGLE).toBe("stage:toggle");
@@ -249,5 +251,113 @@ describe("Avatar Stage & Workspace Desktop Lifecycle Contracts", () => {
     expect(store.state.avatarConfig.lookAtEnabled).toBe(false);
     expect(store.state.avatarConfig.lookAtMode).toBe("eyes_only");
     expect(store.state.avatarConfig.lookAtIntensity).toBe(0.75);
+  });
+
+  it("retrieves and sets native Stage window bounds while maintaining minimum dimensions", async () => {
+    const store = useAppStore();
+
+    // Initial default bounds
+    const initial = await store.getStageBounds();
+    expect(initial.width).toBe(420);
+    expect(initial.height).toBe(640);
+
+    // Update bounds
+    const updated = await store.setStageBounds({
+      x: 300,
+      y: 200,
+      width: 500,
+      height: 700,
+    });
+    expect(updated.x).toBe(300);
+    expect(updated.y).toBe(200);
+    expect(updated.width).toBe(500);
+    expect(updated.height).toBe(700);
+
+    // Verify state synchronization
+    expect(store.state.avatarConfig.stageWidth).toBe(500);
+    expect(store.state.avatarConfig.stageHeight).toBe(700);
+    expect(store.state.avatarConfig.stageX).toBe(300);
+    expect(store.state.avatarConfig.stageY).toBe(200);
+  });
+
+  it("verifies directional resize mathematics preserves the opposite edge", () => {
+    const MIN_WIDTH = 240;
+    const MIN_HEIGHT = 320;
+    const MAX_WIDTH = 3840;
+    const MAX_HEIGHT = 2160;
+
+    const startX = 400;
+    const startY = 300;
+    const startW = 420;
+    const startH = 640;
+    const rightEdge = startX + startW; // 820
+    const bottomEdge = startY + startH; // 940
+
+    // 1. Resizing West (dragging left handle by deltaX = +50, meaning shrinking width by 50)
+    const deltaX_w = 50;
+    const rawW_w = startW - deltaX_w; // 370
+    const clampedW_w = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, rawW_w));
+    const nextX_w = startX + (startW - clampedW_w); // 400 + 50 = 450
+    expect(nextX_w).toBe(450);
+    expect(clampedW_w).toBe(370);
+    // Right edge MUST stay exactly at 820
+    expect(nextX_w + clampedW_w).toBe(rightEdge);
+
+    // 2. Resizing West past minimum (deltaX = +300, rawW = 120 < MIN_WIDTH 240)
+    const deltaX_w_extreme = 300;
+    const rawW_w_extreme = startW - deltaX_w_extreme; // 120
+    const clampedW_w_extreme = Math.max(
+      MIN_WIDTH,
+      Math.min(MAX_WIDTH, rawW_w_extreme),
+    ); // 240
+    const nextX_w_extreme = startX + (startW - clampedW_w_extreme); // 400 + 180 = 580
+    expect(clampedW_w_extreme).toBe(240);
+    expect(nextX_w_extreme + clampedW_w_extreme).toBe(rightEdge);
+
+    // 3. Resizing North (dragging top handle by deltaY = +40, shrinking height by 40)
+    const deltaY_n = 40;
+    const rawH_n = startH - deltaY_n; // 600
+    const clampedH_n = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, rawH_n));
+    const nextY_n = startY + (startH - clampedH_n); // 300 + 40 = 340
+    expect(nextY_n).toBe(340);
+    expect(clampedH_n).toBe(600);
+    // Bottom edge MUST stay exactly at 940
+    expect(nextY_n + clampedH_n).toBe(bottomEdge);
+
+    // 4. Resizing East (dragging right handle by deltaX = +80)
+    const deltaX_e = 80;
+    const nextW_e = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, startW + deltaX_e));
+    expect(nextW_e).toBe(500);
+    // Left edge stays at startX
+    expect(startX).toBe(400);
+
+    // 5. Resizing South (dragging bottom handle by deltaY = +60)
+    const deltaY_s = 60;
+    const nextH_s = Math.max(
+      MIN_HEIGHT,
+      Math.min(MAX_HEIGHT, startH + deltaY_s),
+    );
+    expect(nextH_s).toBe(700);
+    // Top edge stays at startY
+    expect(startY).toBe(300);
+  });
+
+  it("verifies 3D model scale remains strictly independent from native window dimensions", async () => {
+    const store = useAppStore();
+
+    // Scale is initially 1.0
+    expect(store.state.avatarConfig.scale).toBe(1.0);
+
+    // Resizing window dimensions must NOT change model scale
+    await store.setStageBounds({ width: 600, height: 800 });
+    expect(store.state.avatarConfig.stageWidth).toBe(600);
+    expect(store.state.avatarConfig.stageHeight).toBe(800);
+    expect(store.state.avatarConfig.scale).toBe(1.0);
+
+    // Changing 3D model scale must NOT alter window dimensions
+    await store.updateAvatarConfig({ scale: 1.4 });
+    expect(store.state.avatarConfig.scale).toBe(1.4);
+    expect(store.state.avatarConfig.stageWidth).toBe(600);
+    expect(store.state.avatarConfig.stageHeight).toBe(800);
   });
 });

@@ -113,6 +113,13 @@ export interface BlinkDiagnostic {
   totalBlinks: number;
 }
 
+export interface WindowBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface WorkspaceBounds {
   x?: number;
   y?: number;
@@ -269,6 +276,8 @@ export interface DesktopStageAPI {
     error?: string;
   }>;
   getBlinkDiagnostic?: () => Promise<BlinkDiagnostic | null>;
+  getBounds?: () => Promise<WindowBounds>;
+  setBounds?: (bounds: Partial<WindowBounds>) => Promise<WindowBounds>;
   reportModelStatus?: (status: {
     avatarLoaded: boolean;
     currentAvatarName?: string;
@@ -309,6 +318,8 @@ export const IPC_CHANNELS = {
   // Stage channels
   STAGE_GET_STATUS: "stage:get-status",
   STAGE_GET_CONFIG: "stage:get-config",
+  STAGE_GET_BOUNDS: "stage:get-bounds",
+  STAGE_SET_BOUNDS: "stage:set-bounds",
   STAGE_SHOW: "stage:show",
   STAGE_HIDE: "stage:hide",
   STAGE_TOGGLE: "stage:toggle",

@@ -74,6 +74,26 @@ export function createWebFallbackAPI(): DesktopAPI {
     stage: {
       getStatus: async () => ({ ...webFallbackStageStatus }),
       getConfig: async () => ({ ...webFallbackAvatarConfig }),
+      getBounds: async () => ({
+        x: webFallbackAvatarConfig.stageX ?? 100,
+        y: webFallbackAvatarConfig.stageY ?? 100,
+        width: webFallbackAvatarConfig.stageWidth || 420,
+        height: webFallbackAvatarConfig.stageHeight || 640,
+      }),
+      setBounds: async (bounds) => {
+        if (bounds.x !== undefined) webFallbackAvatarConfig.stageX = bounds.x;
+        if (bounds.y !== undefined) webFallbackAvatarConfig.stageY = bounds.y;
+        if (bounds.width !== undefined)
+          webFallbackAvatarConfig.stageWidth = bounds.width;
+        if (bounds.height !== undefined)
+          webFallbackAvatarConfig.stageHeight = bounds.height;
+        return {
+          x: webFallbackAvatarConfig.stageX ?? 100,
+          y: webFallbackAvatarConfig.stageY ?? 100,
+          width: webFallbackAvatarConfig.stageWidth || 420,
+          height: webFallbackAvatarConfig.stageHeight || 640,
+        };
+      },
       show: async () => {
         webFallbackStageStatus.stageVisible = true;
         return { ...webFallbackStageStatus };

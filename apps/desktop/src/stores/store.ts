@@ -15,6 +15,7 @@ import type {
   ModelConnection,
   MemoryItem,
   ChatMessage,
+  WindowBounds,
 } from "@vrm/platform-contracts";
 import {
   DEFAULT_SETTINGS,
@@ -780,6 +781,35 @@ export function useAppStore() {
     }
   }
 
+  async function getStageBounds(): Promise<WindowBounds> {
+    const api = getPlatformAPI();
+    return (
+      (await api.stage?.getBounds?.()) || {
+        x: state.avatarConfig.stageX ?? 100,
+        y: state.avatarConfig.stageY ?? 100,
+        width: state.avatarConfig.stageWidth || 420,
+        height: state.avatarConfig.stageHeight || 640,
+      }
+    );
+  }
+
+  async function setStageBounds(
+    bounds: Partial<WindowBounds>,
+  ): Promise<WindowBounds> {
+    const api = getPlatformAPI();
+    const result = (await api.stage?.setBounds?.(bounds)) || {
+      x: bounds.x ?? state.avatarConfig.stageX ?? 100,
+      y: bounds.y ?? state.avatarConfig.stageY ?? 100,
+      width: bounds.width ?? state.avatarConfig.stageWidth ?? 420,
+      height: bounds.height ?? state.avatarConfig.stageHeight ?? 640,
+    };
+    if (result.width) state.avatarConfig.stageWidth = result.width;
+    if (result.height) state.avatarConfig.stageHeight = result.height;
+    if (result.x !== undefined) state.avatarConfig.stageX = result.x;
+    if (result.y !== undefined) state.avatarConfig.stageY = result.y;
+    return result;
+  }
+
   async function updateAvatarConfig(partial: Partial<AvatarConfig>) {
     try {
       const api = getPlatformAPI();
@@ -1105,6 +1135,8 @@ export function useAppStore() {
     setStageClickThrough,
     setStageAlwaysOnTop,
     setStageAnimationPaused,
+    getStageBounds,
+    setStageBounds,
     updateAvatarConfig,
     selectVrmFile,
     loadSampleVrm,

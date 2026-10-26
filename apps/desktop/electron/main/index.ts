@@ -20,6 +20,7 @@ import {
   type AvatarOrientationMode,
   type StageStatus,
   type WorkspaceBounds,
+  type WindowBounds,
   type GazeData,
 } from "@vrm/platform-contracts";
 import {
@@ -552,6 +553,12 @@ function updateTrayMenu(): void {
       label: isPaused ? "Resume Animation" : "Pause Animation",
       click: () => setAnimationPaused(!isPaused),
     },
+    {
+      label: stageStatus.clickThrough
+        ? "Disable Click-Through (Interactive)"
+        : "Enable Click-Through (Ctrl+Shift+M)",
+      click: () => setClickThrough(!stageStatus.clickThrough),
+    },
     { type: "separator" },
     {
       label: "Avatar Settings",
@@ -742,6 +749,97 @@ function registerIpcHandlers(): void {
     return { ...avatarConfig };
   });
 
+  ipcMain.handle(IPC_CHANNELS.STAGE_GET_BOUNDS, (event): WindowBounds => {
+    if (!validateIpcSender(event.sender, allowedWindows())) {
+      throw new Error("Unauthorized IPC sender");
+    }
+    if (stageWindow && !stageWindow.isDestroyed()) {
+      const b = stageWindow.getBounds();
+      return { x: b.x, y: b.y, width: b.width, height: b.height };
+    }
+    return {
+      x: avatarConfig.stageX ?? 100,
+      y: avatarConfig.stageY ?? 100,
+      width: avatarConfig.stageWidth || 420,
+      height: avatarConfig.stageHeight || 640,
+    };
+  });
+
+  ipcMain.handle(
+    IPC_CHANNELS.STAGE_SET_BOUNDS,
+    async (event, newBounds: Partial<WindowBounds>): Promise<WindowBounds> => {
+      if (!validateIpcSender(event.sender, allowedWindows())) {
+        throw new Error("Unauthorized IPC sender");
+      }
+      if (!newBounds || typeof newBounds !== "object") {
+        throw new Error("Invalid bounds payload");
+      }
+      if (!stageWindow || stageWindow.isDestroyed()) {
+        throw new Error("Stage window is not available");
+      }
+
+      const cur = stageWindow.getBounds();
+      let targetX = newBounds.x !== undefined ? Number(newBounds.x) : cur.x;
+      let targetY = newBounds.y !== undefined ? Number(newBounds.y) : cur.y;
+      let targetW =
+        newBounds.width !== undefined ? Number(newBounds.width) : cur.width;
+      let targetH =
+        newBounds.height !== undefined ? Number(newBounds.height) : cur.height;
+
+      if (
+        !Number.isFinite(targetX) ||
+        !Number.isFinite(targetY) ||
+        !Number.isFinite(targetW) ||
+        !Number.isFinite(targetH)
+      ) {
+        throw new Error(
+          "Bounds coordinates and dimensions must be finite numbers",
+        );
+      }
+
+      targetW = Math.max(240, Math.min(3840, Math.round(targetW)));
+      targetH = Math.max(320, Math.min(2160, Math.round(targetH)));
+      targetX = Math.round(targetX);
+      targetY = Math.round(targetY);
+
+      const displays = screen.getAllDisplays().map((d) => ({
+        bounds: d.bounds,
+        workArea: d.workArea,
+      }));
+
+      const validated = validateWindowBounds(
+        {
+          x: targetX,
+          y: targetY,
+          width: targetW,
+          height: targetH,
+        },
+        displays,
+      );
+
+      stageWindow.setBounds({
+        x: validated.x,
+        y: validated.y,
+        width: validated.width,
+        height: validated.height,
+      });
+
+      avatarConfig.stageX = validated.x;
+      avatarConfig.stageY = validated.y;
+      avatarConfig.stageWidth = validated.width;
+      avatarConfig.stageHeight = validated.height;
+
+      await savePersistedConfig();
+
+      return {
+        x: validated.x,
+        y: validated.y,
+        width: validated.width,
+        height: validated.height,
+      };
+    },
+  );
+
   ipcMain.handle(IPC_CHANNELS.STAGE_SHOW, (event): StageStatus => {
     if (!validateIpcSender(event.sender, allowedWindows())) {
       throw new Error("Unauthorized IPC sender");
@@ -844,6 +942,32 @@ function registerIpcHandlers(): void {
       }
       if (partial.animationPaused !== undefined) {
         setAnimationPaused(partial.animationPaused);
+      }
+      if (
+        (partial.stageWidth !== undefined ||
+          partial.stageHeight !== undefined ||
+          partial.stageX !== undefined ||
+          partial.stageY !== undefined) &&
+        stageWindow &&
+        !stageWindow.isDestroyed()
+      ) {
+        const cur = stageWindow.getBounds();
+        const nextW = Math.max(
+          240,
+          Math.min(3840, Math.round(partial.stageWidth ?? cur.width)),
+        );
+        const nextH = Math.max(
+          320,
+          Math.min(2160, Math.round(partial.stageHeight ?? cur.height)),
+        );
+        const nextX = Math.round(partial.stageX ?? cur.x);
+        const nextY = Math.round(partial.stageY ?? cur.y);
+        stageWindow.setBounds({
+          x: nextX,
+          y: nextY,
+          width: nextW,
+          height: nextH,
+        });
       }
       await savePersistedConfig();
       broadcastStageConfig();

@@ -489,8 +489,9 @@ function setupToolbarListeners() {
   });
 
   btnClickThrough.addEventListener("click", async () => {
-    await desktopAPI.stage?.setClickThrough(true);
-    btnClickThrough.classList.add("active");
+    const next = !btnClickThrough.classList.contains("active");
+    await desktopAPI.stage?.setClickThrough(next);
+    btnClickThrough.classList.toggle("active", next);
   });
 
   btnPauseAnimation.addEventListener("click", async () => {
@@ -680,7 +681,224 @@ async function setupStageSync() {
   }
 }
 
+// Drag Grip: renderer-driven fallback drag to move the native window
+function setupDragHandleListeners() {
+  const dragHandle = document.getElementById("btn-drag-handle");
+  if (!dragHandle) return;
+
+  const desktopAPI = window.desktopAPI;
+  if (!desktopAPI?.stage?.setBounds || !desktopAPI?.stage?.getBounds) return;
+
+  let isDragging = false;
+  let startPointerX = 0;
+  let startPointerY = 0;
+  let startWindowX = 0;
+  let startWindowY = 0;
+  let rafId: number | null = null;
+  let pendingX = 0;
+  let pendingY = 0;
+
+  dragHandle.addEventListener("pointerdown", async (e: PointerEvent) => {
+    if (e.button !== 0) return;
+
+    try {
+      const bounds = await desktopAPI.stage!.getBounds!();
+      isDragging = true;
+      startPointerX = e.screenX;
+      startPointerY = e.screenY;
+      startWindowX = bounds.x;
+      startWindowY = bounds.y;
+      pendingX = startWindowX;
+      pendingY = startWindowY;
+
+      dragHandle.setPointerCapture(e.pointerId);
+      dragHandle.classList.add("dragging");
+    } catch {
+      isDragging = false;
+    }
+  });
+
+  dragHandle.addEventListener("pointermove", (e: PointerEvent) => {
+    if (!isDragging) return;
+
+    const deltaX = e.screenX - startPointerX;
+    const deltaY = e.screenY - startPointerY;
+
+    pendingX = startWindowX + deltaX;
+    pendingY = startWindowY + deltaY;
+
+    if (!rafId) {
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        if (isDragging) {
+          desktopAPI.stage?.setBounds?.({
+            x: Math.round(pendingX),
+            y: Math.round(pendingY),
+          });
+        }
+      });
+    }
+  });
+
+  const stopDrag = (e: PointerEvent) => {
+    if (!isDragging) return;
+    isDragging = false;
+    if (rafId) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
+    dragHandle.classList.remove("dragging");
+    try {
+      if (dragHandle.hasPointerCapture(e.pointerId)) {
+        dragHandle.releasePointerCapture(e.pointerId);
+      }
+    } catch {
+      // Ignored
+    }
+
+    desktopAPI.stage?.setBounds?.({
+      x: Math.round(pendingX),
+      y: Math.round(pendingY),
+    });
+  };
+
+  dragHandle.addEventListener("pointerup", stopDrag);
+  dragHandle.addEventListener("pointercancel", stopDrag);
+}
+
+// 8-Directional Native Window Resize Listeners
+function setupWindowResizeListeners() {
+  const handles = document.querySelectorAll<HTMLDivElement>(
+    ".stage-resize-handle",
+  );
+  if (!handles || handles.length === 0) return;
+
+  const desktopAPI = window.desktopAPI;
+  if (!desktopAPI?.stage?.setBounds || !desktopAPI?.stage?.getBounds) return;
+
+  const MIN_WIDTH = 240;
+  const MIN_HEIGHT = 320;
+  const MAX_WIDTH = 3840;
+  const MAX_HEIGHT = 2160;
+
+  handles.forEach((handle) => {
+    const direction = handle.dataset.direction;
+    if (!direction) return;
+
+    let isResizing = false;
+    let startPointerX = 0;
+    let startPointerY = 0;
+    let startX = 0;
+    let startY = 0;
+    let startW = 0;
+    let startH = 0;
+    let rafId: number | null = null;
+    let candidateBounds = { x: 0, y: 0, width: 0, height: 0 };
+
+    handle.addEventListener("pointerdown", async (e: PointerEvent) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      try {
+        const bounds = await desktopAPI.stage!.getBounds!();
+        isResizing = true;
+        startPointerX = e.screenX;
+        startPointerY = e.screenY;
+        startX = bounds.x;
+        startY = bounds.y;
+        startW = bounds.width;
+        startH = bounds.height;
+        candidateBounds = {
+          x: startX,
+          y: startY,
+          width: startW,
+          height: startH,
+        };
+
+        handle.setPointerCapture(e.pointerId);
+        document.body.classList.add("resizing-active");
+      } catch {
+        isResizing = false;
+      }
+    });
+
+    handle.addEventListener("pointermove", (e: PointerEvent) => {
+      if (!isResizing) return;
+
+      const deltaX = e.screenX - startPointerX;
+      const deltaY = e.screenY - startPointerY;
+
+      let nextX = startX;
+      let nextY = startY;
+      let nextW = startW;
+      let nextH = startH;
+
+      // Horizontal resize (East changes width; West changes x and width while pinning right edge)
+      if (direction.includes("e")) {
+        nextW = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, startW + deltaX));
+      } else if (direction.includes("w")) {
+        const rawW = startW - deltaX;
+        const clampedW = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, rawW));
+        nextW = clampedW;
+        nextX = startX + (startW - clampedW);
+      }
+
+      // Vertical resize (South changes height; North changes y and height while pinning bottom edge)
+      if (direction.includes("s")) {
+        nextH = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, startH + deltaY));
+      } else if (direction.includes("n")) {
+        const rawH = startH - deltaY;
+        const clampedH = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, rawH));
+        nextH = clampedH;
+        nextY = startY + (startH - clampedH);
+      }
+
+      candidateBounds = {
+        x: Math.round(nextX),
+        y: Math.round(nextY),
+        width: Math.round(nextW),
+        height: Math.round(nextH),
+      };
+
+      if (!rafId) {
+        rafId = requestAnimationFrame(() => {
+          rafId = null;
+          if (isResizing) {
+            desktopAPI.stage?.setBounds?.(candidateBounds);
+          }
+        });
+      }
+    });
+
+    const stopResize = (e: PointerEvent) => {
+      if (!isResizing) return;
+      isResizing = false;
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+      document.body.classList.remove("resizing-active");
+      try {
+        if (handle.hasPointerCapture(e.pointerId)) {
+          handle.releasePointerCapture(e.pointerId);
+        }
+      } catch {
+        // Ignored
+      }
+
+      // Final bounds commit
+      desktopAPI.stage?.setBounds?.(candidateBounds);
+    };
+
+    handle.addEventListener("pointerup", stopResize);
+    handle.addEventListener("pointercancel", stopResize);
+  });
+}
+
 // Boot Stage
 initScene();
 setupToolbarListeners();
+setupDragHandleListeners();
+setupWindowResizeListeners();
 setupStageSync();

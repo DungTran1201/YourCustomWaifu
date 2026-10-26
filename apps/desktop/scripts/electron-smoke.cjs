@@ -88,6 +88,14 @@ app.whenReady().then(async () => {
       error("FAILED: stage.ensureSampleVrm is not exposed on desktopAPI.stage!");
     }
 
+    const hasBoundsMethods = await win.webContents.executeJavaScript(
+      "typeof window.desktopAPI?.stage?.getBounds === 'function' && typeof window.desktopAPI?.stage?.setBounds === 'function'"
+    );
+    log("stage.getBounds and stage.setBounds functions exist:", hasBoundsMethods);
+    if (!hasBoundsMethods) {
+      error("FAILED: stage.getBounds or stage.setBounds is not exposed on desktopAPI.stage!");
+    }
+
     // 3. Verify status badge text in DOM
     const badgeText = await win.webContents.executeJavaScript(
       "document.querySelector('.status-badge')?.textContent?.trim() || ''"
@@ -160,6 +168,16 @@ app.whenReady().then(async () => {
     log("Stage fallback notice & retry elements present:", stageHasNoticeElements);
     if (!stageHasNoticeElements) {
       error("FAILED: stage.html missing #stage-fallback-notice or #stage-error-retry-btn!");
+    }
+
+    const resizeHandleCount = await stageWin.webContents.executeJavaScript(
+      "document.querySelectorAll('.stage-resize-handle').length"
+    );
+    log("Stage resize handle count in DOM:", resizeHandleCount);
+    if (resizeHandleCount !== 8) {
+      error(`FAILED: expected 8 resize handles in stage.html, found ${resizeHandleCount}`);
+    } else {
+      log("SUCCESS: all 8 directional resize handles found in Stage DOM!");
     }
 
     clearTimeout(timeout);
