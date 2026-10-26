@@ -164,20 +164,25 @@ function handleCreateSkill() {
 
 <style scoped>
 .view-container {
+  width: 100%;
   max-width: 860px;
   margin: 0 auto;
-  padding: 40px 24px;
+  padding: clamp(20px, 4vw, 40px) clamp(14px, 3vw, 24px);
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .section-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
   margin-bottom: 24px;
 }
 
 .section-header h2 {
-  font-size: 1.8rem;
+  font-size: clamp(1.35rem, 3vw, 1.8rem);
   font-weight: 700;
   color: var(--text-primary);
   margin-bottom: 6px;
@@ -395,5 +400,14 @@ input:checked + .slider {
 input:checked + .slider:before {
   transform: translateX(18px);
   background-color: var(--bg-primary);
+}
+
+@media (max-width: 680px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .full-width {
+    grid-column: span 1;
+  }
 }
 </style>

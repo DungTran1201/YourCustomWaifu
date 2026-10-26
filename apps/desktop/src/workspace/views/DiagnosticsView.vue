@@ -204,9 +204,12 @@ onMounted(() => {
 
 <style scoped>
 .view-container {
+  width: 100%;
   max-width: 900px;
   margin: 0 auto;
-  padding: 40px 24px;
+  padding: clamp(20px, 4vw, 40px) clamp(14px, 3vw, 24px);
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .section-header {
@@ -215,12 +218,14 @@ onMounted(() => {
 
 .header-main {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
 }
 
 .section-header h2 {
-  font-size: 1.8rem;
+  font-size: clamp(1.35rem, 3vw, 1.8rem);
   font-weight: 700;
   color: var(--text-primary);
   margin-bottom: 6px;
@@ -251,7 +256,7 @@ onMounted(() => {
 
 .grid-stats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
   gap: 16px;
   margin-bottom: 32px;
 }
@@ -264,6 +269,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-width: 0;
 }
 
 .stat-label {
@@ -307,7 +313,7 @@ onMounted(() => {
 
 .capability-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
   gap: 12px;
 }
 
@@ -321,6 +327,7 @@ onMounted(() => {
   justify-content: space-between;
   font-size: 0.9rem;
   color: var(--text-secondary);
+  min-width: 0;
 }
 
 .os-info-box {
@@ -337,6 +344,8 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   font-size: 0.9rem;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .info-k {
@@ -345,6 +354,7 @@ onMounted(() => {
 
 .info-v {
   color: var(--text-primary);
+  word-break: break-all;
 }
 
 .ipc-card {
@@ -366,6 +376,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 16px;
+  flex-wrap: wrap;
 }
 
 .action-btn {

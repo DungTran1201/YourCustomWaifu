@@ -304,12 +304,17 @@ async function copyMessage(id: string, text: string) {
   background: var(--bg-primary);
   flex-shrink: 0;
   z-index: 10;
+  min-width: 0;
+  gap: 8px;
 }
 
 .header-left {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
 }
 
 .agent-avatar-badge {
@@ -322,24 +327,31 @@ async function copyMessage(id: string, text: string) {
   align-items: center;
   justify-content: center;
   color: var(--text-primary);
+  flex-shrink: 0;
 }
 
 .agent-meta {
   display: flex;
   flex-direction: column;
   line-height: 1.2;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .agent-headline {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
 }
 
 .agent-name {
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .agent-status-dot {
@@ -347,11 +359,15 @@ async function copyMessage(id: string, text: string) {
   height: 6px;
   border-radius: 50%;
   background: var(--accent-success);
+  flex-shrink: 0;
 }
 
 .agent-subtitle {
   font-size: 0.72rem;
   color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .model-tag {
@@ -362,12 +378,14 @@ async function copyMessage(id: string, text: string) {
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
   font-family: var(--font-family-mono);
+  flex-shrink: 0;
 }
 
 .header-actions {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .chat-action-btn {
@@ -392,13 +410,14 @@ async function copyMessage(id: string, text: string) {
 
 /* Messages area */
 .chat-messages {
-  flex: 1;
+  flex: 1 1 auto;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 16px 0;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
 }
 
 .chat-stream-column {
@@ -409,6 +428,7 @@ async function copyMessage(id: string, text: string) {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  min-width: 0;
 }
 
 /* Empty State */
@@ -417,7 +437,7 @@ async function copyMessage(id: string, text: string) {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 48px 16px;
+  padding: 40px 16px;
   text-align: center;
   margin-top: auto;
   margin-bottom: auto;
@@ -573,6 +593,7 @@ async function copyMessage(id: string, text: string) {
 .message-content {
   white-space: pre-wrap;
   word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 /* Loading bubble */
@@ -670,6 +691,8 @@ async function copyMessage(id: string, text: string) {
 
 .composer-column {
   max-width: 820px;
+  width: 100%;
+  min-width: 0;
   margin: 0 auto;
 }
 
@@ -712,11 +735,15 @@ async function copyMessage(id: string, text: string) {
   justify-content: space-between;
   padding-top: 4px;
   border-top: 1px solid var(--border-subtle);
+  gap: 8px;
 }
 
 .toolbar-hint {
   font-size: 0.7rem;
   color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .toolbar-hint kbd {
@@ -739,6 +766,7 @@ async function copyMessage(id: string, text: string) {
   font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
+  flex-shrink: 0;
   transition: all var(--transition-fast);
 }
 
@@ -749,5 +777,47 @@ async function copyMessage(id: string, text: string) {
 .composer-send-btn:disabled {
   opacity: 0.35;
   cursor: not-allowed;
+}
+
+/* Chat Responsive Media Queries */
+@media (max-width: 640px) {
+  .agent-subtitle {
+    display: none;
+  }
+  .chat-action-btn span {
+    display: none;
+  }
+  .chat-action-btn {
+    padding: 4px;
+  }
+  .message-bubble {
+    max-width: 92%;
+  }
+}
+
+@media (max-height: 650px) {
+  .chat-empty-state {
+    padding: 14px 12px;
+  }
+  .empty-icon-shield {
+    width: 34px;
+    height: 34px;
+    margin-bottom: 8px;
+  }
+  .empty-title {
+    font-size: 0.95rem;
+    margin-bottom: 4px;
+  }
+  .empty-description {
+    font-size: 0.78rem;
+    margin-bottom: 12px;
+  }
+  .quick-prompts-container {
+    gap: 6px;
+  }
+  .quick-prompt-chip {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+  }
 }
 </style>

@@ -72,9 +72,12 @@ const store = useAppStore();
 
 <style scoped>
 .view-container {
+  width: 100%;
   max-width: 860px;
   margin: 0 auto;
-  padding: 40px 24px;
+  padding: clamp(20px, 4vw, 40px) clamp(14px, 3vw, 24px);
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .section-header {
@@ -82,7 +85,7 @@ const store = useAppStore();
 }
 
 .section-header h2 {
-  font-size: 1.8rem;
+  font-size: clamp(1.35rem, 3vw, 1.8rem);
   font-weight: 700;
   color: var(--text-primary);
   margin-bottom: 6px;
@@ -96,6 +99,7 @@ const store = useAppStore();
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
   padding: 12px 18px;
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);

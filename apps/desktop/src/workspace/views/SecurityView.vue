@@ -324,8 +324,10 @@ async function handleDeleteAccount() {
 
 <style scoped>
 .security-view {
-  flex: 1;
-  padding: 32px 24px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: clamp(20px, 4vw, 32px) clamp(14px, 3vw, 24px);
   display: flex;
   justify-content: center;
 }
@@ -333,6 +335,7 @@ async function handleDeleteAccount() {
 .security-container {
   width: 100%;
   max-width: 680px;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 28px;
@@ -343,7 +346,7 @@ async function handleDeleteAccount() {
 }
 
 .page-title {
-  font-size: 1.75rem;
+  font-size: clamp(1.35rem, 3vw, 1.75rem);
   font-weight: 700;
   color: var(--text-primary);
   margin-bottom: 6px;
@@ -600,6 +603,21 @@ async function handleDeleteAccount() {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 640px) {
+  .card-header-row {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .session-item {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .session-info {
+    min-width: 0;
+    overflow: hidden;
   }
 }
 </style>

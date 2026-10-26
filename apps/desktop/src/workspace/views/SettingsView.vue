@@ -115,9 +115,12 @@ const logLevels = ["debug", "info", "warn", "error"] as const;
 
 <style scoped>
 .view-container {
+  width: 100%;
   max-width: 800px;
   margin: 0 auto;
-  padding: 40px 24px;
+  padding: clamp(20px, 4vw, 40px) clamp(14px, 3vw, 24px);
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .section-header {
@@ -125,7 +128,7 @@ const logLevels = ["debug", "info", "warn", "error"] as const;
 }
 
 .section-header h2 {
-  font-size: 1.8rem;
+  font-size: clamp(1.35rem, 3vw, 1.8rem);
   font-weight: 700;
   color: var(--text-primary);
   margin-bottom: 6px;
@@ -149,6 +152,7 @@ const logLevels = ["debug", "info", "warn", "error"] as const;
   justify-content: space-between;
   padding: 20px 0;
   border-bottom: 1px solid var(--border-subtle);
+  gap: 16px;
 }
 
 .setting-row:last-child {
@@ -159,6 +163,8 @@ const logLevels = ["debug", "info", "warn", "error"] as const;
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
+  flex: 1 1 200px;
 }
 
 .setting-label {
@@ -173,6 +179,7 @@ const logLevels = ["debug", "info", "warn", "error"] as const;
 
 .radio-pill-group {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   background: var(--bg-primary);
   padding: 4px;
@@ -267,5 +274,12 @@ input:checked + .slider:before {
 .info-card h4 {
   color: var(--text-primary);
   margin-bottom: 6px;
+}
+
+@media (max-width: 640px) {
+  .setting-row {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
 }
 </style>

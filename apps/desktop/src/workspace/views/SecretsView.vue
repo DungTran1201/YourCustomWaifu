@@ -163,8 +163,10 @@ async function handleDelete(targetProvider: string) {
 
 <style scoped>
 .secrets-view {
-  flex: 1;
-  padding: 32px 24px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: clamp(20px, 4vw, 32px) clamp(14px, 3vw, 24px);
   display: flex;
   justify-content: center;
 }
@@ -172,6 +174,7 @@ async function handleDelete(targetProvider: string) {
 .secrets-container {
   width: 100%;
   max-width: 680px;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 24px;
@@ -182,7 +185,7 @@ async function handleDelete(targetProvider: string) {
 }
 
 .page-title {
-  font-size: 1.75rem;
+  font-size: clamp(1.35rem, 3vw, 1.75rem);
   font-weight: 700;
   color: var(--text-primary);
   margin-bottom: 6px;
@@ -258,7 +261,7 @@ async function handleDelete(targetProvider: string) {
   gap: 16px;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   .grid-2 {
     grid-template-columns: 1fr;
   }
@@ -404,6 +407,17 @@ async function handleDelete(targetProvider: string) {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 640px) {
+  .secret-item {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .secret-info {
+    flex-wrap: wrap;
+    gap: 8px;
   }
 }
 </style>

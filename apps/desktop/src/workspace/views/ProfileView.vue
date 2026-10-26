@@ -140,8 +140,10 @@ async function handleSave() {
 
 <style scoped>
 .profile-view {
-  flex: 1;
-  padding: 32px 24px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: clamp(20px, 4vw, 32px) clamp(14px, 3vw, 24px);
   display: flex;
   justify-content: center;
 }
@@ -149,6 +151,7 @@ async function handleSave() {
 .profile-container {
   width: 100%;
   max-width: 680px;
+  min-width: 0;
 }
 
 .profile-header {
@@ -156,7 +159,7 @@ async function handleSave() {
 }
 
 .page-title {
-  font-size: 1.75rem;
+  font-size: clamp(1.35rem, 3vw, 1.75rem);
   font-weight: 700;
   color: var(--text-primary);
   margin-bottom: 6px;
@@ -255,7 +258,7 @@ async function handleSave() {
   gap: 16px;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   .grid-2 {
     grid-template-columns: 1fr;
   }

@@ -242,7 +242,13 @@ onMounted(() => {
     <div class="shell-body">
       <NavigationBar />
 
-      <main class="shell-main" role="main">
+      <main
+        :class="[
+          'shell-main',
+          { 'chat-view-active': store.state.currentTab === 'chat' },
+        ]"
+        role="main"
+      >
         <!-- Guest Preview routing: focus on Avatar Stage and settings -->
         <template v-if="store.state.isGuest">
           <AvatarSettingsView v-if="store.state.currentTab === 'avatar'" />
@@ -299,11 +305,14 @@ onMounted(() => {
 <style scoped>
 .shell-layout {
   height: 100vh;
+  width: 100%;
   display: flex;
   flex-direction: column;
   background-color: var(--bg-primary);
   color: var(--text-primary);
   overflow: hidden;
+  min-width: 0;
+  min-height: 0;
 }
 
 /* Topbar Header */
@@ -318,12 +327,16 @@ onMounted(() => {
   user-select: none;
   flex-shrink: 0;
   z-index: 20;
+  min-width: 0;
+  gap: 8px;
 }
 
 .topbar-left {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
+  flex-shrink: 1;
 }
 
 .bridge-error-badge {
@@ -418,6 +431,9 @@ onMounted(() => {
 .topbar-center {
   display: flex;
   align-items: center;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 8px;
 }
 
 .current-view-title {
@@ -425,12 +441,17 @@ onMounted(() => {
   font-weight: 500;
   color: var(--text-muted);
   letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .topbar-right {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
+  min-width: 0;
 }
 
 .stage-pill-btn {
@@ -551,18 +572,52 @@ onMounted(() => {
 
 /* Shell Body */
 .shell-body {
-  flex: 1;
+  flex: 1 1 auto;
   display: flex;
   overflow: hidden;
   position: relative;
+  min-height: 0;
+  min-width: 0;
 }
 
 .shell-main {
-  flex: 1;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   background: var(--bg-primary);
   position: relative;
+  min-height: 0;
+  min-width: 0;
+}
+
+.shell-main.chat-view-active {
+  overflow: hidden;
+}
+
+/* Responsive Topbar reflow */
+@media (max-width: 900px) {
+  .topbar-center {
+    display: none;
+  }
+  .app-version {
+    display: none;
+  }
+}
+
+@media (max-width: 820px) {
+  .shell-topbar {
+    padding: 0 10px;
+    gap: 6px;
+  }
+  .user-pill-name {
+    max-width: 70px;
+  }
+  .guest-preview-badge,
+  .bridge-error-badge {
+    padding: 2px 5px;
+    font-size: 0.62rem;
+  }
 }
 </style>

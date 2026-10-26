@@ -148,20 +148,25 @@ async function handleGuestPreview() {
 
 <style scoped>
 .auth-view {
-  flex: 1;
+  width: 100%;
+  min-width: 0;
+  min-height: 100%;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 40px 16px;
+  padding: clamp(16px, 3vw, 40px) 16px;
 }
 
 .auth-card {
   width: 100%;
   max-width: 440px;
+  min-width: 0;
+  box-sizing: border-box;
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  padding: 32px;
+  padding: clamp(20px, 4vw, 32px);
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
 }
 
@@ -371,6 +376,36 @@ async function handleGuestPreview() {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@media (max-height: 620px) {
+  .auth-view {
+    padding: 12px 16px;
+  }
+  .auth-card {
+    padding: 18px 22px;
+  }
+  .auth-header {
+    margin-bottom: 14px;
+  }
+  .auth-icon {
+    margin-bottom: 4px;
+  }
+  .auth-title {
+    font-size: 1.3rem;
+    margin-bottom: 4px;
+  }
+  .auth-form {
+    gap: 12px;
+  }
+  .guest-preview-container {
+    margin-top: 12px;
+    gap: 8px;
+  }
+  .auth-footer {
+    margin-top: 14px;
+    padding-top: 12px;
   }
 }
 </style>

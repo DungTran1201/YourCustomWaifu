@@ -1,9 +1,33 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, onMounted, onUnmounted } from "vue";
 import { useAppStore, type NavigationTab } from "@vrm/app-core";
 import AppIcon from "./AppIcon.vue";
 
 const store = useAppStore();
+
+const isNarrowViewport = ref(false);
+
+function checkWidth() {
+  if (typeof window !== "undefined") {
+    isNarrowViewport.value = window.innerWidth <= 860;
+  }
+}
+
+onMounted(() => {
+  checkWidth();
+  window.addEventListener("resize", checkWidth, { passive: true });
+});
+
+onUnmounted(() => {
+  window.removeEventListener("resize", checkWidth);
+});
+
+const isEffectivelyCollapsed = computed(() => {
+  if (store.state.sidebarCollapsed) {
+    return true;
+  }
+  return isNarrowViewport.value;
+});
 
 interface TabDef {
   id: NavigationTab;
@@ -87,13 +111,13 @@ const tabGroups = computed<TabGroup[]>(() => {
 
 <template>
   <aside
-    :class="['workspace-sidebar', { collapsed: store.state.sidebarCollapsed }]"
+    :class="['workspace-sidebar', { collapsed: isEffectivelyCollapsed }]"
     role="navigation"
     aria-label="Sidebar Navigation"
   >
     <div class="sidebar-scroll">
       <div v-for="group in tabGroups" :key="group.name" class="nav-group">
-        <div v-if="!store.state.sidebarCollapsed" class="group-title">
+        <div v-if="!isEffectivelyCollapsed" class="group-title">
           {{ group.name }}
         </div>
         <div v-else class="group-divider" aria-hidden="true"></div>
@@ -112,7 +136,7 @@ const tabGroups = computed<TabGroup[]>(() => {
           @click="store.setTab(tab.id)"
         >
           <AppIcon :name="tab.icon" size="16" class="nav-icon" />
-          <span v-if="!store.state.sidebarCollapsed" class="nav-label">
+          <span v-if="!isEffectivelyCollapsed" class="nav-label">
             {{ tab.label }}
           </span>
           <span
@@ -136,6 +160,7 @@ const tabGroups = computed<TabGroup[]>(() => {
   transition: width var(--transition-normal);
   overflow: hidden;
   flex-shrink: 0;
+  min-height: 0;
 }
 
 .workspace-sidebar.collapsed {
@@ -143,13 +168,14 @@ const tabGroups = computed<TabGroup[]>(() => {
 }
 
 .sidebar-scroll {
-  flex: 1;
+  flex: 1 1 auto;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 12px 6px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-height: 0;
 }
 
 .nav-group {
