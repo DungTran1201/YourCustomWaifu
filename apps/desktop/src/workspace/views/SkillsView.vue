@@ -310,7 +310,7 @@ function handleCreateSkill() {
 .category-badge {
   font-size: 0.7rem;
   text-transform: uppercase;
-  color: var(--accent-cyan);
+  color: var(--text-muted);
   font-weight: 600;
   letter-spacing: 0.05em;
 }
@@ -389,11 +389,11 @@ function handleCreateSkill() {
 }
 
 input:checked + .slider {
-  background-color: var(--accent-cyan);
+  background-color: var(--text-primary);
 }
 
 input:checked + .slider:before {
   transform: translateX(18px);
-  background-color: #000;
+  background-color: var(--bg-primary);
 }
 </style>

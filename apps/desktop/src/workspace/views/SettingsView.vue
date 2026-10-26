@@ -107,9 +107,7 @@ const logLevels = ["debug", "info", "warn", "error"] as const;
         <span v-if="store.platform.value === 'electron'">
           Operating inside native desktop shell with secure IPC bridge.
         </span>
-        <span v-else>
-          Operating inside browser sandbox with capability fallbacks.
-        </span>
+        <span v-else> Operating with desktop standalone runtime. </span>
       </p>
     </div>
   </div>
@@ -188,12 +186,15 @@ const logLevels = ["debug", "info", "warn", "error"] as const;
   font-weight: 500;
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
+  border: none;
+  cursor: pointer;
+  background: transparent;
   transition: all var(--transition-fast);
 }
 
 .pill-btn.active {
-  background: var(--accent-cyan);
-  color: #000;
+  background: var(--text-primary);
+  color: #101114;
   font-weight: 600;
 }
 
@@ -246,12 +247,12 @@ const logLevels = ["debug", "info", "warn", "error"] as const;
 }
 
 input:checked + .slider {
-  background-color: var(--accent-cyan);
+  background-color: var(--text-primary);
 }
 
 input:checked + .slider:before {
   transform: translateX(20px);
-  background-color: #000;
+  background-color: var(--bg-primary);
 }
 
 .info-card {

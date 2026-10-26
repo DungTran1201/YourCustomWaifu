@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useAppStore } from "@vrm/app-core";
+import AppIcon from "../../components/AppIcon.vue";
 
 const store = useAppStore();
 
@@ -168,7 +169,7 @@ function handleOrientationChange(mode: "auto" | "0deg" | "180deg") {
 
     <!-- Error message if any -->
     <div v-if="store.state.stageError" class="stage-error-banner">
-      <span class="error-icon">⚠️</span>
+      <AppIcon name="alert" size="16" />
       <div class="error-text">
         <strong>Stage Notice:</strong>
         <span>{{ store.state.stageError }}</span>
@@ -768,8 +769,8 @@ function handleOrientationChange(mode: "auto" | "0deg" | "180deg") {
 }
 
 .pill-btn.active {
-  background: var(--accent-warning);
-  color: #000;
+  background: var(--text-primary);
+  color: #101114;
   font-weight: 600;
 }
 
@@ -816,12 +817,12 @@ function handleOrientationChange(mode: "auto" | "0deg" | "180deg") {
 }
 
 input:checked + .slider {
-  background-color: var(--accent-cyan);
+  background-color: var(--text-primary);
 }
 
 input:checked + .slider:before {
   transform: translateX(20px);
-  background-color: #000;
+  background-color: var(--bg-primary);
 }
 
 .info-card {
@@ -847,9 +848,9 @@ input:checked + .slider:before {
   display: inline-block;
   margin-left: 8px;
   padding: 1px 6px;
-  background: rgba(6, 182, 212, 0.15);
-  border: 1px solid rgba(6, 182, 212, 0.3);
-  color: var(--accent-cyan);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
   font-size: 0.75rem;
   border-radius: var(--radius-sm);
   font-weight: 500;

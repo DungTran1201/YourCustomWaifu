@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import { useAppStore } from "@vrm/app-core";
+import AppIcon from "../../components/AppIcon.vue";
 
 const store = useAppStore();
 
@@ -38,10 +39,12 @@ async function handleGuestPreview() {
   <div class="auth-view">
     <div class="auth-card">
       <div class="auth-header">
-        <div class="auth-icon">🔐</div>
+        <div class="auth-icon" aria-hidden="true">
+          <AppIcon name="signin" size="24" />
+        </div>
         <h1 class="auth-title">Welcome Back</h1>
         <p class="auth-subtitle">
-          Sign in to your account across Web and Desktop
+          Sign in to your personal companion desktop workspace
         </p>
       </div>
 

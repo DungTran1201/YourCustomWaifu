@@ -267,8 +267,9 @@ function handleCreateRule() {
 }
 
 .scope-pill.agent {
-  background: rgba(6, 182, 212, 0.15);
-  color: #22d3ee;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
 }
 
 .priority-tag {
@@ -342,11 +343,11 @@ function handleCreateRule() {
 }
 
 input:checked + .slider {
-  background-color: var(--accent-cyan);
+  background-color: var(--text-primary);
 }
 
 input:checked + .slider:before {
   transform: translateX(18px);
-  background-color: #000;
+  background-color: var(--bg-primary);
 }
 </style>

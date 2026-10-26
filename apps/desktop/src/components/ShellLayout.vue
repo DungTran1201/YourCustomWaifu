@@ -4,6 +4,7 @@ import { useAppStore } from "@vrm/app-core";
 import { APP_METADATA } from "@vrm/shared";
 import NavigationBar from "./NavigationBar.vue";
 import StatusBadge from "./StatusBadge.vue";
+import AppIcon from "./AppIcon.vue";
 import SettingsView from "../workspace/views/SettingsView.vue";
 import DiagnosticsView from "../workspace/views/DiagnosticsView.vue";
 import SignInView from "../workspace/views/SignInView.vue";
@@ -25,14 +26,12 @@ import ActivityView from "../workspace/views/ActivityView.vue";
 
 const store = useAppStore();
 
-const platformLabel = computed(() =>
-  store.platform.value === "electron" ? "Desktop App" : "Web Client",
-);
+const platformLabel = computed(() => "Desktop App");
 
 const activeTabTitle = computed(() => {
   switch (store.state.currentTab) {
     case "chat":
-      return "Companion Chatspace";
+      return "Companion Chat";
     case "avatar":
       return "Avatar Stage Settings";
     case "agents":
@@ -54,7 +53,7 @@ const activeTabTitle = computed(() => {
     case "security":
       return "Security & Sessions";
     case "secrets":
-      return "AI Credentials & Keys";
+      return "AI Keys & Credentials";
     case "settings":
       return "Application Settings";
     case "diagnostics":
@@ -80,7 +79,7 @@ onMounted(() => {
 
 <template>
   <div class="shell-layout">
-    <!-- Consistent Native Desktop Topbar -->
+    <!-- Restrained Native Desktop Topbar -->
     <header class="shell-topbar" role="banner">
       <div class="topbar-left">
         <!-- Sidebar Collapse / Expand Toggle Button -->
@@ -90,20 +89,29 @@ onMounted(() => {
           :title="
             store.state.sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'
           "
+          :aria-label="
+            store.state.sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'
+          "
           @click="store.toggleSidebar()"
         >
-          <span class="toggle-icon">{{
-            store.state.sidebarCollapsed ? "❯" : "❮"
-          }}</span>
+          <AppIcon
+            :name="
+              store.state.sidebarCollapsed ? 'chevron-right' : 'chevron-left'
+            "
+            size="14"
+          />
         </button>
 
         <div class="brand">
-          <div class="logo-mark">⚡</div>
+          <div class="logo-mark">
+            <AppIcon name="stage" size="14" />
+          </div>
           <div class="brand-text">
             <span class="app-name">{{ APP_METADATA.shortName }}</span>
             <span class="app-version">v{{ APP_METADATA.version }}</span>
           </div>
         </div>
+
         <StatusBadge
           v-if="!store.hasBridgeError.value"
           status="ready"
@@ -174,7 +182,7 @@ onMounted(() => {
             title="Account Profile"
             @click="store.setTab('profile')"
           >
-            <span class="user-pill-icon">👤</span>
+            <AppIcon name="user" size="13" class="user-pill-icon" />
             <span class="user-pill-name">{{
               store.state.user?.displayName ||
               store.state.user?.email?.split("@")[0]
@@ -211,13 +219,21 @@ onMounted(() => {
           id="theme-toggle-btn"
           class="action-icon-btn"
           title="Toggle Theme"
+          :aria-label="
+            store.state.settings.theme === 'dark'
+              ? 'Switch to light theme'
+              : 'Switch to dark theme'
+          "
           @click="
             store.updateSettings({
               theme: store.state.settings.theme === 'dark' ? 'light' : 'dark',
             })
           "
         >
-          {{ store.state.settings.theme === "dark" ? "☀️" : "🌙" }}
+          <AppIcon
+            :name="store.state.settings.theme === 'dark' ? 'sun' : 'moon'"
+            size="14"
+          />
         </button>
       </div>
     </header>
@@ -277,25 +293,6 @@ onMounted(() => {
         </template>
       </main>
     </div>
-
-    <!-- Minimal Desktop Status Footer -->
-    <footer class="shell-footer" role="contentinfo">
-      <div class="footer-left">
-        <span>{{ APP_METADATA.name }} &copy; 2026 Dung Tran</span>
-        <span class="divider">&bull;</span>
-        <span>Licensed under {{ APP_METADATA.license }}</span>
-      </div>
-      <div class="footer-right">
-        <a
-          id="footer-github-link"
-          :href="APP_METADATA.repositoryUrl"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          GitHub Repository
-        </a>
-      </div>
-    </footer>
   </div>
 </template>
 
@@ -311,13 +308,13 @@ onMounted(() => {
 
 /* Topbar Header */
 .shell-topbar {
-  height: 50px;
+  height: 46px;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
+  padding: 0 14px;
   user-select: none;
   flex-shrink: 0;
   z-index: 20;
@@ -326,47 +323,47 @@ onMounted(() => {
 .topbar-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .bridge-error-badge {
-  padding: 3px 8px;
-  background: rgba(239, 68, 68, 0.18);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.45);
+  padding: 2px 7px;
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--accent-danger);
+  border: 1px solid rgba(239, 68, 68, 0.35);
   border-radius: var(--radius-sm);
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
 }
 
 .guest-preview-badge {
-  padding: 3px 8px;
-  background: rgba(6, 182, 212, 0.18);
-  color: var(--accent-cyan);
-  border: 1px solid rgba(6, 182, 212, 0.45);
+  padding: 2px 7px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
 }
 
 .guest-exit-btn {
-  border-color: rgba(6, 182, 212, 0.4);
-  color: var(--accent-cyan);
+  border-color: var(--border-default);
+  color: var(--text-secondary);
 }
 
 .guest-exit-btn:hover {
-  background: rgba(6, 182, 212, 0.15);
-  color: #fff;
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .sidebar-toggle-btn {
   background: transparent;
   border: 1px solid var(--border-subtle);
   color: var(--text-secondary);
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
@@ -381,10 +378,6 @@ onMounted(() => {
   border-color: var(--border-default);
 }
 
-.toggle-icon {
-  font-size: 0.75rem;
-}
-
 .brand {
   display: flex;
   align-items: center;
@@ -392,15 +385,15 @@ onMounted(() => {
 }
 
 .logo-mark {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, var(--accent-cyan), var(--accent-indigo));
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
-  font-size: 0.85rem;
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .brand-text {
@@ -410,14 +403,14 @@ onMounted(() => {
 }
 
 .app-name {
-  font-weight: 700;
-  font-size: 0.9rem;
+  font-weight: 600;
+  font-size: 0.85rem;
   color: var(--text-primary);
   letter-spacing: -0.01em;
 }
 
 .app-version {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   color: var(--text-muted);
   font-family: var(--font-family-mono);
 }
@@ -428,11 +421,10 @@ onMounted(() => {
 }
 
 .current-view-title {
-  font-size: 0.825rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
 }
 
 .topbar-right {
@@ -444,24 +436,24 @@ onMounted(() => {
 .stage-pill-btn {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 5px 11px;
+  gap: 6px;
+  padding: 4px 9px;
   border-radius: var(--radius-sm);
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-size: 0.78rem;
+  font-weight: 500;
   border: 1px solid var(--border-subtle);
   cursor: pointer;
   transition: all var(--transition-fast);
 }
 
 .stage-pill-btn.stage-active {
-  background: rgba(16, 185, 129, 0.12);
-  color: #10b981;
-  border-color: rgba(16, 185, 129, 0.4);
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--accent-success);
+  border-color: rgba(16, 185, 129, 0.3);
 }
 
 .stage-pill-btn.stage-inactive {
-  background: var(--bg-tertiary);
+  background: var(--bg-surface);
   color: var(--text-secondary);
 }
 
@@ -470,8 +462,8 @@ onMounted(() => {
 }
 
 .stage-dot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: currentColor;
 }
@@ -480,37 +472,34 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 10px;
-  background: var(--bg-tertiary);
+  padding: 4px 9px;
+  background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: 9999px;
   color: var(--text-primary);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 500;
   cursor: pointer;
   transition: all var(--transition-fast);
 }
 
 .user-pill-btn:hover {
-  border-color: var(--accent-cyan);
-}
-
-.user-pill-icon {
-  font-size: 0.8rem;
+  border-color: var(--border-default);
+  background: var(--bg-hover);
 }
 
 .user-pill-name {
-  max-width: 110px;
+  max-width: 100px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .nav-auth-btn {
-  padding: 5px 10px;
+  padding: 4px 9px;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 500;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-subtle);
@@ -521,34 +510,35 @@ onMounted(() => {
 .nav-auth-btn:hover {
   color: var(--text-primary);
   background: var(--bg-hover);
+  border-color: var(--border-default);
 }
 
 .nav-auth-primary-btn {
-  padding: 5px 12px;
-  background: var(--accent-cyan);
-  color: #000;
-  font-size: 0.8rem;
+  padding: 4px 11px;
+  background: var(--text-primary);
+  color: var(--bg-primary);
+  font-size: 0.78rem;
   font-weight: 600;
   border-radius: var(--radius-sm);
-  border: none;
+  border: 1px solid transparent;
   cursor: pointer;
   transition: all var(--transition-fast);
 }
 
 .nav-auth-primary-btn:hover {
-  background: #22d3ee;
+  opacity: 0.9;
 }
 
 .action-icon-btn {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-sm);
   background: transparent;
   border: 1px solid var(--border-subtle);
-  font-size: 0.95rem;
+  color: var(--text-secondary);
   cursor: pointer;
   transition: all var(--transition-fast);
 }
@@ -556,6 +546,7 @@ onMounted(() => {
 .action-icon-btn:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
+  border-color: var(--border-default);
 }
 
 /* Shell Body */
@@ -573,40 +564,5 @@ onMounted(() => {
   overflow: hidden;
   background: var(--bg-primary);
   position: relative;
-}
-
-/* Shell Footer */
-.shell-footer {
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-  background: var(--bg-secondary);
-  border-top: 1px solid var(--border-subtle);
-  font-size: 0.725rem;
-  color: var(--text-muted);
-  user-select: none;
-  flex-shrink: 0;
-}
-
-.footer-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.divider {
-  color: var(--text-muted);
-}
-
-.footer-right a {
-  color: var(--text-muted);
-  text-decoration: none;
-  transition: color var(--transition-fast);
-}
-
-.footer-right a:hover {
-  color: var(--text-secondary);
 }
 </style>

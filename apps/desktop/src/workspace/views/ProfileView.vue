@@ -57,7 +57,7 @@ async function handleSave() {
         {{ store.state.authError }}
       </div>
 
-      <!-- Prominent Unverified Email Notice -->
+      <!-- Contact Identifier Notice -->
       <div
         class="email-status-card"
         role="region"
@@ -65,7 +65,7 @@ async function handleSave() {
       >
         <div class="status-badge-row">
           <span class="status-pill status-unverified"
-            >⚠️ Unverified Contact Address</span
+            >Self-asserted Contact Address</span
           >
           <span class="registered-date"
             >Created

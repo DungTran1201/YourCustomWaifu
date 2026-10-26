@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import { useAppStore } from "@vrm/app-core";
+import AppIcon from "../../components/AppIcon.vue";
 
 const store = useAppStore();
 
@@ -45,7 +46,8 @@ async function handleDelete(targetProvider: string) {
       <!-- Envelope Encryption Notice -->
       <div class="vault-notice" role="note">
         <div class="vault-notice-title">
-          🔒 Hardware / KMS Envelope Encryption
+          <AppIcon name="lock" size="14" />
+          <span>Hardware / KMS Envelope Encryption</span>
         </div>
         <div class="vault-notice-body">
           API keys are encrypted using AES-256-GCM with keys managed by backend

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { useAppStore } from "@vrm/app-core";
+import AppIcon from "../../components/AppIcon.vue";
 
 const store = useAppStore();
 
@@ -42,16 +43,18 @@ async function handleSubmit() {
   <div class="auth-view">
     <div class="auth-card">
       <div class="auth-header">
-        <div class="auth-icon">🚀</div>
+        <div class="auth-icon" aria-hidden="true">
+          <AppIcon name="signup" size="24" />
+        </div>
         <h1 class="auth-title">Create Account</h1>
         <p class="auth-subtitle">
-          Instant activation with shared Web & Desktop access
+          Instant activation for your local desktop companion
         </p>
       </div>
 
       <!-- Policy Advisory: No Email Verification -->
       <div class="advisory-banner" role="note">
-        <div class="advisory-title">ℹ️ No Email Verification Required</div>
+        <div class="advisory-title">No Email Verification Required</div>
         <div class="advisory-text">
           Accounts activate immediately upon creation. No confirmation links or
           OTPs will be sent. Please ensure your email address is spelled

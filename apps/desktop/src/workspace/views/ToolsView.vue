@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useAppStore } from "@vrm/app-core";
+import AppIcon from "../../components/AppIcon.vue";
 
 const store = useAppStore();
 </script>
@@ -17,7 +18,7 @@ const store = useAppStore();
     </div>
 
     <div class="info-banner">
-      <span class="info-icon">🛡️</span>
+      <AppIcon name="security" size="16" />
       <p>
         Tools are sandboxed and managed directly by the runtime. Terminal, Git,
         and shell execution tools are strictly prohibited.

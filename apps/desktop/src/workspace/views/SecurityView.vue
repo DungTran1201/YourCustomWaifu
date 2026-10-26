@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
 import { useAppStore } from "@vrm/app-core";
+import AppIcon from "../../components/AppIcon.vue";
 
 const store = useAppStore();
 
@@ -218,7 +219,10 @@ async function handleDeleteAccount() {
           >
             <div class="session-info">
               <div class="session-icon">
-                {{ session.clientType === "desktop" ? "💻" : "🌐" }}
+                <AppIcon
+                  :name="session.clientType === 'desktop' ? 'desktop' : 'globe'"
+                  size="16"
+                />
               </div>
               <div class="session-details">
                 <div class="device-name">
@@ -483,7 +487,8 @@ async function handleDeleteAccount() {
 }
 
 .session-item.current {
-  border-color: rgba(6, 182, 212, 0.4);
+  border-color: var(--border-default);
+  background: var(--bg-surface);
 }
 
 .session-info {
@@ -493,7 +498,10 @@ async function handleDeleteAccount() {
 }
 
 .session-icon {
-  font-size: 1.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
 }
 
 .device-name {
@@ -510,9 +518,9 @@ async function handleDeleteAccount() {
   font-weight: 600;
   padding: 2px 8px;
   border-radius: 9999px;
-  background: rgba(6, 182, 212, 0.15);
-  color: var(--accent-cyan);
-  border: 1px solid rgba(6, 182, 212, 0.3);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
 }
 
 .device-meta {

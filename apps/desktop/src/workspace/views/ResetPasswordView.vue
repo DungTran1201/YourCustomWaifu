@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { useAppStore } from "@vrm/app-core";
+import AppIcon from "../../components/AppIcon.vue";
 
 const store = useAppStore();
 
@@ -38,7 +39,7 @@ async function handleSubmit() {
   <div class="auth-view">
     <div class="auth-card">
       <div class="auth-header">
-        <div class="auth-icon">🛡️</div>
+        <div class="auth-icon"><AppIcon name="security" size="24" /></div>
         <h1 class="auth-title">Set New Password</h1>
         <p class="auth-subtitle">
           All existing active sessions will be terminated upon reset

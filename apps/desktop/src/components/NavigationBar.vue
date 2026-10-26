@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useAppStore, type NavigationTab } from "@vrm/app-core";
+import AppIcon from "./AppIcon.vue";
 
 const store = useAppStore();
 
@@ -19,14 +20,14 @@ const tabGroups = computed<TabGroup[]>(() => {
   if (store.state.isGuest) {
     return [
       {
-        name: "Guest Preview",
-        tabs: [{ id: "avatar", label: "Avatar Stage", icon: "🎭" }],
+        name: "Preview",
+        tabs: [{ id: "avatar", label: "Avatar Stage", icon: "stage" }],
       },
       {
         name: "System",
         tabs: [
-          { id: "settings", label: "Settings", icon: "⚙️" },
-          { id: "diagnostics", label: "Diagnostics", icon: "🩺" },
+          { id: "settings", label: "Settings", icon: "settings" },
+          { id: "diagnostics", label: "Diagnostics", icon: "diagnostics" },
         ],
       },
     ];
@@ -37,29 +38,29 @@ const tabGroups = computed<TabGroup[]>(() => {
       {
         name: "Companion",
         tabs: [
-          { id: "chat", label: "Chat", icon: "💬" },
-          { id: "avatar", label: "Avatar", icon: "🎭" },
-          { id: "agents", label: "Agents", icon: "🤖" },
+          { id: "chat", label: "Chat", icon: "chat" },
+          { id: "avatar", label: "Avatar Stage", icon: "stage" },
+          { id: "agents", label: "Agents", icon: "agents" },
+          { id: "memory", label: "Memory", icon: "memory" },
         ],
       },
       {
-        name: "Intelligence",
+        name: "Capabilities",
         tabs: [
-          { id: "skills", label: "Skills", icon: "⚡" },
-          { id: "rules", label: "Rules", icon: "📜" },
-          { id: "tools", label: "Tools", icon: "🛠️" },
-          { id: "connections", label: "Connections", icon: "🔌" },
-          { id: "memory", label: "Memory", icon: "🧠" },
+          { id: "skills", label: "Skills", icon: "skills" },
+          { id: "rules", label: "Rules", icon: "rules" },
+          { id: "tools", label: "Tools", icon: "tools" },
         ],
       },
       {
-        name: "System",
+        name: "Configuration",
         tabs: [
-          { id: "profile", label: "Profile", icon: "👤" },
-          { id: "security", label: "Security", icon: "🛡️" },
-          { id: "secrets", label: "AI Keys", icon: "🔑" },
-          { id: "settings", label: "Settings", icon: "⚙️" },
-          { id: "diagnostics", label: "Diagnostics", icon: "🩺" },
+          { id: "connections", label: "AI Connections", icon: "connections" },
+          { id: "secrets", label: "AI Keys", icon: "secrets" },
+          { id: "profile", label: "Profile", icon: "profile" },
+          { id: "security", label: "Security", icon: "security" },
+          { id: "settings", label: "Settings", icon: "settings" },
+          { id: "diagnostics", label: "Diagnostics", icon: "diagnostics" },
         ],
       },
     ];
@@ -69,15 +70,15 @@ const tabGroups = computed<TabGroup[]>(() => {
     {
       name: "Authentication",
       tabs: [
-        { id: "signin", label: "Sign In", icon: "🔑" },
-        { id: "signup", label: "Register", icon: "✨" },
+        { id: "signin", label: "Sign In", icon: "signin" },
+        { id: "signup", label: "Register", icon: "signup" },
       ],
     },
     {
       name: "System",
       tabs: [
-        { id: "settings", label: "Settings", icon: "⚙️" },
-        { id: "diagnostics", label: "Diagnostics", icon: "🩺" },
+        { id: "settings", label: "Settings", icon: "settings" },
+        { id: "diagnostics", label: "Diagnostics", icon: "diagnostics" },
       ],
     },
   ];
@@ -95,7 +96,7 @@ const tabGroups = computed<TabGroup[]>(() => {
         <div v-if="!store.state.sidebarCollapsed" class="group-title">
           {{ group.name }}
         </div>
-        <div v-else class="group-divider"></div>
+        <div v-else class="group-divider" aria-hidden="true"></div>
 
         <button
           v-for="tab in group.tabs"
@@ -106,9 +107,11 @@ const tabGroups = computed<TabGroup[]>(() => {
             { active: store.state.currentTab === tab.id },
           ]"
           :title="tab.label"
+          :aria-label="tab.label"
+          :aria-current="store.state.currentTab === tab.id ? 'page' : undefined"
           @click="store.setTab(tab.id)"
         >
-          <span class="nav-icon">{{ tab.icon }}</span>
+          <AppIcon :name="tab.icon" size="16" class="nav-icon" />
           <span v-if="!store.state.sidebarCollapsed" class="nav-label">
             {{ tab.label }}
           </span>
@@ -124,26 +127,26 @@ const tabGroups = computed<TabGroup[]>(() => {
 
 <style scoped>
 .workspace-sidebar {
-  width: 220px;
+  width: 210px;
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
   user-select: none;
-  transition: width 180ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: width var(--transition-normal);
   overflow: hidden;
   flex-shrink: 0;
 }
 
 .workspace-sidebar.collapsed {
-  width: 62px;
+  width: 58px;
 }
 
 .sidebar-scroll {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 12px 8px;
+  padding: 12px 6px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -157,43 +160,35 @@ const tabGroups = computed<TabGroup[]>(() => {
 
 .group-title {
   font-size: 0.68rem;
-  font-weight: 700;
+  font-weight: 600;
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--text-muted);
-  padding: 6px 10px 4px 10px;
+  padding: 4px 10px;
+  margin-bottom: 2px;
 }
 
 .group-divider {
   height: 1px;
   background: var(--border-subtle);
-  margin: 6px 4px;
+  margin: 6px 8px;
 }
 
 .sidebar-nav-btn {
-  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 10px;
-  background: transparent;
-  border: none;
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
-  font-size: 0.85rem;
+  font-size: 0.825rem;
   font-weight: 500;
-  cursor: pointer;
   text-align: left;
-  white-space: nowrap;
-  transition:
-    background 120ms ease,
-    color 120ms ease;
-  width: 100%;
-}
-
-.workspace-sidebar.collapsed .sidebar-nav-btn {
-  justify-content: center;
-  padding: 9px 0;
+  background: transparent;
+  position: relative;
+  transition: all var(--transition-fast);
 }
 
 .sidebar-nav-btn:hover {
@@ -207,28 +202,38 @@ const tabGroups = computed<TabGroup[]>(() => {
   font-weight: 600;
 }
 
-.nav-icon {
-  font-size: 1rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 20px;
-}
-
-.nav-label {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .active-indicator {
   position: absolute;
   left: 0;
-  top: 6px;
-  bottom: 6px;
-  width: 3px;
-  background: var(--accent-cyan);
+  top: 7px;
+  bottom: 7px;
+  width: 2px;
+  background: var(--text-primary);
   border-radius: 0 2px 2px 0;
+}
+
+.nav-icon {
+  color: inherit;
+  opacity: 0.85;
+}
+
+.sidebar-nav-btn.active .nav-icon {
+  opacity: 1;
+}
+
+.nav-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.workspace-sidebar.collapsed .sidebar-nav-btn {
+  justify-content: center;
+  padding: 0;
+}
+
+.workspace-sidebar.collapsed .active-indicator {
+  left: 2px;
 }
 </style>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import { useAppStore } from "@vrm/app-core";
+import AppIcon from "../../components/AppIcon.vue";
 
 const store = useAppStore();
 
@@ -53,7 +54,7 @@ async function handleTest(provider: "gemini" | "openai" | "anthropic") {
 
     <!-- Security assurance -->
     <div class="security-banner">
-      <span class="banner-icon">🔒</span>
+      <AppIcon name="lock" size="14" />
       <p>
         Credentials are encrypted at rest via hardware-backed envelope
         cryptography and never exposed to the client.

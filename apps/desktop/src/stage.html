@@ -109,8 +109,8 @@
     }
 
     .tool-btn.active {
-      color: #06b6d4;
-      background: rgba(6, 182, 212, 0.18);
+      color: #F1F2F4;
+      background: rgba(255, 255, 255, 0.16);
     }
 
     .tool-separator {
@@ -149,7 +149,7 @@
       width: 24px;
       height: 24px;
       border: 2px solid rgba(255, 255, 255, 0.15);
-      border-top-color: #06b6d4;
+      border-top-color: #F1F2F4;
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
     }
@@ -201,10 +201,10 @@
       background: rgba(20, 21, 25, 0.85);
       backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
-      border: 1px solid rgba(6, 182, 212, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.12);
       border-radius: 9999px;
       font-size: 0.725rem;
-      color: #06b6d4;
+      color: #a4a7ae;
       pointer-events: none;
       transition: opacity 200ms ease;
     }
@@ -222,7 +222,9 @@
     <!-- Floating Minimal Toolbar -->
     <div id="stage-toolbar" class="stage-toolbar">
       <!-- Drag Grip Handle -->
-      <div id="btn-drag-handle" class="drag-handle" title="Drag to move Stage">✥</div>
+      <div id="btn-drag-handle" class="drag-handle" title="Drag to move Stage">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="19" r="1"></circle></svg>
+      </div>
 
       <div class="tool-separator"></div>
 
@@ -233,32 +235,48 @@
       <div class="tool-separator"></div>
 
       <!-- Always on top toggle -->
-      <button id="btn-always-on-top" class="tool-btn active" title="Toggle Always On Top">📌</button>
+      <button id="btn-always-on-top" class="tool-btn active" title="Toggle Always On Top">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"></line><path d="M5 17h14v-2l-2-2V5h1V3H6v2h1v8l-2 2v2z"></path></svg>
+      </button>
 
       <!-- Click-through toggle -->
-      <button id="btn-click-through" class="tool-btn" title="Toggle Click-Through Mode (Ctrl+Shift+M)">🖱️</button>
+      <button id="btn-click-through" class="tool-btn" title="Toggle Click-Through Mode (Ctrl+Shift+M)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 3 7 18 3-7 7-3L3 3z"></path></svg>
+      </button>
 
       <!-- Pause / Resume animation -->
-      <button id="btn-pause-animation" class="tool-btn" title="Pause/Resume Motion">⏯️</button>
+      <button id="btn-pause-animation" class="tool-btn" title="Pause/Resume Motion">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+      </button>
 
       <!-- Global Eye Tracking toggle -->
-      <button id="btn-toggle-lookat" class="tool-btn active" title="Toggle Global Eye/Gaze Tracking">👀</button>
+      <button id="btn-toggle-lookat" class="tool-btn active" title="Toggle Global Eye/Gaze Tracking">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+      </button>
 
       <!-- Test Blink button -->
-      <button id="btn-test-blink" class="tool-btn" title="Test Blink (Trigger natural eye blink)">😉</button>
+      <button id="btn-test-blink" class="tool-btn" title="Test Blink (Trigger natural eye blink)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 10s3-5 10-5 10 5 10 5"></path><path d="M2 14l3-2"></path><path d="M22 14l-3-2"></path><path d="M12 17v-3"></path><path d="M7 16l1.5-2.5"></path><path d="M17 16l-1.5-2.5"></path></svg>
+      </button>
 
       <div class="tool-separator"></div>
 
       <!-- Open Workspace button -->
-      <button id="btn-open-workspace" class="tool-btn" title="Open Companion Workspace">💬</button>
+      <button id="btn-open-workspace" class="tool-btn" title="Open Companion Workspace">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+      </button>
 
       <!-- Open Avatar Settings button -->
-      <button id="btn-open-settings" class="tool-btn" title="Open Avatar Settings">⚙️</button>
+      <button id="btn-open-settings" class="tool-btn" title="Open Avatar Settings">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+      </button>
 
       <div class="tool-separator"></div>
 
       <!-- Hide Stage -->
-      <button id="btn-hide-stage" class="tool-btn" title="Hide Avatar Stage">✕</button>
+      <button id="btn-hide-stage" class="tool-btn" title="Hide Avatar Stage">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
     </div>
 
     <!-- Loading Indicator -->

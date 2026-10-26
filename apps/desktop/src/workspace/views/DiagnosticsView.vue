@@ -3,6 +3,7 @@ import { onMounted } from "vue";
 import { useAppStore } from "@vrm/app-core";
 import StateView from "../../components/StateView.vue";
 import StatusBadge from "../../components/StatusBadge.vue";
+import AppIcon from "../../components/AppIcon.vue";
 
 const store = useAppStore();
 
@@ -27,7 +28,8 @@ onMounted(() => {
           :disabled="store.state.isLoading"
           @click="store.loadDiagnostics()"
         >
-          🔄 Refresh
+          <AppIcon name="refresh" size="13" />
+          <span>Refresh</span>
         </button>
       </div>
     </div>
@@ -68,7 +70,7 @@ onMounted(() => {
               :label="
                 store.state.diagnostics.platform === 'electron'
                   ? 'Native Shell'
-                  : 'Browser Client'
+                  : 'Standalone Runtime'
               "
             />
           </div>
@@ -140,7 +142,7 @@ onMounted(() => {
               :label="
                 store.state.diagnostics.capabilities.nativeMenus
                   ? 'Enabled'
-                  : 'Browser Managed'
+                  : 'System Managed'
               "
             />
           </div>
@@ -229,6 +231,9 @@ onMounted(() => {
 }
 
 .refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 8px 16px;
   background: var(--bg-tertiary);
   color: var(--text-primary);
@@ -237,6 +242,7 @@ onMounted(() => {
   font-size: 0.85rem;
   font-weight: 500;
   transition: all var(--transition-fast);
+  cursor: pointer;
 }
 
 .refresh-btn:hover:not(:disabled) {
@@ -364,17 +370,18 @@ onMounted(() => {
 
 .action-btn {
   padding: 8px 18px;
-  background: var(--accent-cyan);
-  color: #000;
+  background: var(--text-primary);
+  color: #101114;
   font-weight: 600;
   border-radius: var(--radius-sm);
   font-size: 0.85rem;
+  border: none;
+  cursor: pointer;
   transition: all var(--transition-fast);
 }
 
 .action-btn:hover {
-  background: #22d3ee;
-  box-shadow: 0 0 10px var(--accent-cyan-glow);
+  background: #ffffff;
 }
 
 .ping-output {

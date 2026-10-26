@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useAppStore } from "@vrm/app-core";
+import AppIcon from "../../components/AppIcon.vue";
 
 const store = useAppStore();
 
@@ -33,7 +34,9 @@ async function handleSubmit() {
   <div class="auth-view">
     <div class="auth-card">
       <div class="auth-header">
-        <div class="auth-icon">🔑</div>
+        <div class="auth-icon" aria-hidden="true">
+          <AppIcon name="key" size="24" />
+        </div>
         <h1 class="auth-title">Reset Password</h1>
         <p class="auth-subtitle">
           We will send a 15-minute recovery link to your contact address

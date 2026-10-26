@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import AppIcon from "./AppIcon.vue";
+
 defineProps<{
   type: "loading" | "empty" | "error" | "not-available";
   title: string;
@@ -15,9 +17,24 @@ const emit = defineEmits<{
   <div :class="['state-view', `state-${type}`]">
     <div class="state-icon">
       <span v-if="type === 'loading'" class="spinner"></span>
-      <span v-else-if="type === 'empty'">📂</span>
-      <span v-else-if="type === 'error'">⚠️</span>
-      <span v-else-if="type === 'not-available'">🚫</span>
+      <AppIcon
+        v-else-if="type === 'empty'"
+        name="box"
+        size="32"
+        stroke-width="1.5"
+      />
+      <AppIcon
+        v-else-if="type === 'error'"
+        name="alert"
+        size="32"
+        stroke-width="1.5"
+      />
+      <AppIcon
+        v-else-if="type === 'not-available'"
+        name="lock"
+        size="32"
+        stroke-width="1.5"
+      />
     </div>
     <h3 class="state-title">{{ title }}</h3>
     <p class="state-description">{{ description }}</p>

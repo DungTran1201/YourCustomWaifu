@@ -2,6 +2,7 @@
 import { ref, computed } from "vue";
 import { useAppStore } from "@vrm/app-core";
 import type { MemoryItem } from "@vrm/platform-contracts";
+import AppIcon from "../../components/AppIcon.vue";
 
 const store = useAppStore();
 const searchQuery = ref("");
@@ -67,7 +68,7 @@ function formatDate(iso: string): string {
 
     <!-- Privacy Banner -->
     <div class="privacy-card">
-      <div class="privacy-icon">🛡️</div>
+      <div class="privacy-icon"><AppIcon name="security" size="20" /></div>
       <div class="privacy-text">
         <h4>Strict Local Privacy Baseline</h4>
         <p>
