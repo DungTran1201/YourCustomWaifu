@@ -224,6 +224,7 @@ export interface MemoryItem {
   createdAt: string;
   lastRecalledAt?: string;
   confidence: number;
+  agentId?: string;
 }
 
 export interface ChatMessage {
@@ -232,6 +233,7 @@ export interface ChatMessage {
   content: string;
   timestamp: string;
   agentId?: string;
+  conversationId?: string;
   status?: "sending" | "streaming" | "complete" | "error";
 }
 
