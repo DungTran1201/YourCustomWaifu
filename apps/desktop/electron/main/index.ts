@@ -652,6 +652,13 @@ function registerIpcHandlers(): void {
     return "pong:electron-main";
   });
 
+  ipcMain.handle(IPC_CHANNELS.GET_API_BASE_URL, (event) => {
+    if (!validateIpcSender(event.sender, allowedWindows())) {
+      throw new Error("Unauthorized IPC sender");
+    }
+    return process.env["VITE_API_BASE_URL"] || "http://127.0.0.1:3000";
+  });
+
   // 2. Auth IPC Handlers
   ipcMain.handle(IPC_CHANNELS.AUTH_LOGIN, async (event, credentials) => {
     if (!validateIpcSender(event.sender, allowedWindows())) {
@@ -683,7 +690,11 @@ function registerIpcHandlers(): void {
     } catch {
       // safeStorage fallback
     }
-    return { user: data.user };
+    return {
+      user: data.user,
+      sessionToken: data.accessToken || data.refreshToken,
+      csrfToken: data.csrfToken,
+    };
   });
 
   ipcMain.handle(IPC_CHANNELS.AUTH_REGISTER, async (event, credentials) => {
@@ -758,7 +769,11 @@ function registerIpcHandlers(): void {
       );
     }
 
-    return { user: data.user };
+    return {
+      user: data.user,
+      sessionToken: data.accessToken || data.refreshToken,
+      csrfToken: data.csrfToken,
+    };
   });
 
   ipcMain.handle(IPC_CHANNELS.AUTH_LOGOUT, async (event) => {
@@ -803,7 +818,12 @@ function registerIpcHandlers(): void {
         },
       });
       if (!meRes.ok) return null;
-      return await meRes.json();
+      const meData = await meRes.json();
+      return {
+        user: meData.user || meData,
+        sessionToken: data.accessToken || data.refreshToken,
+        csrfToken: data.csrfToken,
+      };
     } catch {
       return null;
     }
@@ -1244,7 +1264,18 @@ async function startEmbeddedAuthServer(): Promise<void> {
     const { getDatabase } = await import("../server/database.js");
     const { createServer } = await import("../server/server.js");
     const db = getDatabase();
-    const server = createServer({ db });
+    const desktopCorsOrigins = [
+      "http://localhost:5173",
+      "http://localhost:4173",
+      "http://127.0.0.1:5173",
+      "http://127.0.0.1:4173",
+      "file://",
+      "null",
+      "vscode-webview://",
+      "https://vrm.app",
+      "https://app.vrm.app",
+    ];
+    const server = createServer({ db, corsOrigins: desktopCorsOrigins });
     const port = parseInt(process.env["AUTH_PORT"] || "3000", 10);
     await new Promise<void>((resolve) => {
       server.listen(port, "127.0.0.1", () => {
@@ -1275,7 +1306,10 @@ async function startEmbeddedAuthServer(): Promise<void> {
           console.warn(
             `[Desktop Auth Server] Port ${port} is occupied by an incompatible process. Relocating to dynamic port...`,
           );
-          const fallbackServer = createServer({ db });
+          const fallbackServer = createServer({
+            db,
+            corsOrigins: desktopCorsOrigins,
+          });
           fallbackServer.listen(0, "127.0.0.1", () => {
             embeddedAuthServer = fallbackServer;
             const fallbackAddr = fallbackServer.address() as { port: number };

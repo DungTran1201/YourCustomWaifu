@@ -201,6 +201,8 @@ export class AuthService {
     ipSubnet: string = "127.0.0.1/32",
   ): Promise<{
     accessToken: string;
+    sessionToken: string;
+    csrfToken: string;
     expiresIn: number;
     refreshToken: string;
     refreshExpiresIn: number;
@@ -220,6 +222,8 @@ export class AuthService {
 
     return {
       accessToken,
+      sessionToken: accessToken,
+      csrfToken: regResult.csrfToken,
       expiresIn: 900, // 15 minutes
       refreshToken,
       refreshExpiresIn: 90 * 86400, // 90 days
@@ -234,6 +238,8 @@ export class AuthService {
     ipSubnet: string = "127.0.0.1/32",
   ): Promise<{
     accessToken: string;
+    sessionToken: string;
+    csrfToken: string;
     expiresIn: number;
     refreshToken: string;
     refreshExpiresIn: number;
@@ -253,6 +259,8 @@ export class AuthService {
 
     return {
       accessToken,
+      sessionToken: accessToken,
+      csrfToken: loginResult.csrfToken,
       expiresIn: 900, // 15 minutes
       refreshToken,
       refreshExpiresIn: 90 * 86400, // 90 days

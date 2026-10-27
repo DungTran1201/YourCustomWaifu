@@ -76,20 +76,7 @@ async function handleDeleteAccount() {
   isDeleting.value = true;
   deleteError.value = null;
   try {
-    const res = await fetch("http://127.0.0.1:3000/api/v1/users/me/delete", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({
-        currentPassword: deletePassword.value,
-        confirmationPhrase: confirmPhrase.value,
-      }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.message || "Failed to delete account");
-    }
-    await store.logout();
+    await store.deleteAccount(deletePassword.value, confirmPhrase.value);
   } catch (err: any) {
     deleteError.value = err?.message || "Account deletion failed";
   } finally {

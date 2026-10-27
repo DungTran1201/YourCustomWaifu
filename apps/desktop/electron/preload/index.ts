@@ -18,6 +18,9 @@ const desktopAPI: DesktopAPI = {
   ping: (): Promise<string> => {
     return ipcRenderer.invoke(IPC_CHANNELS.PING);
   },
+  getApiBaseUrl: (): Promise<string> => {
+    return ipcRenderer.invoke(IPC_CHANNELS.GET_API_BASE_URL);
+  },
   isGuestPreviewAvailable: (): Promise<boolean> => {
     return ipcRenderer.invoke(IPC_CHANNELS.GUEST_PREVIEW_AVAILABLE);
   },

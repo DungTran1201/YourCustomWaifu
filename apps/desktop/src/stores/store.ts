@@ -12,6 +12,7 @@ import type {
   SkillItem,
   RuleItem,
   ToolItem,
+  ToolExecutionResponse,
   ModelConnection,
   MemoryItem,
   ChatMessage,
@@ -64,6 +65,7 @@ export interface AppState {
   authNotice: string | null;
   sessions: UserSession[];
   secrets: ProviderSecretItem[];
+  sessionToken: string | null;
   csrfToken: string | null;
   resetToken: string | null;
   // Avatar Stage state
@@ -105,6 +107,7 @@ const state = reactive<AppState>({
   authNotice: null,
   sessions: [],
   secrets: [],
+  sessionToken: null,
   csrfToken: null,
   resetToken: null,
   // Stage initial state
@@ -289,7 +292,32 @@ const state = reactive<AppState>({
   chatError: null,
 });
 
-function getApiBaseUrl(): string {
+let cachedApiBaseUrl: string | null = null;
+
+export async function resolveApiBaseUrl(): Promise<string> {
+  if (cachedApiBaseUrl) return cachedApiBaseUrl;
+  if (typeof window !== "undefined") {
+    if ((window as any).VITE_API_BASE_URL) {
+      cachedApiBaseUrl = (window as any).VITE_API_BASE_URL;
+      return cachedApiBaseUrl!;
+    }
+    if (window.desktopAPI?.getApiBaseUrl) {
+      try {
+        const url = await window.desktopAPI.getApiBaseUrl();
+        if (url) {
+          cachedApiBaseUrl = url;
+          return url;
+        }
+      } catch {
+        // Fallback
+      }
+    }
+  }
+  return "http://127.0.0.1:3000";
+}
+
+export function getApiBaseUrl(): string {
+  if (cachedApiBaseUrl) return cachedApiBaseUrl;
   if (typeof window !== "undefined" && (window as any).VITE_API_BASE_URL) {
     return (window as any).VITE_API_BASE_URL;
   }
@@ -300,7 +328,7 @@ async function apiRequest(
   path: string,
   options: RequestInit = {},
 ): Promise<any> {
-  const baseUrl = getApiBaseUrl();
+  const baseUrl = await resolveApiBaseUrl();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...((options.headers as Record<string, string>) || {}),
@@ -308,6 +336,9 @@ async function apiRequest(
 
   if (state.csrfToken) {
     headers["X-CSRF-Token"] = state.csrfToken;
+  }
+  if (state.sessionToken) {
+    headers["Authorization"] = `Bearer ${state.sessionToken}`;
   }
 
   const res = await fetch(`${baseUrl}${path}`, {
@@ -375,15 +406,23 @@ export function useAppStore() {
   async function initAuth() {
     state.authLoading = true;
     try {
+      await resolveApiBaseUrl();
       if (
         isElectronEnvironment() &&
         window.desktopAPI?.auth?.getStoredSession
       ) {
         const stored = await window.desktopAPI.auth.getStoredSession();
         if (stored) {
-          state.user = stored;
+          state.user = (stored as any).user || stored;
+          if ((stored as any).sessionToken) {
+            state.sessionToken = (stored as any).sessionToken;
+          }
+          if ((stored as any).csrfToken) {
+            state.csrfToken = (stored as any).csrfToken;
+          }
           state.isAuthenticated = true;
           state.currentTab = "chat";
+          fetchCompanionData().catch(() => {});
           return;
         }
       }
@@ -439,6 +478,8 @@ export function useAppStore() {
           password: passwordRaw,
         });
         state.user = res.user;
+        if (res.sessionToken) state.sessionToken = res.sessionToken;
+        if (res.csrfToken) state.csrfToken = res.csrfToken;
         state.isAuthenticated = true;
         setTab("chat");
         fetchCompanionData().catch(() => {});
@@ -451,6 +492,7 @@ export function useAppStore() {
       });
       state.user = res.user;
       state.isAuthenticated = true;
+      if (res.sessionToken) state.sessionToken = res.sessionToken;
       if (res.csrfToken) state.csrfToken = res.csrfToken;
       setTab("chat");
       fetchCompanionData().catch(() => {});
@@ -478,6 +520,8 @@ export function useAppStore() {
           displayName: displayNameRaw,
         });
         state.user = res.user;
+        if (res.sessionToken) state.sessionToken = res.sessionToken;
+        if (res.csrfToken) state.csrfToken = res.csrfToken;
         state.isAuthenticated = true;
         setTab("chat");
         fetchCompanionData().catch(() => {});
@@ -494,6 +538,7 @@ export function useAppStore() {
       });
       state.user = res.user;
       state.isAuthenticated = true;
+      if (res.sessionToken) state.sessionToken = res.sessionToken;
       if (res.csrfToken) state.csrfToken = res.csrfToken;
       setTab("chat");
       fetchCompanionData().catch(() => {});
@@ -516,6 +561,8 @@ export function useAppStore() {
       );
     } finally {
       state.user = null;
+      state.sessionToken = null;
+      state.csrfToken = null;
       state.isAuthenticated = false;
       state.sessions = [];
       state.secrets = [];
@@ -535,6 +582,8 @@ export function useAppStore() {
       );
     } finally {
       state.user = null;
+      state.sessionToken = null;
+      state.csrfToken = null;
       state.isAuthenticated = false;
       state.sessions = [];
       state.secrets = [];
@@ -572,6 +621,18 @@ export function useAppStore() {
     } finally {
       state.authLoading = false;
     }
+  }
+
+  async function deleteAccount(
+    currentPassword: string,
+    confirmationPhrase: string,
+  ) {
+    const res = await apiRequest("/api/v1/users/me/delete", {
+      method: "POST",
+      body: JSON.stringify({ currentPassword, confirmationPhrase }),
+    });
+    await logout();
+    return res;
   }
 
   async function changePassword(
@@ -1191,6 +1252,17 @@ export function useAppStore() {
     }
   }
 
+  async function executeTool(
+    id: string,
+    args: Record<string, unknown> = {},
+    confirmed = false,
+  ): Promise<ToolExecutionResponse> {
+    return (await apiRequest(`/api/v1/tools/${id}/execute`, {
+      method: "POST",
+      body: JSON.stringify({ args, confirmed }),
+    })) as ToolExecutionResponse;
+  }
+
   // --- Real Model Connections Actions ---
   async function testConnection(provider: "gemini" | "openai" | "anthropic") {
     const conn = state.modelConnections.find((c) => c.provider === provider);
@@ -1303,6 +1375,7 @@ export function useAppStore() {
     fetchProfile,
     updateProfile,
     changePassword,
+    deleteAccount,
     fetchSessions,
     revokeSession,
     forgotPassword,
@@ -1340,6 +1413,7 @@ export function useAppStore() {
     deleteRule,
     toggleTool,
     updateTool,
+    executeTool,
     testConnection,
     addMemory,
     deleteMemory,

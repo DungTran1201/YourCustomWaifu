@@ -2,6 +2,7 @@ import http from "node:http";
 import crypto from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { AuthService } from "./auth-service.js";
+import { ToolExecutor } from "./tool-executor.js";
 import { CompanionRepository } from "./companion-repository.js";
 import {
   type ModelProviderRouter,
@@ -16,11 +17,39 @@ export interface ServerOptions {
   db: DatabaseSync;
   corsOrigins?: string[];
   providerRouter?: ModelProviderRouter;
+  toolExecutor?: ToolExecutor;
+}
+
+function isAllowedOrigin(
+  origin: string | undefined,
+  allowedList: string[],
+): boolean {
+  if (!origin) return false;
+  if (allowedList.includes(origin)) return true;
+  // If allowedList has localhost or loopback, allow any localhost/127.0.0.1 port
+  const allowsLoopback = allowedList.some(
+    (o) => o.includes("localhost") || o.includes("127.0.0.1"),
+  );
+  if (allowsLoopback) {
+    try {
+      const parsed = new URL(origin);
+      if (
+        (parsed.protocol === "http:" || parsed.protocol === "https:") &&
+        (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1")
+      ) {
+        return true;
+      }
+    } catch {
+      // not a valid URL
+    }
+  }
+  return false;
 }
 
 export function createServer(options: ServerOptions): http.Server {
   const authService = new AuthService(options.db);
   const companionRepo = new CompanionRepository(options.db);
+  const toolExecutor = options.toolExecutor || new ToolExecutor(companionRepo);
   const providerRouter = options.providerRouter || defaultProviderRouter;
   const allowedOrigins = options.corsOrigins || [
     "http://localhost:5173",
@@ -43,7 +72,8 @@ export function createServer(options: ServerOptions): http.Server {
 
     // CORS Handling
     const origin = req.headers["origin"];
-    if (origin && allowedOrigins.includes(origin)) {
+    const originAllowed = isAllowedOrigin(origin, allowedOrigins);
+    if (origin && originAllowed) {
       res.setHeader("Access-Control-Allow-Origin", origin);
       res.setHeader("Access-Control-Allow-Credentials", "true");
       res.setHeader(
@@ -52,11 +82,17 @@ export function createServer(options: ServerOptions): http.Server {
       );
       res.setHeader(
         "Access-Control-Allow-Methods",
-        "GET, POST, PATCH, DELETE, OPTIONS",
+        "GET, POST, PATCH, PUT, DELETE, OPTIONS",
       );
+      res.setHeader("Access-Control-Max-Age", "86400");
     }
 
     if (req.method === "OPTIONS") {
+      if (origin && !originAllowed) {
+        res.writeHead(403);
+        res.end();
+        return;
+      }
       res.writeHead(204);
       res.end();
       return;
@@ -238,7 +274,11 @@ export function createServer(options: ServerOptions): http.Server {
         const cookie = `sid=${result.sessionToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000`;
         sendJson(
           201,
-          { user: result.user, csrfToken: result.csrfToken },
+          {
+            user: result.user,
+            sessionToken: result.sessionToken,
+            csrfToken: result.csrfToken,
+          },
           {
             "Set-Cookie": cookie,
             "X-CSRF-Token": result.csrfToken,
@@ -275,7 +315,11 @@ export function createServer(options: ServerOptions): http.Server {
         const cookie = `sid=${result.sessionToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000`;
         sendJson(
           200,
-          { user: result.user, csrfToken: result.csrfToken },
+          {
+            user: result.user,
+            sessionToken: result.sessionToken,
+            csrfToken: result.csrfToken,
+          },
           {
             "Set-Cookie": cookie,
             "X-CSRF-Token": result.csrfToken,
@@ -672,6 +716,26 @@ export function createServer(options: ServerOptions): http.Server {
           }
         }
 
+        // Active Associated Tools
+        let toolsText = "";
+        if (agent.associatedToolIds && agent.associatedToolIds.length > 0) {
+          const userTools = companionRepo.listTools(sessionUser.user.id);
+          const activeTools = userTools.filter(
+            (t) => t.enabled && agent.associatedToolIds.includes(t.id),
+          );
+          if (activeTools.length > 0) {
+            toolsText = activeTools
+              .map((t) => {
+                const enriched = toolExecutor.enrichToolItem(t);
+                const paramsStr = enriched.parameters
+                  ? ` (Parameters: ${Object.keys(enriched.parameters).join(", ")})`
+                  : "";
+                return `- ${t.name}: ${t.description}${paramsStr}`;
+              })
+              .join("\n");
+          }
+        }
+
         // Deterministic System Prompt Composition
         const promptSections: string[] = [
           `You are ${agent.name}, an attentive personal desktop AI companion.`,
@@ -689,6 +753,12 @@ export function createServer(options: ServerOptions): http.Server {
         if (memoryText) {
           promptSections.push(
             `Relevant Context from user's local memory vault:\n${memoryText}`,
+          );
+        }
+
+        if (toolsText) {
+          promptSections.push(
+            `Available Tools and Capabilities:\n${toolsText}`,
           );
         }
 
@@ -908,6 +978,24 @@ export function createServer(options: ServerOptions): http.Server {
       if (req.method === "POST" && pathname === "/api/v1/tools") {
         const created = companionRepo.createTool(sessionUser.user.id, body);
         sendJson(201, created, rateHeaders);
+        return;
+      }
+
+      const toolExecMatch = pathname.match(
+        /^\/api\/v1\/tools\/([^/]+)\/execute$/,
+      );
+      if (req.method === "POST" && toolExecMatch && toolExecMatch[1]) {
+        const toolId = toolExecMatch[1];
+        const execResponse = await toolExecutor.execute(
+          sessionUser.user.id,
+          toolId,
+          {
+            toolId,
+            args: body.args || {},
+            confirmed: Boolean(body.confirmed),
+          },
+        );
+        sendJson(200, execResponse, rateHeaders);
         return;
       }
 

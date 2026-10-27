@@ -206,6 +206,50 @@ export interface ToolItem {
   requiresConfirmation: boolean;
   enabled: boolean;
   status: "ready" | "needs-config" | "disabled";
+  parameters?: Record<string, ToolParameterSchema>;
+}
+export interface ToolParameterSchema {
+  type: "string" | "number" | "boolean" | "object" | "array";
+  description: string;
+  required?: boolean;
+  enum?: (string | number)[];
+  default?: unknown;
+}
+
+export interface ToolDefinition {
+  id: string;
+  name: string;
+  description: string;
+  category: "Presentation" | "Context" | "System" | "General";
+  permissionLevel: "read-only" | "user-action" | "system";
+  requiresConfirmation: boolean;
+  parameters: Record<string, ToolParameterSchema>;
+}
+
+export type ToolErrorCode =
+  | "unknown_tool"
+  | "tool_disabled"
+  | "permission_denied"
+  | "confirmation_required"
+  | "invalid_arguments"
+  | "execution_timeout"
+  | "execution_failed";
+
+export interface ToolExecutionRequest {
+  toolId: string;
+  args?: Record<string, unknown>;
+  confirmed?: boolean;
+}
+
+export interface ToolExecutionResponse {
+  success: boolean;
+  toolId: string;
+  result?: unknown;
+  error?: {
+    code: ToolErrorCode;
+    message: string;
+  };
+  executionTimeMs: number;
 }
 
 export interface ModelConnection {
@@ -237,20 +281,26 @@ export interface ChatMessage {
   status?: "sending" | "streaming" | "complete" | "error";
 }
 
+export interface DesktopAuthResult {
+  user: UserProfile;
+  sessionToken?: string;
+  csrfToken?: string;
+}
+
 export interface DesktopAuthAPI {
   login: (credentials: {
     email: string;
     password: string;
     deviceName?: string;
-  }) => Promise<{ user: UserProfile }>;
+  }) => Promise<DesktopAuthResult>;
   register: (credentials: {
     email: string;
     password: string;
     displayName?: string;
     deviceName?: string;
-  }) => Promise<{ user: UserProfile }>;
+  }) => Promise<DesktopAuthResult>;
   logout: () => Promise<void>;
-  getStoredSession: () => Promise<UserProfile | null>;
+  getStoredSession: () => Promise<DesktopAuthResult | null>;
 }
 
 export interface DesktopStageAPI {
@@ -309,6 +359,7 @@ export interface DesktopAPI {
   getAppVersion: () => Promise<string>;
   getDiagnostics: () => Promise<DiagnosticsInfo>;
   ping: () => Promise<string>;
+  getApiBaseUrl?: () => Promise<string>;
   isGuestPreviewAvailable?: () => Promise<boolean>;
   auth?: DesktopAuthAPI;
   stage?: DesktopStageAPI;
@@ -319,6 +370,7 @@ export const IPC_CHANNELS = {
   GET_VERSION: "app:get-version",
   GET_DIAGNOSTICS: "app:get-diagnostics",
   PING: "app:ping",
+  GET_API_BASE_URL: "app:get-api-base-url",
   GUEST_PREVIEW_AVAILABLE: "app:guest-preview-available",
   AUTH_LOGIN: "app:auth-login",
   AUTH_REGISTER: "app:auth-register",
