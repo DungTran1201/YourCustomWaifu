@@ -36,6 +36,38 @@ const activeAgent = computed<AgentProfile>(() => {
 const isEditing = ref(false);
 const editForm = ref<AgentProfile>({ ...activeAgent.value });
 const saveNotice = ref<string | null>(null);
+const showPromptPreview = ref(false);
+
+const effectivePromptPreview = computed(() => {
+  const parts = [
+    `You are ${editForm.value.name}, an attentive personal desktop AI companion.`,
+    `Personality: ${editForm.value.personality}. Conversational Style: ${editForm.value.conversationalStyle}.`,
+  ];
+  if (editForm.value.systemInstructions) {
+    parts.push(`Instructions: ${editForm.value.systemInstructions}`);
+  }
+  const enabledRules = store.state.rules.filter(
+    (r) =>
+      r.enabled &&
+      (r.scope === "global" || r.applicableAgentId === activeAgent.value.id),
+  );
+  if (enabledRules.length > 0) {
+    parts.push(
+      `Operational Rules to obey:\n` +
+        enabledRules.map((r) => `- [${r.name}] ${r.content}`).join("\n"),
+    );
+  }
+  const enabledSkills = store.state.skills.filter(
+    (s) => s.enabled && editForm.value.associatedSkillIds?.includes(s.id),
+  );
+  if (enabledSkills.length > 0) {
+    parts.push(
+      `Active Skills:\n` +
+        enabledSkills.map((s) => `- [${s.name}] ${s.content}`).join("\n"),
+    );
+  }
+  return parts.join("\n\n");
+});
 
 function startEditing() {
   editForm.value = { ...activeAgent.value };
@@ -159,6 +191,27 @@ function saveAgent() {
         rows="5"
         :disabled="!isEditing"
       ></textarea>
+
+      <div class="prompt-meta-row">
+        <span class="char-count">
+          {{ editForm.systemInstructions.length }} characters (~{{
+            Math.round(editForm.systemInstructions.length / 4)
+          }}
+          tokens)
+        </span>
+        <button
+          type="button"
+          class="btn-preview-toggle"
+          @click="showPromptPreview = !showPromptPreview"
+        >
+          {{ showPromptPreview ? "Hide Preview" : "Preview Effective Prompt" }}
+        </button>
+      </div>
+
+      <div v-if="showPromptPreview" class="prompt-preview-box">
+        <h4 class="preview-title">Effective Instruction Composition Preview</h4>
+        <pre class="preview-content">{{ effectivePromptPreview }}</pre>
+      </div>
     </div>
 
     <!-- Behavior Preferences -->
@@ -403,5 +456,55 @@ function saveAgent() {
     flex-wrap: wrap;
     gap: 10px;
   }
+}
+
+.prompt-meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.btn-preview-toggle {
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  color: var(--accent);
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-preview-toggle:hover {
+  background: var(--surface-hover);
+  border-color: var(--accent);
+}
+
+.prompt-preview-box {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--bg-alt, rgba(0, 0, 0, 0.2));
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+}
+
+.preview-title {
+  margin: 0 0 8px 0;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.preview-content {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  line-height: 1.5;
 }
 </style>
