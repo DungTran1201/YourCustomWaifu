@@ -2,6 +2,11 @@ import http from "node:http";
 import crypto from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { AuthService } from "./auth-service.js";
+import { CompanionRepository } from "./companion-repository.js";
+import {
+  type ModelProviderRouter,
+  defaultProviderRouter,
+} from "./provider-adapters.js";
 import { globalRateLimiter } from "./rate-limiter.js";
 import type { UserProfile } from "@vrm/platform-contracts";
 
@@ -10,10 +15,13 @@ const MAX_BODY_SIZE = 100 * 1024; // 100 KiB
 export interface ServerOptions {
   db: DatabaseSync;
   corsOrigins?: string[];
+  providerRouter?: ModelProviderRouter;
 }
 
 export function createServer(options: ServerOptions): http.Server {
   const authService = new AuthService(options.db);
+  const companionRepo = new CompanionRepository(options.db);
+  const providerRouter = options.providerRouter || defaultProviderRouter;
   const allowedOrigins = options.corsOrigins || [
     "http://localhost:5173",
     "http://localhost:4173",
@@ -488,6 +496,472 @@ export function createServer(options: ServerOptions): http.Server {
         authService.deleteSecret(sessionUser.user.id, provider);
         sendJson(200, { message: "Provider key deleted" }, rateHeaders);
         return;
+      }
+
+      // 18. AI Provider Settings & Real Connection Verification
+      if (req.method === "GET" && pathname === "/api/v1/providers/settings") {
+        const connections = companionRepo.listProviderSettings(
+          sessionUser.user.id,
+        );
+        sendJson(200, { connections }, rateHeaders);
+        return;
+      }
+
+      if (req.method === "POST" && pathname === "/api/v1/providers/settings") {
+        if (!body.provider || !body.selectedModel) {
+          sendError(
+            400,
+            "invalid_payload",
+            "provider and selectedModel are required",
+          );
+          return;
+        }
+        const updated = companionRepo.saveProviderSettings(
+          sessionUser.user.id,
+          body,
+        );
+        sendJson(200, updated, rateHeaders);
+        return;
+      }
+
+      if (req.method === "POST" && pathname === "/api/v1/providers/test") {
+        const provider = body.provider;
+        if (!provider) {
+          sendError(400, "missing_provider", "Provider identifier is required");
+          return;
+        }
+        const decryptedKey = authService.getDecryptedSecret(
+          sessionUser.user.id,
+          provider,
+        );
+        if (!decryptedKey) {
+          sendError(
+            400,
+            "no_secret",
+            "No API key found in Hardware Key Vault. Add key in AI Keys.",
+          );
+          return;
+        }
+
+        try {
+          const adapter = providerRouter.getAdapter(provider);
+          const testRes = await adapter.testConnection(decryptedKey);
+
+          companionRepo.saveProviderSettings(sessionUser.user.id, {
+            provider,
+            selectedModel: body.selectedModel || "default",
+            availableModels: testRes.availableModels,
+            status: testRes.success ? "ready" : "error",
+            errorMessage: testRes.errorMessage,
+          });
+
+          sendJson(200, testRes, rateHeaders);
+        } catch (err: any) {
+          companionRepo.saveProviderSettings(sessionUser.user.id, {
+            provider,
+            selectedModel: body.selectedModel || "default",
+            status: "error",
+            errorMessage: err.message,
+          });
+          sendError(
+            500,
+            "provider_test_failed",
+            err.message || "Failed to test provider connection",
+          );
+        }
+        return;
+      }
+
+      // 19. Real Provider-Backed Chat Runtime
+      if (req.method === "POST" && pathname === "/api/v1/chat/completions") {
+        const rawContent = (body.message || "").trim();
+        if (!rawContent) {
+          sendError(400, "empty_message", "Message content cannot be empty");
+          return;
+        }
+
+        const agent = body.agentId
+          ? companionRepo.getAgentById(sessionUser.user.id, body.agentId)
+          : companionRepo.getActiveAgent(sessionUser.user.id);
+
+        if (!agent) {
+          sendError(404, "agent_not_found", "No active Agent profile found");
+          return;
+        }
+
+        const conv = companionRepo.getOrCreateDefaultConversation(
+          sessionUser.user.id,
+          agent.id,
+        );
+        const conversationId = body.conversationId || conv.conversationId;
+
+        // Persist User Message
+        const userMsg = companionRepo.addMessage(
+          sessionUser.user.id,
+          conversationId,
+          {
+            role: "user",
+            content: rawContent,
+            agentId: agent.id,
+            status: "complete",
+          },
+        );
+
+        // Retrieve decrypted provider key from Hardware Vault
+        const decryptedKey = authService.getDecryptedSecret(
+          sessionUser.user.id,
+          agent.preferredProvider,
+        );
+        if (!decryptedKey) {
+          sendError(
+            400,
+            "missing_provider_key",
+            `No API key configured for ${agent.preferredProvider}. Please add your key in AI Keys.`,
+          );
+          return;
+        }
+
+        // Gather applicable rules in priority order
+        const rules = companionRepo
+          .listRules(sessionUser.user.id, agent.id)
+          .filter((r) => r.enabled);
+        const rulesText = rules
+          .map((r) => `- [${r.name}] ${r.content}`)
+          .join("\n");
+
+        // Gather enabled skills
+        const allSkills = companionRepo
+          .listSkills(sessionUser.user.id)
+          .filter((s) => s.enabled);
+        const agentSkills = allSkills.filter((s) =>
+          agent.associatedSkillIds.includes(s.id),
+        );
+        const skillsText = agentSkills
+          .map((s) => `- [${s.name}] ${s.content}`)
+          .join("\n");
+
+        // Gather relevant private memory (only if retention enabled)
+        let memoryText = "";
+        if (agent.behaviorPreferences?.memoryRetention !== false) {
+          const memories = companionRepo.searchRelevantMemories(
+            sessionUser.user.id,
+            rawContent,
+            agent.id,
+            4,
+          );
+          if (memories.length > 0) {
+            memoryText = memories
+              .map((m) => `- (${m.category}) ${m.content}`)
+              .join("\n");
+          }
+        }
+
+        // Deterministic System Prompt Composition
+        const promptSections: string[] = [
+          `You are ${agent.name}, an attentive personal desktop AI companion.`,
+          `Personality: ${agent.personality}. Conversational Style: ${agent.conversationalStyle}.`,
+        ];
+        if (agent.systemInstructions) {
+          promptSections.push(`Instructions: ${agent.systemInstructions}`);
+        }
+        if (rulesText) {
+          promptSections.push(`Operational Rules to obey:\n${rulesText}`);
+        }
+        if (skillsText) {
+          promptSections.push(`Active Skills:\n${skillsText}`);
+        }
+        if (memoryText) {
+          promptSections.push(
+            `Relevant Context from user's local memory vault:\n${memoryText}`,
+          );
+        }
+
+        const systemPrompt = promptSections.join("\n\n");
+
+        // Conversation history window (up to 12 recent messages)
+        const recentMessages = companionRepo.listMessages(
+          sessionUser.user.id,
+          conversationId,
+          12,
+        );
+        const chatHistory = recentMessages.map((m) => ({
+          role: m.role,
+          content: m.content,
+        }));
+
+        try {
+          const adapter = providerRouter.getAdapter(agent.preferredProvider);
+          const completion = await adapter.generateChatResponse(decryptedKey, {
+            model: agent.preferredModel,
+            messages: chatHistory,
+            systemPrompt,
+          });
+
+          // Persist Assistant Message
+          const assistantMsg = companionRepo.addMessage(
+            sessionUser.user.id,
+            conversationId,
+            {
+              role: "assistant",
+              content: completion.content,
+              agentId: agent.id,
+              status: "complete",
+            },
+          );
+
+          sendJson(
+            200,
+            {
+              message: assistantMsg,
+              userMessage: userMsg,
+              usage: completion.usage,
+            },
+            rateHeaders,
+          );
+        } catch (err: any) {
+          sendError(
+            502,
+            "model_generation_failed",
+            err.message || "Failed to generate completion from provider",
+          );
+        }
+        return;
+      }
+
+      // 20. Chat History & Clear
+      if (req.method === "GET" && pathname === "/api/v1/chat/messages") {
+        const conversationId =
+          url.searchParams.get("conversationId") || undefined;
+        const messages = companionRepo.listMessages(
+          sessionUser.user.id,
+          conversationId,
+          50,
+        );
+        sendJson(200, { messages }, rateHeaders);
+        return;
+      }
+
+      if (req.method === "POST" && pathname === "/api/v1/chat/clear") {
+        const conversationId = body.conversationId;
+        companionRepo.clearMessages(sessionUser.user.id, conversationId);
+        sendJson(200, { message: "Chat history cleared" }, rateHeaders);
+        return;
+      }
+
+      // 21. Agents CRUD & Active Selection
+      if (req.method === "GET" && pathname === "/api/v1/agents") {
+        const agents = companionRepo.listAgents(sessionUser.user.id);
+        const active = companionRepo.getActiveAgent(sessionUser.user.id);
+        sendJson(200, { agents, activeAgentId: active?.id }, rateHeaders);
+        return;
+      }
+
+      if (req.method === "POST" && pathname === "/api/v1/agents") {
+        const created = companionRepo.createAgent(sessionUser.user.id, body);
+        sendJson(201, created, rateHeaders);
+        return;
+      }
+
+      const agentActiveMatch = pathname.match(
+        /^\/api\/v1\/agents\/([^/]+)\/active$/,
+      );
+      if (req.method === "POST" && agentActiveMatch) {
+        const targetId = agentActiveMatch[1];
+        if (targetId) {
+          companionRepo.setActiveAgent(sessionUser.user.id, targetId);
+          sendJson(
+            200,
+            { message: "Active agent updated", activeAgentId: targetId },
+            rateHeaders,
+          );
+          return;
+        }
+      }
+
+      const agentMatch = pathname.match(/^\/api\/v1\/agents\/([^/]+)$/);
+      if (agentMatch) {
+        const agentId = agentMatch[1];
+        if (agentId) {
+          if (req.method === "GET") {
+            const agent = companionRepo.getAgentById(
+              sessionUser.user.id,
+              agentId,
+            );
+            if (!agent) {
+              sendError(404, "not_found", "Agent not found");
+              return;
+            }
+            sendJson(200, agent, rateHeaders);
+            return;
+          }
+          if (req.method === "PATCH") {
+            const updated = companionRepo.updateAgent(
+              sessionUser.user.id,
+              agentId,
+              body,
+            );
+            sendJson(200, updated, rateHeaders);
+            return;
+          }
+          if (req.method === "DELETE") {
+            companionRepo.deleteAgent(sessionUser.user.id, agentId);
+            sendJson(200, { message: "Agent deleted" }, rateHeaders);
+            return;
+          }
+        }
+      }
+
+      // 22. Skills CRUD
+      if (req.method === "GET" && pathname === "/api/v1/skills") {
+        const skills = companionRepo.listSkills(sessionUser.user.id);
+        sendJson(200, { skills }, rateHeaders);
+        return;
+      }
+
+      if (req.method === "POST" && pathname === "/api/v1/skills") {
+        const created = companionRepo.createSkill(sessionUser.user.id, body);
+        sendJson(201, created, rateHeaders);
+        return;
+      }
+
+      const skillMatch = pathname.match(/^\/api\/v1\/skills\/([^/]+)$/);
+      if (skillMatch) {
+        const skillId = skillMatch[1];
+        if (skillId) {
+          if (req.method === "PATCH") {
+            const updated = companionRepo.updateSkill(
+              sessionUser.user.id,
+              skillId,
+              body,
+            );
+            sendJson(200, updated, rateHeaders);
+            return;
+          }
+          if (req.method === "DELETE") {
+            companionRepo.deleteSkill(sessionUser.user.id, skillId);
+            sendJson(200, { message: "Skill deleted" }, rateHeaders);
+            return;
+          }
+        }
+      }
+
+      // 23. Rules CRUD
+      if (req.method === "GET" && pathname === "/api/v1/rules") {
+        const rules = companionRepo.listRules(
+          sessionUser.user.id,
+          url.searchParams.get("agentId") || undefined,
+        );
+        sendJson(200, { rules }, rateHeaders);
+        return;
+      }
+
+      if (req.method === "POST" && pathname === "/api/v1/rules") {
+        const created = companionRepo.createRule(sessionUser.user.id, body);
+        sendJson(201, created, rateHeaders);
+        return;
+      }
+
+      const ruleMatch = pathname.match(/^\/api\/v1\/rules\/([^/]+)$/);
+      if (ruleMatch) {
+        const ruleId = ruleMatch[1];
+        if (ruleId) {
+          if (req.method === "PATCH") {
+            const updated = companionRepo.updateRule(
+              sessionUser.user.id,
+              ruleId,
+              body,
+            );
+            sendJson(200, updated, rateHeaders);
+            return;
+          }
+          if (req.method === "DELETE") {
+            companionRepo.deleteRule(sessionUser.user.id, ruleId);
+            sendJson(200, { message: "Rule deleted" }, rateHeaders);
+            return;
+          }
+        }
+      }
+
+      // 24. Tools CRUD
+      if (req.method === "GET" && pathname === "/api/v1/tools") {
+        const tools = companionRepo.listTools(sessionUser.user.id);
+        sendJson(200, { tools }, rateHeaders);
+        return;
+      }
+
+      if (req.method === "POST" && pathname === "/api/v1/tools") {
+        const created = companionRepo.createTool(sessionUser.user.id, body);
+        sendJson(201, created, rateHeaders);
+        return;
+      }
+
+      const toolMatch = pathname.match(/^\/api\/v1\/tools\/([^/]+)$/);
+      if (toolMatch) {
+        const toolId = toolMatch[1];
+        if (toolId) {
+          if (req.method === "PATCH") {
+            const updated = companionRepo.updateTool(
+              sessionUser.user.id,
+              toolId,
+              body,
+            );
+            sendJson(200, updated, rateHeaders);
+            return;
+          }
+          if (req.method === "DELETE") {
+            companionRepo.deleteTool(sessionUser.user.id, toolId);
+            sendJson(200, { message: "Tool deleted" }, rateHeaders);
+            return;
+          }
+        }
+      }
+
+      // 25. Memories CRUD & Clear
+      if (req.method === "GET" && pathname === "/api/v1/memories") {
+        const query = url.searchParams.get("q") || undefined;
+        const category = url.searchParams.get("category") || undefined;
+        const agentId = url.searchParams.get("agentId") || undefined;
+        const memories = companionRepo.listMemories(sessionUser.user.id, {
+          query,
+          category,
+          agentId,
+        });
+        sendJson(200, { memories }, rateHeaders);
+        return;
+      }
+
+      if (req.method === "POST" && pathname === "/api/v1/memories") {
+        const created = companionRepo.createMemory(sessionUser.user.id, body);
+        sendJson(201, created, rateHeaders);
+        return;
+      }
+
+      if (req.method === "POST" && pathname === "/api/v1/memories/clear") {
+        const agentId = body.agentId;
+        companionRepo.clearAllMemories(sessionUser.user.id, agentId);
+        sendJson(200, { message: "All memories cleared" }, rateHeaders);
+        return;
+      }
+
+      const memoryMatch = pathname.match(/^\/api\/v1\/memories\/([^/]+)$/);
+      if (memoryMatch) {
+        const memoryId = memoryMatch[1];
+        if (memoryId) {
+          if (req.method === "PATCH") {
+            const updated = companionRepo.updateMemory(
+              sessionUser.user.id,
+              memoryId,
+              body,
+            );
+            sendJson(200, updated, rateHeaders);
+            return;
+          }
+          if (req.method === "DELETE") {
+            companionRepo.deleteMemory(sessionUser.user.id, memoryId);
+            sendJson(200, { message: "Memory deleted" }, rateHeaders);
+            return;
+          }
+        }
       }
 
       // Fallback: 404 Not Found

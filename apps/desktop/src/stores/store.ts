@@ -394,6 +394,7 @@ export function useAppStore() {
         state.user = profile;
         state.isAuthenticated = true;
         state.currentTab = "chat";
+        fetchCompanionData().catch(() => {});
       } else {
         state.user = null;
         state.isAuthenticated = false;
@@ -440,6 +441,7 @@ export function useAppStore() {
         state.user = res.user;
         state.isAuthenticated = true;
         setTab("chat");
+        fetchCompanionData().catch(() => {});
         return;
       }
 
@@ -451,6 +453,7 @@ export function useAppStore() {
       state.isAuthenticated = true;
       if (res.csrfToken) state.csrfToken = res.csrfToken;
       setTab("chat");
+      fetchCompanionData().catch(() => {});
     } catch (err: any) {
       state.authError = err?.message || "Invalid email or password";
       throw err;
@@ -480,6 +483,7 @@ export function useAppStore() {
       state.isAuthenticated = true;
       if (res.csrfToken) state.csrfToken = res.csrfToken;
       setTab("chat");
+      fetchCompanionData().catch(() => {});
     } catch (err: any) {
       state.authError = err?.message || "Registration failed";
       throw err;
@@ -921,7 +925,60 @@ export function useAppStore() {
     setTab("signin");
   }
 
-  // --- Chat & Companion Runtime Actions ---
+  // --- Companion Data Sync ---
+  async function fetchCompanionData() {
+    if (!state.isAuthenticated) return;
+    try {
+      await fetchSecrets();
+
+      const [
+        agentsRes,
+        skillsRes,
+        rulesRes,
+        toolsRes,
+        connsRes,
+        memsRes,
+        msgsRes,
+      ] = await Promise.all([
+        apiRequest("/api/v1/agents").catch(() => null),
+        apiRequest("/api/v1/skills").catch(() => null),
+        apiRequest("/api/v1/rules").catch(() => null),
+        apiRequest("/api/v1/tools").catch(() => null),
+        apiRequest("/api/v1/providers/settings").catch(() => null),
+        apiRequest("/api/v1/memories").catch(() => null),
+        apiRequest("/api/v1/chat/messages").catch(() => null),
+      ]);
+
+      if (agentsRes?.agents && agentsRes.agents.length > 0) {
+        state.agents = agentsRes.agents;
+        if (agentsRes.activeAgentId) {
+          state.activeAgentId = agentsRes.activeAgentId;
+        }
+      }
+      if (skillsRes?.skills && skillsRes.skills.length > 0) {
+        state.skills = skillsRes.skills;
+      }
+      if (rulesRes?.rules && rulesRes.rules.length > 0) {
+        state.rules = rulesRes.rules;
+      }
+      if (toolsRes?.tools && toolsRes.tools.length > 0) {
+        state.tools = toolsRes.tools;
+      }
+      if (connsRes?.connections && connsRes.connections.length > 0) {
+        state.modelConnections = connsRes.connections;
+      }
+      if (memsRes?.memories) {
+        state.memories = memsRes.memories;
+      }
+      if (msgsRes?.messages && msgsRes.messages.length > 0) {
+        state.messages = msgsRes.messages;
+      }
+    } catch {
+      // Non-blocking fallback
+    }
+  }
+
+  // --- Real Chat & Companion Runtime Actions ---
   async function sendChatMessage(customContent?: string) {
     const content = (customContent || state.chatInput || "").trim();
     if (!content || state.chatSending) return;
@@ -939,50 +996,39 @@ export function useAppStore() {
     };
     state.messages.push(userMsg);
 
-    const activeAgent =
-      state.agents.find((a) => a.id === state.activeAgentId) || state.agents[0];
-    const agentName = activeAgent?.name || "Aiko";
-    const agentDesc = activeAgent?.description || "Your desktop AI companion";
-    const agentStyle = activeAgent?.conversationalStyle || "engaging";
-    const agentId = activeAgent?.id || "agent_aiko";
-
     try {
-      // Simulate intelligent companion conversational response aligned with active agent persona
-      await new Promise((r) => setTimeout(r, 600));
+      const res = await apiRequest("/api/v1/chat/completions", {
+        method: "POST",
+        body: JSON.stringify({
+          message: content,
+          agentId: state.activeAgentId,
+        }),
+      });
 
-      let responseText = "";
-      const lower = content.toLowerCase();
-
-      if (lower.includes("stage") || lower.includes("avatar")) {
-        const statusText = state.stageStatus.stageVisible
-          ? "Avatar Stage is currently visible and floating above your desktop applications."
-          : "Avatar Stage is currently hidden. You can show it with one click from the top header or with the global shortcut Ctrl+Shift+A.";
-        responseText = `I'm monitoring your 3D Avatar Stage! ${statusText} You can adjust scale, transparent framing, and click-through mode in Avatar Settings.`;
-      } else if (lower.includes("who are you") || lower.includes("introduce")) {
-        responseText = `I'm ${agentName}. ${agentDesc}. My conversational style is ${agentStyle.toLowerCase()}. How can I assist you today?`;
-      } else if (lower.includes("memory") || lower.includes("remember")) {
-        responseText = `I have access to ${state.memories.length} saved long-term context items in your local Memory vault. I'll remember our conversation details without sending your private memories to external third parties.`;
-      } else {
-        responseText = `I hear you! Working with ${agentName}: "${content}". I've reflected this in our shared workspace session. Let me know if you want to configure additional skills, rules, or avatar motions!`;
+      if (res?.message) {
+        state.messages.push(res.message);
       }
-
-      const assistantMsg: ChatMessage = {
-        id: `msg_a_${Date.now()}`,
-        role: "assistant",
-        content: responseText,
-        timestamp: new Date().toISOString(),
-        agentId,
-        status: "complete",
-      };
-      state.messages.push(assistantMsg);
     } catch (err: any) {
       state.chatError = err.message || "Failed to generate response";
+      const errorMsg: ChatMessage = {
+        id: `msg_err_${Date.now()}`,
+        role: "assistant",
+        content: `[Error: ${state.chatError}]`,
+        timestamp: new Date().toISOString(),
+        status: "error",
+      };
+      state.messages.push(errorMsg);
     } finally {
       state.chatSending = false;
     }
   }
 
-  function clearChatMessages() {
+  async function clearChatMessages() {
+    try {
+      await apiRequest("/api/v1/chat/clear", { method: "POST", body: "{}" });
+    } catch {
+      // fallback
+    }
     state.messages = [
       {
         id: `msg_welcome_${Date.now()}`,
@@ -996,63 +1042,143 @@ export function useAppStore() {
   }
 
   // --- Agent & Personalization Actions ---
-  function updateAgent(agentId: string, partial: Partial<AgentProfile>) {
+  async function updateAgent(agentId: string, partial: Partial<AgentProfile>) {
     const target = state.agents.find((a) => a.id === agentId);
     if (target) {
       Object.assign(target, partial);
     }
+    try {
+      await apiRequest(`/api/v1/agents/${agentId}`, {
+        method: "PATCH",
+        body: JSON.stringify(partial),
+      });
+    } catch {
+      // offline or mock fallback
+    }
+  }
+
+  async function setActiveAgent(agentId: string) {
+    state.activeAgentId = agentId;
+    try {
+      await apiRequest(`/api/v1/agents/${agentId}/active`, {
+        method: "POST",
+        body: "{}",
+      });
+    } catch {
+      // fallback
+    }
   }
 
   // --- Skills Actions ---
-  function addSkill(skill: Omit<SkillItem, "id">) {
+  async function addSkill(skill: Omit<SkillItem, "id">) {
     const newSkill: SkillItem = {
       ...skill,
       id: `skill_${Date.now()}`,
     };
     state.skills.push(newSkill);
+    try {
+      const res = await apiRequest("/api/v1/skills", {
+        method: "POST",
+        body: JSON.stringify(skill),
+      });
+      if (res?.id) newSkill.id = res.id;
+    } catch {
+      // fallback
+    }
   }
 
-  function updateSkill(id: string, partial: Partial<SkillItem>) {
+  async function updateSkill(id: string, partial: Partial<SkillItem>) {
     const item = state.skills.find((s) => s.id === id);
     if (item) Object.assign(item, partial);
+    try {
+      await apiRequest(`/api/v1/skills/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(partial),
+      });
+    } catch {
+      // fallback
+    }
   }
 
-  function deleteSkill(id: string) {
+  async function deleteSkill(id: string) {
     state.skills = state.skills.filter((s) => s.id !== id);
+    try {
+      await apiRequest(`/api/v1/skills/${id}`, { method: "DELETE" });
+    } catch {
+      // fallback
+    }
   }
 
   // --- Rules Actions ---
-  function addRule(rule: Omit<RuleItem, "id">) {
+  async function addRule(rule: Omit<RuleItem, "id">) {
     const newRule: RuleItem = {
       ...rule,
       id: `rule_${Date.now()}`,
     };
     state.rules.push(newRule);
-  }
-
-  function updateRule(id: string, partial: Partial<RuleItem>) {
-    const item = state.rules.find((r) => r.id === id);
-    if (item) Object.assign(item, partial);
-  }
-
-  function deleteRule(id: string) {
-    state.rules = state.rules.filter((r) => r.id !== id);
-  }
-
-  // --- Tools Actions ---
-  function toggleTool(id: string) {
-    const tool = state.tools.find((t) => t.id === id);
-    if (tool) {
-      tool.enabled = !tool.enabled;
+    try {
+      const res = await apiRequest("/api/v1/rules", {
+        method: "POST",
+        body: JSON.stringify(rule),
+      });
+      if (res?.id) newRule.id = res.id;
+    } catch {
+      // fallback
     }
   }
 
-  function updateTool(id: string, partial: Partial<ToolItem>) {
-    const tool = state.tools.find((t) => t.id === id);
-    if (tool) Object.assign(tool, partial);
+  async function updateRule(id: string, partial: Partial<RuleItem>) {
+    const item = state.rules.find((r) => r.id === id);
+    if (item) Object.assign(item, partial);
+    try {
+      await apiRequest(`/api/v1/rules/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(partial),
+      });
+    } catch {
+      // fallback
+    }
   }
 
-  // --- Model Connections Actions ---
+  async function deleteRule(id: string) {
+    state.rules = state.rules.filter((r) => r.id !== id);
+    try {
+      await apiRequest(`/api/v1/rules/${id}`, { method: "DELETE" });
+    } catch {
+      // fallback
+    }
+  }
+
+  // --- Tools Actions ---
+  async function toggleTool(id: string) {
+    const tool = state.tools.find((t) => t.id === id);
+    if (tool) {
+      tool.enabled = !tool.enabled;
+      try {
+        await apiRequest(`/api/v1/tools/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ enabled: tool.enabled }),
+        });
+      } catch {
+        // fallback
+      }
+    }
+  }
+
+  async function updateTool(id: string, partial: Partial<ToolItem>) {
+    const tool = state.tools.find((t) => t.id === id);
+    if (tool) Object.assign(tool, partial);
+    try {
+      await apiRequest(`/api/v1/tools/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(partial),
+      });
+    } catch {
+      // fallback
+    }
+  }
+
+  // --- Real Model Connections Actions ---
   async function testConnection(provider: "gemini" | "openai" | "anthropic") {
     const conn = state.modelConnections.find((c) => c.provider === provider);
     if (!conn) return;
@@ -1068,31 +1194,73 @@ export function useAppStore() {
     conn.status = "authenticated";
     conn.errorMessage = undefined;
 
-    // Simulate verification
-    await new Promise((r) => setTimeout(r, 400));
-    conn.status = "ready";
+    try {
+      const res = await apiRequest("/api/v1/providers/test", {
+        method: "POST",
+        body: JSON.stringify({
+          provider,
+          selectedModel: conn.selectedModel,
+        }),
+      });
+
+      if (res.success) {
+        conn.status = "ready";
+        if (res.availableModels && res.availableModels.length > 0) {
+          conn.availableModels = res.availableModels;
+        }
+      } else {
+        conn.status = "error";
+        conn.errorMessage = res.errorMessage || "Provider verification failed";
+      }
+    } catch (err: any) {
+      conn.status = "error";
+      conn.errorMessage = err.message || "Failed to verify provider connection";
+    }
   }
 
   // --- Memory Actions ---
-  function addMemory(
+  async function addMemory(
     content: string,
     category: MemoryItem["category"] = "fact",
   ) {
-    state.memories.unshift({
+    const newMemory: MemoryItem = {
       id: `mem_${Date.now()}`,
       category,
       content,
       createdAt: new Date().toISOString(),
       confidence: 1.0,
-    });
+    };
+    state.memories.unshift(newMemory);
+    try {
+      const res = await apiRequest("/api/v1/memories", {
+        method: "POST",
+        body: JSON.stringify({ content, category }),
+      });
+      if (res?.id) newMemory.id = res.id;
+    } catch {
+      // fallback
+    }
   }
 
-  function deleteMemory(id: string) {
+  async function deleteMemory(id: string) {
     state.memories = state.memories.filter((m) => m.id !== id);
+    try {
+      await apiRequest(`/api/v1/memories/${id}`, { method: "DELETE" });
+    } catch {
+      // fallback
+    }
   }
 
-  function clearAllMemories() {
+  async function clearAllMemories() {
     state.memories = [];
+    try {
+      await apiRequest("/api/v1/memories/clear", {
+        method: "POST",
+        body: "{}",
+      });
+    } catch {
+      // fallback
+    }
   }
 
   function toggleSidebar(collapsed?: boolean) {
@@ -1144,9 +1312,11 @@ export function useAppStore() {
     enterGuestPreview,
     exitGuestPreview,
     // Companion & Chat exports
+    fetchCompanionData,
     sendChatMessage,
     clearChatMessages,
     updateAgent,
+    setActiveAgent,
     addSkill,
     updateSkill,
     deleteSkill,
