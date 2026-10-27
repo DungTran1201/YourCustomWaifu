@@ -23,6 +23,9 @@ describe("Avatar Stage & Workspace Desktop Lifecycle Contracts", () => {
     expect(IPC_CHANNELS.STAGE_HIDE).toBe("stage:hide");
     expect(IPC_CHANNELS.STAGE_TOGGLE).toBe("stage:toggle");
     expect(IPC_CHANNELS.STAGE_SET_CLICKTHROUGH).toBe("stage:set-clickthrough");
+    expect(IPC_CHANNELS.STAGE_SET_IGNORE_MOUSE_EVENTS).toBe(
+      "stage:set-ignore-mouse-events",
+    );
     expect(IPC_CHANNELS.STAGE_SET_ALWAYSONTOP).toBe("stage:set-alwaysontop");
     expect(IPC_CHANNELS.STAGE_SET_ANIMATION_PAUSED).toBe(
       "stage:set-animation-paused",
@@ -359,5 +362,51 @@ describe("Avatar Stage & Workspace Desktop Lifecycle Contracts", () => {
     expect(store.state.avatarConfig.scale).toBe(1.4);
     expect(store.state.avatarConfig.stageWidth).toBe(600);
     expect(store.state.avatarConfig.stageHeight).toBe(800);
+  });
+
+  it("applies Small, Medium, Large window size presets to native bounds without altering 3D avatar scale", async () => {
+    const store = useAppStore();
+
+    // Preset definitions
+    const PRESETS = {
+      small: { width: 300, height: 460 },
+      medium: { width: 420, height: 640 },
+      large: { width: 560, height: 840 },
+    };
+
+    // Set custom model scale
+    await store.updateAvatarConfig({ scale: 1.25 });
+    expect(store.state.avatarConfig.scale).toBe(1.25);
+
+    // Apply Small Preset
+    await store.setStageBounds(PRESETS.small);
+    expect(store.state.avatarConfig.stageWidth).toBe(300);
+    expect(store.state.avatarConfig.stageHeight).toBe(460);
+    expect(store.state.avatarConfig.scale).toBe(1.25);
+
+    // Apply Large Preset
+    await store.setStageBounds(PRESETS.large);
+    expect(store.state.avatarConfig.stageWidth).toBe(560);
+    expect(store.state.avatarConfig.stageHeight).toBe(840);
+    expect(store.state.avatarConfig.scale).toBe(1.25);
+
+    // Apply Medium Preset
+    await store.setStageBounds(PRESETS.medium);
+    expect(store.state.avatarConfig.stageWidth).toBe(420);
+    expect(store.state.avatarConfig.stageHeight).toBe(640);
+    expect(store.state.avatarConfig.scale).toBe(1.25);
+  });
+
+  it("verifies setIgnoreMouseEvents interaction island method is exposed on platform API", async () => {
+    const fallbackAPI = createWebFallbackAPI();
+    expect(typeof fallbackAPI.stage?.setIgnoreMouseEvents).toBe("function");
+
+    // Must resolve cleanly without errors
+    await expect(
+      fallbackAPI.stage?.setIgnoreMouseEvents?.(false),
+    ).resolves.toBeUndefined();
+    await expect(
+      fallbackAPI.stage?.setIgnoreMouseEvents?.(true, true),
+    ).resolves.toBeUndefined();
   });
 });

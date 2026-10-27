@@ -45,6 +45,12 @@ const desktopAPI: DesktopAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.STAGE_TOGGLE),
     setClickThrough: (enabled: boolean): Promise<StageStatus> =>
       ipcRenderer.invoke(IPC_CHANNELS.STAGE_SET_CLICKTHROUGH, enabled),
+    setIgnoreMouseEvents: (ignore: boolean, forward = true): Promise<void> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.STAGE_SET_IGNORE_MOUSE_EVENTS,
+        ignore,
+        forward,
+      ),
     setAlwaysOnTop: (enabled: boolean): Promise<StageStatus> =>
       ipcRenderer.invoke(IPC_CHANNELS.STAGE_SET_ALWAYSONTOP, enabled),
     setAnimationPaused: (paused: boolean): Promise<StageStatus> =>

@@ -89,11 +89,11 @@ app.whenReady().then(async () => {
     }
 
     const hasBoundsMethods = await win.webContents.executeJavaScript(
-      "typeof window.desktopAPI?.stage?.getBounds === 'function' && typeof window.desktopAPI?.stage?.setBounds === 'function'"
+      "typeof window.desktopAPI?.stage?.getBounds === 'function' && typeof window.desktopAPI?.stage?.setBounds === 'function' && typeof window.desktopAPI?.stage?.setIgnoreMouseEvents === 'function'"
     );
-    log("stage.getBounds and stage.setBounds functions exist:", hasBoundsMethods);
+    log("stage.getBounds, setBounds, and setIgnoreMouseEvents functions exist:", hasBoundsMethods);
     if (!hasBoundsMethods) {
-      error("FAILED: stage.getBounds or stage.setBounds is not exposed on desktopAPI.stage!");
+      error("FAILED: stage.getBounds, setBounds, or setIgnoreMouseEvents is not exposed on desktopAPI.stage!");
     }
 
     // 3. Verify status badge text in DOM
@@ -168,6 +168,14 @@ app.whenReady().then(async () => {
     log("Stage fallback notice & retry elements present:", stageHasNoticeElements);
     if (!stageHasNoticeElements) {
       error("FAILED: stage.html missing #stage-fallback-notice or #stage-error-retry-btn!");
+    }
+
+    const stageHasKebabControls = await stageWin.webContents.executeJavaScript(
+      "document.querySelector('#btn-stage-kebab') !== null && document.querySelector('#stage-kebab-menu') !== null && document.querySelector('#btn-move-stage') !== null && document.querySelectorAll('.preset-btn').length === 3"
+    );
+    log("Stage kebab trigger, flyout menu, move handle & 3 presets present:", stageHasKebabControls);
+    if (!stageHasKebabControls) {
+      error("FAILED: stage.html missing #btn-stage-kebab, #stage-kebab-menu, #btn-move-stage, or 3 .preset-btn elements!");
     }
 
     const resizeHandleCount = await stageWin.webContents.executeJavaScript(

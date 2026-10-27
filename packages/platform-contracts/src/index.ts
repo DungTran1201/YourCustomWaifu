@@ -278,6 +278,7 @@ export interface DesktopStageAPI {
   getBlinkDiagnostic?: () => Promise<BlinkDiagnostic | null>;
   getBounds?: () => Promise<WindowBounds>;
   setBounds?: (bounds: Partial<WindowBounds>) => Promise<WindowBounds>;
+  setIgnoreMouseEvents?: (ignore: boolean, forward?: boolean) => Promise<void>;
   reportModelStatus?: (status: {
     avatarLoaded: boolean;
     currentAvatarName?: string;
@@ -324,6 +325,7 @@ export const IPC_CHANNELS = {
   STAGE_HIDE: "stage:hide",
   STAGE_TOGGLE: "stage:toggle",
   STAGE_SET_CLICKTHROUGH: "stage:set-clickthrough",
+  STAGE_SET_IGNORE_MOUSE_EVENTS: "stage:set-ignore-mouse-events",
   STAGE_SET_ALWAYSONTOP: "stage:set-alwaysontop",
   STAGE_SET_ANIMATION_PAUSED: "stage:set-animation-paused",
   STAGE_UPDATE_CONFIG: "stage:update-config",

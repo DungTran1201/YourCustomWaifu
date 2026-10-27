@@ -872,6 +872,20 @@ function registerIpcHandlers(): void {
   );
 
   ipcMain.handle(
+    IPC_CHANNELS.STAGE_SET_IGNORE_MOUSE_EVENTS,
+    (event, ignore: boolean, forward = true): void => {
+      if (!validateIpcSender(event.sender, allowedWindows())) {
+        throw new Error("Unauthorized IPC sender");
+      }
+      if (stageWindow && !stageWindow.isDestroyed()) {
+        stageWindow.setIgnoreMouseEvents(Boolean(ignore), {
+          forward: Boolean(forward),
+        });
+      }
+    },
+  );
+
+  ipcMain.handle(
     IPC_CHANNELS.STAGE_SET_ALWAYSONTOP,
     (event, enabled: boolean): StageStatus => {
       if (!validateIpcSender(event.sender, allowedWindows())) {

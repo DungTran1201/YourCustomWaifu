@@ -23,11 +23,29 @@ const errorMessage = document.getElementById(
   "stage-error-message",
 ) as HTMLSpanElement;
 
-// Toolbar Buttons
+// Kebab Menu & Trigger Elements
+const btnStageKebab = document.getElementById(
+  "btn-stage-kebab",
+) as HTMLButtonElement;
+const stageKebabMenu = document.getElementById(
+  "stage-kebab-menu",
+) as HTMLDivElement;
+const btnMoveStage = document.getElementById(
+  "btn-move-stage",
+) as HTMLDivElement;
+
+// Preset and Scale Elements
+const presetButtons =
+  document.querySelectorAll<HTMLButtonElement>(".preset-btn");
 const btnScaleDown = document.getElementById(
   "btn-scale-down",
 ) as HTMLButtonElement;
 const btnScaleUp = document.getElementById("btn-scale-up") as HTMLButtonElement;
+const scaleValueDisplay = document.getElementById(
+  "scale-value-display",
+) as HTMLSpanElement | null;
+
+// Action and Toggle Elements
 const btnAlwaysOnTop = document.getElementById(
   "btn-always-on-top",
 ) as HTMLButtonElement;
@@ -37,17 +55,11 @@ const btnClickThrough = document.getElementById(
 const btnPauseAnimation = document.getElementById(
   "btn-pause-animation",
 ) as HTMLButtonElement;
-const btnToggleLookAt = document.getElementById(
-  "btn-toggle-lookat",
-) as HTMLButtonElement | null;
-const btnTestBlink = document.getElementById(
-  "btn-test-blink",
-) as HTMLButtonElement | null;
+const labelPauseAnimation = document.getElementById(
+  "label-pause-animation",
+) as HTMLSpanElement | null;
 const btnOpenWorkspace = document.getElementById(
   "btn-open-workspace",
-) as HTMLButtonElement;
-const btnOpenSettings = document.getElementById(
-  "btn-open-settings",
 ) as HTMLButtonElement;
 const btnHideStage = document.getElementById(
   "btn-hide-stage",
@@ -61,6 +73,22 @@ const errorRetryBtn = document.getElementById(
 const fallbackNotice = document.getElementById(
   "stage-fallback-notice",
 ) as HTMLDivElement | null;
+
+const PRESET_SIZES = {
+  small: { width: 300, height: 460 },
+  medium: { width: 420, height: 640 },
+  large: { width: 560, height: 840 },
+} as const;
+
+let cachedBounds: { x: number; y: number; width: number; height: number } = {
+  x: 100,
+  y: 100,
+  width: 420,
+  height: 640,
+};
+
+let isMenuOpen = false;
+let isClickThroughActive = false;
 
 let lastRequestedVrmPath: string | undefined = undefined;
 let isFallbackActive = true;
@@ -151,9 +179,12 @@ function initScene() {
 function handleResize() {
   const width = window.innerWidth;
   const height = window.innerHeight;
+  cachedBounds.width = width;
+  cachedBounds.height = height;
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
   renderer.setSize(width, height);
+  updateActivePreset();
 }
 
 function setupFallbackMannequin() {
@@ -369,6 +400,9 @@ function applyScale(scaleValue: number) {
   if (fallbackGroup) {
     fallbackGroup.scale.set(scaleValue, scaleValue, scaleValue);
   }
+  if (scaleValueDisplay) {
+    scaleValueDisplay.textContent = `${Math.round(scaleValue * 100)}%`;
+  }
 }
 
 function animate() {
@@ -465,38 +499,189 @@ function animate() {
   renderer.render(scene, camera);
 }
 
-// Setup floating toolbar interactions
-function setupToolbarListeners() {
+function updateActivePreset() {
+  presetButtons.forEach((btn) => {
+    const preset = btn.dataset.preset as keyof typeof PRESET_SIZES | undefined;
+    if (preset && PRESET_SIZES[preset]) {
+      const target = PRESET_SIZES[preset];
+      const match =
+        Math.abs(cachedBounds.width - target.width) <= 12 &&
+        Math.abs(cachedBounds.height - target.height) <= 12;
+      btn.classList.toggle("active", match);
+    }
+  });
+}
+
+function openMenu() {
+  if (isMenuOpen) return;
+  isMenuOpen = true;
+  stageKebabMenu.classList.remove("hidden");
+  btnStageKebab.classList.add("active");
+  btnStageKebab.setAttribute("aria-expanded", "true");
+
+  if (isClickThroughActive) {
+    window.desktopAPI?.stage?.setIgnoreMouseEvents?.(false);
+  }
+}
+
+function closeMenu() {
+  if (!isMenuOpen) return;
+  isMenuOpen = false;
+  stageKebabMenu.classList.add("hidden");
+  btnStageKebab.classList.remove("active");
+  btnStageKebab.setAttribute("aria-expanded", "false");
+  btnStageKebab.focus();
+
+  if (isClickThroughActive) {
+    window.desktopAPI?.stage?.setIgnoreMouseEvents?.(true, true);
+  }
+}
+
+function toggleMenu() {
+  if (isMenuOpen) {
+    closeMenu();
+  } else {
+    openMenu();
+  }
+}
+
+// Setup side-mounted kebab menu and controls
+function setupKebabMenuListeners() {
   const desktopAPI = window.desktopAPI;
   if (!desktopAPI) return;
 
-  btnScaleDown.addEventListener("click", () => {
-    const next = Math.max(0.5, currentScale - 0.1);
+  // Toggle flyout on kebab trigger click
+  btnStageKebab.addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleMenu();
+  });
+
+  // Keyboard support: Enter / Space toggle menu
+  btnStageKebab.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      toggleMenu();
+    }
+  });
+
+  // Close when clicking outside
+  document.addEventListener("pointerdown", (e) => {
+    if (!isMenuOpen) return;
+    const target = e.target as Node | null;
+    if (
+      target &&
+      !stageKebabMenu.contains(target) &&
+      target !== btnStageKebab &&
+      !btnStageKebab.contains(target)
+    ) {
+      closeMenu();
+    }
+  });
+
+  // Close on Escape key
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && isMenuOpen) {
+      e.preventDefault();
+      closeMenu();
+    }
+  });
+
+  // Prevent interactions inside menu from bubbling to outside-click or triggering window drag
+  stageKebabMenu.addEventListener("pointerdown", (e) => {
+    e.stopPropagation();
+  });
+
+  // Interaction Island: enable pointer input over kebab trigger & flyout when click-through is enabled
+  const handleIslandEnter = () => {
+    if (isClickThroughActive) {
+      desktopAPI.stage?.setIgnoreMouseEvents?.(false);
+    }
+  };
+
+  const handleIslandLeave = (e: PointerEvent) => {
+    if (!isClickThroughActive) return;
+    const nextTarget = e.relatedTarget as Node | null;
+    const stillInIsland =
+      (nextTarget && btnStageKebab.contains(nextTarget)) ||
+      (nextTarget && stageKebabMenu.contains(nextTarget));
+    if (!stillInIsland && !isMenuOpen) {
+      desktopAPI.stage?.setIgnoreMouseEvents?.(true, true);
+    }
+  };
+
+  btnStageKebab.addEventListener("pointerenter", handleIslandEnter);
+  btnStageKebab.addEventListener("pointerleave", handleIslandLeave);
+  stageKebabMenu.addEventListener("pointerenter", handleIslandEnter);
+  stageKebabMenu.addEventListener("pointerleave", handleIslandLeave);
+
+  // 1. Window Size Presets (changes actual native Electron BrowserWindow bounds)
+  presetButtons.forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const preset = btn.dataset.preset as
+        keyof typeof PRESET_SIZES | undefined;
+      if (preset && PRESET_SIZES[preset] && desktopAPI.stage?.setBounds) {
+        const target = PRESET_SIZES[preset];
+        cachedBounds.width = target.width;
+        cachedBounds.height = target.height;
+        const updated = await desktopAPI.stage.setBounds({
+          width: target.width,
+          height: target.height,
+        });
+        cachedBounds = { ...updated };
+        updateActivePreset();
+      }
+    });
+  });
+
+  // 2. Avatar Scale (changes 3D model transform only, decoupled from window size)
+  btnScaleDown.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const next = Math.max(0.5, Math.round((currentScale - 0.1) * 10) / 10);
     applyScale(next);
     desktopAPI.stage?.updateConfig({ scale: next });
   });
 
-  btnScaleUp.addEventListener("click", () => {
-    const next = Math.min(2.0, currentScale + 0.1);
+  btnScaleUp.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const next = Math.min(2.0, Math.round((currentScale + 0.1) * 10) / 10);
     applyScale(next);
     desktopAPI.stage?.updateConfig({ scale: next });
   });
 
-  btnAlwaysOnTop.addEventListener("click", async () => {
+  // 3. Always On Top Toggle
+  btnAlwaysOnTop.addEventListener("click", async (e) => {
+    e.stopPropagation();
     const next = !btnAlwaysOnTop.classList.contains("active");
-    await desktopAPI.stage?.setAlwaysOnTop(next);
     btnAlwaysOnTop.classList.toggle("active", next);
+    btnAlwaysOnTop.setAttribute("aria-checked", String(next));
+    await desktopAPI.stage?.setAlwaysOnTop(next);
   });
 
-  btnClickThrough.addEventListener("click", async () => {
-    const next = !btnClickThrough.classList.contains("active");
-    await desktopAPI.stage?.setClickThrough(next);
+  // 4. Click-Through Toggle
+  btnClickThrough.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    const next = !isClickThroughActive;
+    isClickThroughActive = next;
     btnClickThrough.classList.toggle("active", next);
+    btnClickThrough.setAttribute("aria-checked", String(next));
+    await desktopAPI.stage?.setClickThrough(next);
+    if (!next) {
+      await desktopAPI.stage?.setIgnoreMouseEvents?.(false);
+    }
   });
 
-  btnPauseAnimation.addEventListener("click", async () => {
+  // 5. Pause / Resume Animation Toggle
+  btnPauseAnimation.addEventListener("click", async (e) => {
+    e.stopPropagation();
     isAnimationPaused = !isAnimationPaused;
     btnPauseAnimation.classList.toggle("active", isAnimationPaused);
+    btnPauseAnimation.setAttribute("aria-checked", String(isAnimationPaused));
+    if (labelPauseAnimation) {
+      labelPauseAnimation.textContent = isAnimationPaused
+        ? "Resume Motion"
+        : "Pause Motion";
+    }
     if (isAnimationPaused) {
       blinkController.pause();
     } else {
@@ -505,32 +690,21 @@ function setupToolbarListeners() {
     await desktopAPI.stage?.setAnimationPaused(isAnimationPaused);
   });
 
-  btnToggleLookAt?.addEventListener("click", async () => {
-    isLookAtEnabled = !isLookAtEnabled;
-    btnToggleLookAt.classList.toggle("active", isLookAtEnabled);
-    if (!isLookAtEnabled) {
-      desiredGazeTarget.set(0.0, 1.35, 1.6);
-      targetGazeYaw = 0;
-      targetGazePitch = 0;
-    }
-    await desktopAPI.stage?.updateConfig({ lookAtEnabled: isLookAtEnabled });
-  });
-
-  btnTestBlink?.addEventListener("click", () => {
-    const res = blinkController.triggerTestBlink();
-    if (!res.success) {
-      console.warn("[Stage] Test blink unavailable:", res.error);
-    }
-  });
-
-  btnOpenWorkspace.addEventListener("click", () => {
+  // 6. Open Companion Workspace
+  btnOpenWorkspace.addEventListener("click", (e) => {
+    e.stopPropagation();
+    closeMenu();
     desktopAPI.workspace?.show("chat");
   });
 
-  btnOpenSettings.addEventListener("click", () => {
-    desktopAPI.workspace?.show("avatar");
+  // 7. Hide Avatar Stage
+  btnHideStage.addEventListener("click", (e) => {
+    e.stopPropagation();
+    closeMenu();
+    desktopAPI.stage?.hide();
   });
 
+  // Error overlay actions
   errorSettingsBtn.addEventListener("click", () => {
     desktopAPI.workspace?.show("avatar");
   });
@@ -543,151 +717,14 @@ function setupToolbarListeners() {
       setupStageSync();
     }
   });
-
-  btnHideStage.addEventListener("click", () => {
-    desktopAPI.stage?.hide();
-  });
 }
 
-// Stage Synchronization
-async function setupStageSync() {
-  const desktopAPI = window.desktopAPI;
-  if (!desktopAPI?.stage) return;
-
-  try {
-    currentConfig = await desktopAPI.stage.getConfig();
-    if (currentConfig.scale) {
-      applyScale(currentConfig.scale);
-    }
-    if (currentConfig.lookAtEnabled !== undefined) {
-      isLookAtEnabled = currentConfig.lookAtEnabled;
-      btnToggleLookAt?.classList.toggle("active", isLookAtEnabled);
-    }
-    if (currentConfig.avatarPath) {
-      await loadVrmModel(currentConfig.avatarPath);
-    } else {
-      const isGuestAvailable = await desktopAPI
-        .isGuestPreviewAvailable?.()
-        .catch(() => false);
-      if (isGuestAvailable) {
-        showLoading("Fetching Development Sample VRM...");
-        const sampleRes = await desktopAPI.stage.ensureSampleVrm();
-        if (sampleRes.success && sampleRes.filePath) {
-          await loadVrmModel(sampleRes.filePath);
-        } else {
-          showError(sampleRes.error || "Failed to download sample VRM");
-          if (fallbackGroup) fallbackGroup.visible = true;
-          isFallbackActive = true;
-          updateFallbackNotice(true);
-          hideLoading();
-        }
-      } else {
-        if (fallbackGroup) fallbackGroup.visible = true;
-        isFallbackActive = true;
-        updateFallbackNotice(true);
-        hideLoading();
-      }
-    }
-
-    const status: StageStatus = await desktopAPI.stage.getStatus();
-    isAnimationPaused = status.animationPaused;
-    btnPauseAnimation.classList.toggle("active", isAnimationPaused);
-    btnAlwaysOnTop.classList.toggle("active", status.alwaysOnTop);
-    btnClickThrough.classList.toggle("active", status.clickThrough);
-
-    // Subscribe to global cursor / gaze updates from Electron main process
-    desktopAPI.stage.onCursorMove?.((data) => {
-      if (!isLookAtEnabled) return;
-
-      // Clamp normalized coordinates so the character doesn't over-rotate
-      const clampedX = Math.max(-2.5, Math.min(2.5, data.normalizedX));
-      const clampedY = Math.max(-2.0, Math.min(2.0, data.normalizedY));
-
-      // Map to 3D world space in front of avatar (+X right, +Y up, +Z towards screen)
-      const worldX = clampedX * 0.85;
-      const worldY = 1.35 - clampedY * 0.7;
-      const worldZ = 1.5;
-
-      desiredGazeTarget.set(worldX, worldY, worldZ);
-
-      // Subtle natural head yaw and pitch (turning towards cursor in front of avatar)
-      // Account for avatar root yaw so horizontal head turning direction remains consistent
-      const effectiveYawSign =
-        Math.cos(modelRoot ? modelRoot.rotation.y : 0) >= 0 ? 1 : -1;
-      targetGazeYaw = Math.max(
-        -0.25,
-        Math.min(0.25, clampedX * 0.12 * effectiveYawSign),
-      );
-      targetGazePitch = Math.max(-0.18, Math.min(0.18, -clampedY * 0.1));
-    });
-
-    // Subscribe to broadcast events
-    desktopAPI.stage.onConfigChanged?.((cfg) => {
-      currentConfig = { ...(currentConfig || {}), ...cfg } as AvatarConfig;
-      if (cfg.scale !== undefined && cfg.scale !== currentScale) {
-        applyScale(cfg.scale);
-      }
-      if (
-        (cfg.orientationMode !== undefined || cfg.rotationY !== undefined) &&
-        currentVrm &&
-        modelRoot
-      ) {
-        applyOrientation(
-          currentVrm,
-          modelRoot,
-          cfg.orientationMode ?? currentConfig.orientationMode,
-          cfg.rotationY ?? currentConfig.rotationY,
-        );
-      } else if (cfg.rotationY !== undefined && modelRoot) {
-        modelRoot.rotation.y = cfg.rotationY;
-      }
-      if (
-        cfg.lookAtEnabled !== undefined &&
-        cfg.lookAtEnabled !== isLookAtEnabled
-      ) {
-        isLookAtEnabled = cfg.lookAtEnabled;
-        btnToggleLookAt?.classList.toggle("active", isLookAtEnabled);
-        if (!isLookAtEnabled) {
-          desiredGazeTarget.set(0.0, 1.35, 1.6);
-          targetGazeYaw = 0;
-          targetGazePitch = 0;
-        }
-      }
-      if (cfg.autoBlinkEnabled !== undefined) {
-        blinkController.setAutoBlinkEnabled(cfg.autoBlinkEnabled);
-      }
-      if (cfg.avatarPath && cfg.avatarPath !== lastRequestedVrmPath) {
-        loadVrmModel(cfg.avatarPath);
-      }
-    });
-
-    desktopAPI.stage.onStatusChanged?.((st) => {
-      isAnimationPaused = st.animationPaused;
-      if (isAnimationPaused) {
-        blinkController.pause();
-      } else {
-        blinkController.resume();
-      }
-      btnPauseAnimation.classList.toggle("active", isAnimationPaused);
-      btnAlwaysOnTop.classList.toggle("active", st.alwaysOnTop);
-      btnClickThrough.classList.toggle("active", st.clickThrough);
-    });
-
-    desktopAPI.stage.onTriggerTestBlink?.(() => {
-      blinkController.triggerTestBlink();
-    });
-  } catch (err: any) {
-    showError(err.message || "Failed to synchronize Stage state");
-  }
-}
-
-// Drag Grip: renderer-driven fallback drag to move the native window
-function setupDragHandleListeners() {
-  const dragHandle = document.getElementById("btn-drag-handle");
-  if (!dragHandle) return;
+// Move Stage Handle: pointer-driven native window movement
+function setupMoveStageListener() {
+  if (!btnMoveStage) return;
 
   const desktopAPI = window.desktopAPI;
-  if (!desktopAPI?.stage?.setBounds || !desktopAPI?.stage?.getBounds) return;
+  if (!desktopAPI?.stage?.setBounds) return;
 
   let isDragging = false;
   let startPointerX = 0;
@@ -698,27 +735,28 @@ function setupDragHandleListeners() {
   let pendingX = 0;
   let pendingY = 0;
 
-  dragHandle.addEventListener("pointerdown", async (e: PointerEvent) => {
+  btnMoveStage.addEventListener("pointerdown", (e: PointerEvent) => {
     if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    isDragging = true;
+    startPointerX = e.screenX;
+    startPointerY = e.screenY;
+    startWindowX = cachedBounds.x;
+    startWindowY = cachedBounds.y;
+    pendingX = startWindowX;
+    pendingY = startWindowY;
 
     try {
-      const bounds = await desktopAPI.stage!.getBounds!();
-      isDragging = true;
-      startPointerX = e.screenX;
-      startPointerY = e.screenY;
-      startWindowX = bounds.x;
-      startWindowY = bounds.y;
-      pendingX = startWindowX;
-      pendingY = startWindowY;
-
-      dragHandle.setPointerCapture(e.pointerId);
-      dragHandle.classList.add("dragging");
+      btnMoveStage.setPointerCapture(e.pointerId);
     } catch {
-      isDragging = false;
+      // Ignored
     }
+    btnMoveStage.classList.add("dragging");
   });
 
-  dragHandle.addEventListener("pointermove", (e: PointerEvent) => {
+  btnMoveStage.addEventListener("pointermove", (e: PointerEvent) => {
     if (!isDragging) return;
 
     const deltaX = e.screenX - startPointerX;
@@ -735,6 +773,8 @@ function setupDragHandleListeners() {
             x: Math.round(pendingX),
             y: Math.round(pendingY),
           });
+          cachedBounds.x = Math.round(pendingX);
+          cachedBounds.y = Math.round(pendingY);
         }
       });
     }
@@ -747,10 +787,10 @@ function setupDragHandleListeners() {
       cancelAnimationFrame(rafId);
       rafId = null;
     }
-    dragHandle.classList.remove("dragging");
+    btnMoveStage.classList.remove("dragging");
     try {
-      if (dragHandle.hasPointerCapture(e.pointerId)) {
-        dragHandle.releasePointerCapture(e.pointerId);
+      if (btnMoveStage.hasPointerCapture(e.pointerId)) {
+        btnMoveStage.releasePointerCapture(e.pointerId);
       }
     } catch {
       // Ignored
@@ -760,10 +800,23 @@ function setupDragHandleListeners() {
       x: Math.round(pendingX),
       y: Math.round(pendingY),
     });
+    cachedBounds.x = Math.round(pendingX);
+    cachedBounds.y = Math.round(pendingY);
   };
 
-  dragHandle.addEventListener("pointerup", stopDrag);
-  dragHandle.addEventListener("pointercancel", stopDrag);
+  btnMoveStage.addEventListener("pointerup", stopDrag);
+  btnMoveStage.addEventListener("pointercancel", stopDrag);
+  btnMoveStage.addEventListener("lostpointercapture", stopDrag);
+  window.addEventListener("blur", () => {
+    if (isDragging) {
+      isDragging = false;
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+      btnMoveStage.classList.remove("dragging");
+    }
+  });
 }
 
 // 8-Directional Native Window Resize Listeners
@@ -774,7 +827,7 @@ function setupWindowResizeListeners() {
   if (!handles || handles.length === 0) return;
 
   const desktopAPI = window.desktopAPI;
-  if (!desktopAPI?.stage?.setBounds || !desktopAPI?.stage?.getBounds) return;
+  if (!desktopAPI?.stage?.setBounds) return;
 
   const MIN_WIDTH = 240;
   const MIN_HEIGHT = 320;
@@ -795,32 +848,31 @@ function setupWindowResizeListeners() {
     let rafId: number | null = null;
     let candidateBounds = { x: 0, y: 0, width: 0, height: 0 };
 
-    handle.addEventListener("pointerdown", async (e: PointerEvent) => {
+    handle.addEventListener("pointerdown", (e: PointerEvent) => {
       if (e.button !== 0) return;
       e.preventDefault();
       e.stopPropagation();
 
-      try {
-        const bounds = await desktopAPI.stage!.getBounds!();
-        isResizing = true;
-        startPointerX = e.screenX;
-        startPointerY = e.screenY;
-        startX = bounds.x;
-        startY = bounds.y;
-        startW = bounds.width;
-        startH = bounds.height;
-        candidateBounds = {
-          x: startX,
-          y: startY,
-          width: startW,
-          height: startH,
-        };
+      isResizing = true;
+      startPointerX = e.screenX;
+      startPointerY = e.screenY;
+      startX = cachedBounds.x;
+      startY = cachedBounds.y;
+      startW = cachedBounds.width;
+      startH = cachedBounds.height;
+      candidateBounds = {
+        x: startX,
+        y: startY,
+        width: startW,
+        height: startH,
+      };
 
+      try {
         handle.setPointerCapture(e.pointerId);
-        document.body.classList.add("resizing-active");
       } catch {
-        isResizing = false;
+        // Ignored
       }
+      document.body.classList.add("resizing-active");
     });
 
     handle.addEventListener("pointermove", (e: PointerEvent) => {
@@ -866,6 +918,8 @@ function setupWindowResizeListeners() {
           rafId = null;
           if (isResizing) {
             desktopAPI.stage?.setBounds?.(candidateBounds);
+            cachedBounds = { ...candidateBounds };
+            updateActivePreset();
           }
         });
       }
@@ -889,16 +943,183 @@ function setupWindowResizeListeners() {
 
       // Final bounds commit
       desktopAPI.stage?.setBounds?.(candidateBounds);
+      cachedBounds = { ...candidateBounds };
+      updateActivePreset();
     };
 
     handle.addEventListener("pointerup", stopResize);
     handle.addEventListener("pointercancel", stopResize);
+    handle.addEventListener("lostpointercapture", stopResize);
   });
+
+  window.addEventListener("blur", () => {
+    document.body.classList.remove("resizing-active");
+  });
+}
+
+// Stage Synchronization
+async function setupStageSync() {
+  const desktopAPI = window.desktopAPI;
+  if (!desktopAPI?.stage) return;
+
+  try {
+    currentConfig = await desktopAPI.stage.getConfig();
+    if (currentConfig.scale) {
+      applyScale(currentConfig.scale);
+    }
+    if (currentConfig.avatarPath) {
+      await loadVrmModel(currentConfig.avatarPath);
+    } else {
+      const isGuestAvailable = await desktopAPI
+        .isGuestPreviewAvailable?.()
+        .catch(() => false);
+      if (isGuestAvailable) {
+        showLoading("Fetching Development Sample VRM...");
+        const sampleRes = await desktopAPI.stage.ensureSampleVrm();
+        if (sampleRes.success && sampleRes.filePath) {
+          await loadVrmModel(sampleRes.filePath);
+        } else {
+          showError(sampleRes.error || "Failed to download sample VRM");
+          if (fallbackGroup) fallbackGroup.visible = true;
+          isFallbackActive = true;
+          updateFallbackNotice(true);
+          hideLoading();
+        }
+      } else {
+        if (fallbackGroup) fallbackGroup.visible = true;
+        isFallbackActive = true;
+        updateFallbackNotice(true);
+        hideLoading();
+      }
+    }
+
+    const status: StageStatus = await desktopAPI.stage.getStatus();
+    isAnimationPaused = status.animationPaused;
+    isClickThroughActive = status.clickThrough;
+    btnPauseAnimation.classList.toggle("active", isAnimationPaused);
+    btnPauseAnimation.setAttribute("aria-checked", String(isAnimationPaused));
+    if (labelPauseAnimation) {
+      labelPauseAnimation.textContent = isAnimationPaused
+        ? "Resume Motion"
+        : "Pause Motion";
+    }
+    btnAlwaysOnTop.classList.toggle("active", status.alwaysOnTop);
+    btnAlwaysOnTop.setAttribute("aria-checked", String(status.alwaysOnTop));
+    btnClickThrough.classList.toggle("active", isClickThroughActive);
+    btnClickThrough.setAttribute("aria-checked", String(isClickThroughActive));
+
+    const initialBounds = await desktopAPI.stage.getBounds?.();
+    if (initialBounds) {
+      cachedBounds = { ...initialBounds };
+      updateActivePreset();
+    }
+
+    // Subscribe to global cursor / gaze updates from Electron main process
+    desktopAPI.stage.onCursorMove?.((data) => {
+      if (!isLookAtEnabled) return;
+
+      // Clamp normalized coordinates so the character doesn't over-rotate
+      const clampedX = Math.max(-2.5, Math.min(2.5, data.normalizedX));
+      const clampedY = Math.max(-2.0, Math.min(2.0, data.normalizedY));
+
+      // Map to 3D world space in front of avatar (+X right, +Y up, +Z towards screen)
+      const worldX = clampedX * 0.85;
+      const worldY = 1.35 - clampedY * 0.7;
+      const worldZ = 1.5;
+
+      desiredGazeTarget.set(worldX, worldY, worldZ);
+
+      // Subtle natural head yaw and pitch (turning towards cursor in front of avatar)
+      const effectiveYawSign =
+        Math.cos(modelRoot ? modelRoot.rotation.y : 0) >= 0 ? 1 : -1;
+      targetGazeYaw = Math.max(
+        -0.25,
+        Math.min(0.25, clampedX * 0.12 * effectiveYawSign),
+      );
+      targetGazePitch = Math.max(-0.18, Math.min(0.18, -clampedY * 0.1));
+    });
+
+    // Subscribe to broadcast events
+    desktopAPI.stage.onConfigChanged?.((cfg) => {
+      currentConfig = { ...(currentConfig || {}), ...cfg } as AvatarConfig;
+      if (cfg.scale !== undefined && cfg.scale !== currentScale) {
+        applyScale(cfg.scale);
+      }
+      if (
+        (cfg.orientationMode !== undefined || cfg.rotationY !== undefined) &&
+        currentVrm &&
+        modelRoot
+      ) {
+        applyOrientation(
+          currentVrm,
+          modelRoot,
+          cfg.orientationMode ?? currentConfig.orientationMode,
+          cfg.rotationY ?? currentConfig.rotationY,
+        );
+      } else if (cfg.rotationY !== undefined && modelRoot) {
+        modelRoot.rotation.y = cfg.rotationY;
+      }
+      if (
+        cfg.lookAtEnabled !== undefined &&
+        cfg.lookAtEnabled !== isLookAtEnabled
+      ) {
+        isLookAtEnabled = cfg.lookAtEnabled;
+        if (!isLookAtEnabled) {
+          desiredGazeTarget.set(0.0, 1.35, 1.6);
+          targetGazeYaw = 0;
+          targetGazePitch = 0;
+        }
+      }
+      if (cfg.autoBlinkEnabled !== undefined) {
+        blinkController.setAutoBlinkEnabled(cfg.autoBlinkEnabled);
+      }
+      if (cfg.avatarPath && cfg.avatarPath !== lastRequestedVrmPath) {
+        loadVrmModel(cfg.avatarPath);
+      }
+      if (cfg.stageWidth !== undefined || cfg.stageHeight !== undefined) {
+        if (cfg.stageWidth) cachedBounds.width = cfg.stageWidth;
+        if (cfg.stageHeight) cachedBounds.height = cfg.stageHeight;
+        if (cfg.stageX !== undefined) cachedBounds.x = cfg.stageX;
+        if (cfg.stageY !== undefined) cachedBounds.y = cfg.stageY;
+        updateActivePreset();
+      }
+    });
+
+    desktopAPI.stage.onStatusChanged?.((st) => {
+      isAnimationPaused = st.animationPaused;
+      isClickThroughActive = st.clickThrough;
+      if (isAnimationPaused) {
+        blinkController.pause();
+      } else {
+        blinkController.resume();
+      }
+      btnPauseAnimation.classList.toggle("active", isAnimationPaused);
+      btnPauseAnimation.setAttribute("aria-checked", String(isAnimationPaused));
+      if (labelPauseAnimation) {
+        labelPauseAnimation.textContent = isAnimationPaused
+          ? "Resume Motion"
+          : "Pause Motion";
+      }
+      btnAlwaysOnTop.classList.toggle("active", st.alwaysOnTop);
+      btnAlwaysOnTop.setAttribute("aria-checked", String(st.alwaysOnTop));
+      btnClickThrough.classList.toggle("active", isClickThroughActive);
+      btnClickThrough.setAttribute(
+        "aria-checked",
+        String(isClickThroughActive),
+      );
+    });
+
+    desktopAPI.stage.onTriggerTestBlink?.(() => {
+      blinkController.triggerTestBlink();
+    });
+  } catch (err: any) {
+    showError(err.message || "Failed to synchronize Stage state");
+  }
 }
 
 // Boot Stage
 initScene();
-setupToolbarListeners();
-setupDragHandleListeners();
+setupKebabMenuListeners();
+setupMoveStageListener();
 setupWindowResizeListeners();
 setupStageSync();
