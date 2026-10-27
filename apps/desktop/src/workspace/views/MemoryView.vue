@@ -9,6 +9,22 @@ const searchQuery = ref("");
 const showAddModal = ref(false);
 const newContent = ref("");
 const newCategory = ref<MemoryItem["category"]>("fact");
+const newScope = ref<"global" | "agent">("global");
+const saveNotice = ref<string | null>(null);
+const errorMessage = ref<string | null>(null);
+const confirmingClearAll = ref(false);
+const confirmingDeleteId = ref<string | null>(null);
+
+const activeAgent = computed(() => {
+  return (
+    store.state.agents.find((a) => a.id === store.state.activeAgentId) ||
+    store.state.agents[0]
+  );
+});
+
+const isMemoryRetentionDisabled = computed(() => {
+  return activeAgent.value?.behaviorPreferences?.memoryRetention === false;
+});
 
 const filteredMemories = computed(() => {
   const q = searchQuery.value.toLowerCase().trim();
@@ -16,23 +32,77 @@ const filteredMemories = computed(() => {
   return store.state.memories.filter(
     (m) =>
       m.content.toLowerCase().includes(q) ||
-      m.category.toLowerCase().includes(q),
+      m.category.toLowerCase().includes(q) ||
+      (m.agentId && m.agentId.toLowerCase().includes(q)),
   );
 });
 
 function handleAddMemory() {
-  if (!newContent.value.trim()) return;
-  store.addMemory(newContent.value.trim(), newCategory.value);
+  const content = newContent.value.trim();
+  if (!content) {
+    errorMessage.value = "Memory content cannot be empty";
+    return;
+  }
+  errorMessage.value = null;
+  const targetAgentId =
+    newScope.value === "agent" ? activeAgent.value?.id : undefined;
+
+  store.addMemory(content, newCategory.value, targetAgentId);
   newContent.value = "";
   showAddModal.value = false;
+  saveNotice.value = "Memory stored securely";
+  setTimeout(() => {
+    saveNotice.value = null;
+  }, 2500);
 }
 
-function formatDate(iso: string): string {
+function requestDeleteMemory(id: string) {
+  confirmingDeleteId.value = id;
+}
+
+function cancelDeleteMemory() {
+  confirmingDeleteId.value = null;
+}
+
+function executeDeleteMemory(id: string) {
+  store.deleteMemory(id);
+  confirmingDeleteId.value = null;
+  saveNotice.value = "Memory deleted";
+  setTimeout(() => {
+    saveNotice.value = null;
+  }, 2000);
+}
+
+function openClearAllModal() {
+  confirmingClearAll.value = true;
+}
+
+function cancelClearAll() {
+  confirmingClearAll.value = false;
+}
+
+function executeClearAll() {
+  store.clearAllMemories();
+  confirmingClearAll.value = false;
+  saveNotice.value = "All memories cleared";
+  setTimeout(() => {
+    saveNotice.value = null;
+  }, 2000);
+}
+
+function formatDate(iso?: string): string {
+  if (!iso) return "";
   try {
     return new Date(iso).toLocaleDateString();
   } catch {
     return "";
   }
+}
+
+function getAgentName(agentId?: string): string {
+  if (!agentId) return "Global";
+  const agent = store.state.agents.find((a) => a.id === agentId);
+  return agent ? agent.name : "Agent-Scoped";
 }
 </script>
 
@@ -59,23 +129,69 @@ function formatDate(iso: string): string {
           v-if="store.state.memories.length > 0"
           id="memory-clear-all-btn"
           class="btn-danger"
-          @click="store.clearAllMemories()"
+          @click="openClearAllModal"
         >
           Clear All
         </button>
       </div>
     </div>
 
-    <!-- Privacy Banner -->
+    <!-- User notices -->
+    <div v-if="saveNotice" class="feedback-banner success-banner">
+      {{ saveNotice }}
+    </div>
+    <div v-if="errorMessage" class="feedback-banner error-banner">
+      {{ errorMessage }}
+    </div>
+
+    <!-- Retention Paused Warning -->
+    <div v-if="isMemoryRetentionDisabled" class="retention-warning-card">
+      <div class="warning-icon">⚠️</div>
+      <div class="warning-text">
+        <h4>Memory Retention Paused</h4>
+        <p>
+          Memory retention is currently turned off for
+          <strong>{{ activeAgent?.name || "your active agent" }}</strong
+          >. Stored memories will not be retrieved or sent to AI model providers
+          during chat.
+        </p>
+      </div>
+    </div>
+
+    <!-- Truthful Privacy Banner (HR-8) -->
     <div class="privacy-card">
       <div class="privacy-icon"><AppIcon name="security" size="20" /></div>
       <div class="privacy-text">
-        <h4>Strict Local Privacy Baseline</h4>
+        <h4>Local Storage & Transparent Provider Context</h4>
         <p>
-          Memories are retained in local secure storage. They are only injected
-          into companion context during relevant conversations and are never
-          shared with unauthorized telemetry or external clouds.
+          Memories are stored locally in your private SQLite database on this
+          computer. When chatting with a configured AI model provider (such as
+          Google Gemini, OpenAI, or Anthropic Claude), relevant retrieved
+          memories are included in the request context to personalize your
+          companion's responses. You can pause memory retention in Agent
+          settings or delete memories below at any time.
         </p>
+      </div>
+    </div>
+
+    <!-- Clear All Confirmation Modal -->
+    <div v-if="confirmingClearAll" class="confirmation-modal-backdrop">
+      <div class="confirmation-modal">
+        <h3>Clear All Memories?</h3>
+        <p>
+          Are you sure you want to permanently erase all stored companion
+          memories? This action cannot be undone.
+        </p>
+        <div class="modal-actions">
+          <button class="btn-secondary" @click="cancelClearAll">Cancel</button>
+          <button
+            id="confirm-clear-all-btn"
+            class="btn-danger-confirm"
+            @click="executeClearAll"
+          >
+            Yes, Clear All Memories
+          </button>
+        </div>
       </div>
     </div>
 
@@ -92,12 +208,24 @@ function formatDate(iso: string): string {
             <option value="interaction">Interaction</option>
           </select>
         </div>
+
+        <div class="form-group">
+          <label>Scope</label>
+          <select v-model="newScope" class="custom-select">
+            <option value="global">All Agents (Global)</option>
+            <option value="agent">
+              {{ activeAgent?.name || "Active Agent" }} Only
+            </option>
+          </select>
+        </div>
+
         <div class="form-group full-width">
           <label>Memory Statement</label>
           <input
             v-model="newContent"
             class="custom-input"
             placeholder="e.g. Prefers answers formatted with concise bullet points"
+            @keyup.enter="handleAddMemory"
           />
         </div>
       </div>
@@ -114,7 +242,7 @@ function formatDate(iso: string): string {
         v-model="searchQuery"
         type="search"
         class="search-input"
-        placeholder="Filter memories by keyword or category..."
+        placeholder="Filter memories by keyword, category, or scope..."
       />
     </div>
 
@@ -129,16 +257,39 @@ function formatDate(iso: string): string {
           <span :class="['category-pill', mem.category]">{{
             mem.category
           }}</span>
-          <span class="date-tag">{{ formatDate(mem.createdAt) }}</span>
-          <span class="confidence-tag"
-            >Confidence: {{ Math.round(mem.confidence * 100) }}%</span
-          >
+          <span class="scope-pill">{{ getAgentName(mem.agentId) }}</span>
+          <span class="date-tag">Created: {{ formatDate(mem.createdAt) }}</span>
+          <span v-if="mem.lastRecalledAt" class="recalled-tag">
+            Recalled: {{ formatDate(mem.lastRecalledAt) }}
+          </span>
+          <span class="confidence-tag">
+            Confidence: {{ Math.round(mem.confidence * 100) }}%
+          </span>
         </div>
 
         <p class="memory-content">{{ mem.content }}</p>
 
         <div class="memory-footer">
-          <button class="delete-btn" @click="store.deleteMemory(mem.id)">
+          <div
+            v-if="confirmingDeleteId === mem.id"
+            class="inline-confirm-actions"
+          >
+            <span class="confirm-prompt">Forget this memory?</span>
+            <button
+              class="btn-confirm-delete"
+              @click="executeDeleteMemory(mem.id)"
+            >
+              Confirm
+            </button>
+            <button class="btn-cancel-delete" @click="cancelDeleteMemory">
+              Cancel
+            </button>
+          </div>
+          <button
+            v-else
+            class="delete-btn"
+            @click="requestDeleteMemory(mem.id)"
+          >
             Forget
           </button>
         </div>
@@ -190,11 +341,22 @@ function formatDate(iso: string): string {
   border-radius: var(--radius-sm);
   font-size: 0.85rem;
   font-weight: 600;
+  cursor: pointer;
   transition: all var(--transition-fast);
 }
 
 .btn-primary:hover {
   background: #ffffff;
+}
+
+.btn-secondary {
+  padding: 8px 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  cursor: pointer;
 }
 
 .btn-danger {
@@ -204,6 +366,69 @@ function formatDate(iso: string): string {
   border-radius: var(--radius-sm);
   color: var(--accent-danger);
   font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.btn-danger:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+.btn-danger-confirm {
+  padding: 8px 16px;
+  background: #ef4444;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: #ffffff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.feedback-banner {
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 16px;
+  font-size: 0.85rem;
+}
+
+.success-banner {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #10b981;
+}
+
+.error-banner {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+
+.retention-warning-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  margin-bottom: 20px;
+}
+
+.warning-icon {
+  font-size: 1.3rem;
+}
+
+.warning-text h4 {
+  color: #f59e0b;
+  margin: 0 0 4px 0;
+  font-size: 0.95rem;
+}
+
+.warning-text p {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  margin: 0;
+  line-height: 1.4;
 }
 
 .privacy-card {
@@ -248,7 +473,7 @@ function formatDate(iso: string): string {
 
 .form-grid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
 
@@ -256,6 +481,10 @@ function formatDate(iso: string): string {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.form-group.full-width {
+  grid-column: 1 / -1;
 }
 
 .form-group label {
@@ -284,6 +513,7 @@ function formatDate(iso: string): string {
 .modal-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 10px;
   margin-top: 14px;
 }
 
@@ -329,7 +559,8 @@ function formatDate(iso: string): string {
 .memory-meta {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  flex-wrap: wrap;
   font-size: 0.75rem;
 }
 
@@ -351,7 +582,27 @@ function formatDate(iso: string): string {
   color: #818cf8;
 }
 
-.date-tag {
+.category-pill.habit {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+
+.category-pill.interaction {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+}
+
+.scope-pill {
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-hover, rgba(255, 255, 255, 0.08));
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+}
+
+.date-tag,
+.recalled-tag {
   color: var(--text-muted);
   font-family: var(--font-family-mono);
 }
@@ -364,6 +615,7 @@ function formatDate(iso: string): string {
   font-size: 0.9rem;
   color: var(--text-primary);
   line-height: 1.4;
+  margin: 4px 0;
 }
 
 .memory-footer {
@@ -372,11 +624,78 @@ function formatDate(iso: string): string {
 }
 
 .delete-btn {
+  background: transparent;
+  border: none;
   font-size: 0.75rem;
   color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.2s ease;
 }
 
 .delete-btn:hover {
   color: var(--accent-danger);
+}
+
+.inline-confirm-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+}
+
+.confirm-prompt {
+  color: var(--text-secondary);
+}
+
+.btn-confirm-delete {
+  background: #ef4444;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.btn-cancel-delete {
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.confirmation-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+.confirmation-modal {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 24px;
+  max-width: 440px;
+  width: 90%;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+}
+
+.confirmation-modal h3 {
+  margin: 0 0 10px 0;
+  color: var(--text-primary);
+}
+
+.confirmation-modal p {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin: 0 0 20px 0;
 }
 </style>

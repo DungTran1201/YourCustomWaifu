@@ -1222,11 +1222,13 @@ export function useAppStore() {
   async function addMemory(
     content: string,
     category: MemoryItem["category"] = "fact",
+    agentId?: string,
   ) {
     const newMemory: MemoryItem = {
       id: `mem_${Date.now()}`,
       category,
       content,
+      agentId,
       createdAt: new Date().toISOString(),
       confidence: 1.0,
     };
@@ -1234,7 +1236,7 @@ export function useAppStore() {
     try {
       const res = await apiRequest("/api/v1/memories", {
         method: "POST",
-        body: JSON.stringify({ content, category }),
+        body: JSON.stringify({ content, category, agentId }),
       });
       if (res?.id) newMemory.id = res.id;
     } catch {

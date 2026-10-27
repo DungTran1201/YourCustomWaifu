@@ -760,7 +760,7 @@ export class CompanionRepository {
     } = {},
   ): MemoryItem[] {
     let sql =
-      "SELECT id, category, content, confidence, last_recalled_at, created_at FROM memories WHERE user_id = ?";
+      "SELECT id, category, content, confidence, last_recalled_at, created_at, agent_id FROM memories WHERE user_id = ?";
     const params: any[] = [userId];
 
     if (options.agentId) {
@@ -790,13 +790,14 @@ export class CompanionRepository {
       confidence: r.confidence,
       lastRecalledAt: r.last_recalled_at || undefined,
       createdAt: r.created_at,
+      agentId: r.agent_id || undefined,
     }));
   }
 
   public getMemoryById(userId: string, id: string): MemoryItem | null {
     const r = this.db
       .prepare(
-        "SELECT id, category, content, confidence, last_recalled_at, created_at FROM memories WHERE user_id = ? AND id = ?",
+        "SELECT id, category, content, confidence, last_recalled_at, created_at, agent_id FROM memories WHERE user_id = ? AND id = ?",
       )
       .get(userId, id) as any;
 
@@ -808,6 +809,7 @@ export class CompanionRepository {
       confidence: r.confidence,
       lastRecalledAt: r.last_recalled_at || undefined,
       createdAt: r.created_at,
+      agentId: r.agent_id || undefined,
     };
   }
 
