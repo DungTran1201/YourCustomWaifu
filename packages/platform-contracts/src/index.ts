@@ -243,6 +243,12 @@ export interface DesktopAuthAPI {
     password: string;
     deviceName?: string;
   }) => Promise<{ user: UserProfile }>;
+  register: (credentials: {
+    email: string;
+    password: string;
+    displayName?: string;
+    deviceName?: string;
+  }) => Promise<{ user: UserProfile }>;
   logout: () => Promise<void>;
   getStoredSession: () => Promise<UserProfile | null>;
 }
@@ -315,6 +321,7 @@ export const IPC_CHANNELS = {
   PING: "app:ping",
   GUEST_PREVIEW_AVAILABLE: "app:guest-preview-available",
   AUTH_LOGIN: "app:auth-login",
+  AUTH_REGISTER: "app:auth-register",
   AUTH_LOGOUT: "app:auth-logout",
   AUTH_GET_STORED_SESSION: "app:auth-get-stored-session",
 

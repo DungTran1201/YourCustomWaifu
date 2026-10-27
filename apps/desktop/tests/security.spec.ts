@@ -30,4 +30,36 @@ describe("Desktop Security Invariants", () => {
     const mockForeignSender = { id: 789 } as any;
     expect(validateIpcSender(mockForeignSender, mockActiveWindow)).toBe(false);
   });
+
+  it("ensures default server CORS configuration does not allow file://, null, or wildcard with credentials", async () => {
+    const { createServer } = await import("../electron/server/server.js");
+    const { DatabaseSync } = await import("node:sqlite");
+    const { initSchema } = await import("../electron/server/database.js");
+
+    const db = new DatabaseSync(":memory:");
+    initSchema(db);
+    const server = createServer({ db });
+    await new Promise<void>((resolve) => {
+      server.listen(0, "127.0.0.1", () => resolve());
+    });
+
+    const addr = server.address() as { port: number };
+    const res = await fetch(`http://127.0.0.1:${addr.port}/api/v1/health`, {
+      headers: { Origin: "file://" },
+    });
+    // CORS origin header should not be returned for file://
+    expect(res.headers.get("access-control-allow-origin")).toBeNull();
+
+    const resNull = await fetch(`http://127.0.0.1:${addr.port}/api/v1/health`, {
+      headers: { Origin: "null" },
+    });
+    expect(resNull.headers.get("access-control-allow-origin")).toBeNull();
+
+    await new Promise<void>((resolve) => {
+      server.close(() => {
+        db.close();
+        resolve();
+      });
+    });
+  });
 });

@@ -295,6 +295,114 @@ describe("Authentication & Account Management API Tests", () => {
     });
   });
 
+  describe("Desktop Native Registration & Session Contract (FR-AUTH-DESKTOP)", () => {
+    it("registers user via desktop endpoint, issuing valid desktop session and tokens", async () => {
+      const res = await request("/api/v1/auth/desktop-register", {
+        method: "POST",
+        body: {
+          email: "native_desktop@example.com",
+          password: "CorrectHorseBatteryStaple123!",
+          displayName: "Desktop Companion Master",
+          deviceName: "Station-Alpha",
+        },
+      });
+
+      expect(res.status).toBe(201);
+      expect(res.body.user).toBeDefined();
+      expect(res.body.user.email).toBe("native_desktop@example.com");
+      expect(res.body.user.displayName).toBe("Desktop Companion Master");
+      expect(res.body.user.status).toBe("active");
+      expect(res.body.accessToken).toBeDefined();
+      expect(res.body.refreshToken).toBeDefined();
+      expect(res.body.expiresIn).toBe(900);
+      expect(res.body.refreshExpiresIn).toBe(90 * 86400);
+
+      // Verify in DB that session has client_type = 'desktop' and deviceName = 'Station-Alpha'
+      const sessionRow = db
+        .prepare(
+          "SELECT client_type, device_name FROM sessions WHERE user_id = ?",
+        )
+        .get(res.body.user.id) as any;
+      expect(sessionRow).toBeDefined();
+      expect(sessionRow.client_type).toBe("desktop");
+      expect(sessionRow.device_name).toBe("Station-Alpha");
+
+      // Verify accessToken / refreshToken can immediately query /api/v1/users/me
+      const meRes = await request("/api/v1/users/me", {
+        headers: { Authorization: `Bearer ${res.body.accessToken}` },
+      });
+      expect(meRes.status).toBe(200);
+      expect(meRes.body.email).toBe("native_desktop@example.com");
+
+      // Verify refreshToken can rotate via desktop-refresh
+      const refreshRes = await request("/api/v1/auth/desktop-refresh", {
+        method: "POST",
+        body: { refreshToken: res.body.refreshToken },
+      });
+      expect(refreshRes.status).toBe(200);
+      expect(refreshRes.body.refreshToken).toBeDefined();
+      expect(refreshRes.body.refreshToken).not.toBe(res.body.refreshToken);
+    });
+
+    it("rejects password shorter than 15 characters on desktop registration", async () => {
+      const res = await request("/api/v1/auth/desktop-register", {
+        method: "POST",
+        body: {
+          email: "short_desktop@example.com",
+          password: "TooShort1!",
+        },
+      });
+
+      expect(res.status).toBe(422);
+      expect(res.body.error).toBe("password_too_short");
+    });
+
+    it("rejects duplicate email on desktop registration", async () => {
+      await request("/api/v1/auth/desktop-register", {
+        method: "POST",
+        body: {
+          email: "unique_desktop@example.com",
+          password: "CorrectHorseBatteryStaple123!",
+        },
+      });
+
+      const res = await request("/api/v1/auth/desktop-register", {
+        method: "POST",
+        body: {
+          email: "unique_desktop@example.com",
+          password: "AnotherCorrectHorseBattery123!",
+        },
+      });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error).toBe("registration_failed");
+    });
+
+    it("enforces rate limit on desktop registration", async () => {
+      // 10 attempts allowed per hour
+      for (let i = 0; i < 10; i++) {
+        await request("/api/v1/auth/desktop-register", {
+          method: "POST",
+          body: {
+            email: `ratelimit_${i}@example.com`,
+            password: "CorrectHorseBatteryStaple123!",
+          },
+        });
+      }
+
+      const blockedRes = await request("/api/v1/auth/desktop-register", {
+        method: "POST",
+        body: {
+          email: "ratelimit_blocked@example.com",
+          password: "CorrectHorseBatteryStaple123!",
+        },
+      });
+
+      expect(blockedRes.status).toBe(429);
+      expect(blockedRes.body.error).toBe("rate_limit_exceeded");
+    });
+  });
+
   describe("Password Reset Lifecycle (FR-ACCT-001, FR-ACCT-002)", () => {
     it("executes password reset with single-use token and invalidates prior sessions", async () => {
       process.env.NODE_ENV = "test";

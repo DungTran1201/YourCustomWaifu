@@ -58,6 +58,7 @@ export class AuthService {
     displayNameRaw?: string,
     ipSubnet: string = "127.0.0.1/32",
     clientType: "web" | "desktop" = "web",
+    deviceName?: string,
   ): Promise<{ user: UserProfile; sessionToken: string; csrfToken: string }> {
     const email = emailRaw.trim().toLowerCase();
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -118,7 +119,7 @@ export class AuthService {
     const session = this.createSession(
       userId,
       clientType,
-      `${clientType}-client`,
+      deviceName || `${clientType}-client`,
       ipSubnet,
     );
     const user = this.getUserProfile(userId);
@@ -192,6 +193,40 @@ export class AuthService {
     };
   }
 
+  public async desktopRegister(
+    emailRaw: string,
+    passwordRaw: string,
+    displayNameRaw?: string,
+    deviceName: string = "Desktop Workstation",
+    ipSubnet: string = "127.0.0.1/32",
+  ): Promise<{
+    accessToken: string;
+    expiresIn: number;
+    refreshToken: string;
+    refreshExpiresIn: number;
+    user: UserProfile;
+  }> {
+    const regResult = await this.register(
+      emailRaw,
+      passwordRaw,
+      displayNameRaw,
+      ipSubnet,
+      "desktop",
+      deviceName,
+    );
+
+    const refreshToken = regResult.sessionToken;
+    const accessToken = regResult.sessionToken;
+
+    return {
+      accessToken,
+      expiresIn: 900, // 15 minutes
+      refreshToken,
+      refreshExpiresIn: 90 * 86400, // 90 days
+      user: regResult.user,
+    };
+  }
+
   public async desktopLogin(
     emailRaw: string,
     passwordRaw: string,
@@ -212,9 +247,9 @@ export class AuthService {
       deviceName,
     );
 
-    // For desktop: sessionToken acts as the long-lived refresh token
+    // For desktop: sessionToken acts as the long-lived refresh token and bearer credential
     const refreshToken = loginResult.sessionToken;
-    const accessToken = generateRandomToken(24);
+    const accessToken = loginResult.sessionToken;
 
     return {
       accessToken,
@@ -261,7 +296,7 @@ export class AuthService {
       .run(newTokenHash, idleExpiry, now.toISOString(), sessionRow.id);
 
     return {
-      accessToken: generateRandomToken(24),
+      accessToken: newRefreshToken,
       expiresIn: 900,
       refreshToken: newRefreshToken,
     };

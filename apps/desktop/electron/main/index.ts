@@ -686,6 +686,81 @@ function registerIpcHandlers(): void {
     return { user: data.user };
   });
 
+  ipcMain.handle(IPC_CHANNELS.AUTH_REGISTER, async (event, credentials) => {
+    if (!validateIpcSender(event.sender, allowedWindows())) {
+      throw new Error("Unauthorized IPC sender");
+    }
+    if (!credentials || typeof credentials !== "object") {
+      throw new Error("Invalid registration payload");
+    }
+    const email =
+      typeof credentials.email === "string" ? credentials.email.trim() : "";
+    const password =
+      typeof credentials.password === "string" ? credentials.password : "";
+    const displayName =
+      typeof credentials.displayName === "string"
+        ? credentials.displayName.trim()
+        : undefined;
+    const deviceName =
+      typeof credentials.deviceName === "string" &&
+      credentials.deviceName.trim()
+        ? credentials.deviceName.trim()
+        : os.hostname();
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new Error("Please enter a valid email address");
+    }
+    if (!password || password.length < 15) {
+      throw new Error("Password must be at least 15 characters long");
+    }
+    if (password.length > 128) {
+      throw new Error("Password must not exceed 128 characters");
+    }
+
+    const apiBaseUrl =
+      process.env["VITE_API_BASE_URL"] || "http://127.0.0.1:3000";
+
+    let res: Response;
+    try {
+      res = await fetch(`${apiBaseUrl}/api/v1/auth/desktop-register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          password,
+          displayName,
+          deviceName,
+        }),
+      });
+    } catch {
+      throw new Error(
+        "Authentication service is currently unavailable. Please check that the server is running.",
+      );
+    }
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || "Registration failed");
+    }
+
+    const data = await res.json();
+    try {
+      const { safeStorage } = await import("electron");
+      if (safeStorage.isEncryptionAvailable() && data.refreshToken) {
+        const encrypted = safeStorage.encryptString(data.refreshToken);
+        const credPath = join(app.getPath("userData"), "session.enc");
+        await fs.writeFile(credPath, encrypted);
+      }
+    } catch (persistErr) {
+      console.warn(
+        "[Desktop Auth] Failed to persist secure session:",
+        persistErr,
+      );
+    }
+
+    return { user: data.user };
+  });
+
   ipcMain.handle(IPC_CHANNELS.AUTH_LOGOUT, async (event) => {
     if (!validateIpcSender(event.sender, allowedWindows())) {
       throw new Error("Unauthorized IPC sender");
@@ -1140,6 +1215,30 @@ function registerIpcHandlers(): void {
 
 let embeddedAuthServer: import("node:http").Server | null = null;
 
+async function verifyRunningAuthServer(port: number): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 2000);
+    const res = await fetch(`http://127.0.0.1:${port}/api/v1/health`, {
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (!res.ok) return false;
+    const data = (await res.json().catch(() => ({}))) as {
+      status?: string;
+      version?: string;
+    };
+    return (
+      data &&
+      data.status === "healthy" &&
+      typeof data.version === "string" &&
+      data.version.length > 0
+    );
+  } catch {
+    return false;
+  }
+}
+
 async function startEmbeddedAuthServer(): Promise<void> {
   try {
     const { getDatabase } = await import("../server/database.js");
@@ -1150,20 +1249,55 @@ async function startEmbeddedAuthServer(): Promise<void> {
     await new Promise<void>((resolve) => {
       server.listen(port, "127.0.0.1", () => {
         embeddedAuthServer = server;
+        const addr = server.address() as { port: number };
+        const activePort = addr?.port ?? port;
+        process.env["VITE_API_BASE_URL"] = `http://127.0.0.1:${activePort}`;
         console.log(
-          `[Desktop Auth Server] Listening on http://127.0.0.1:${port}`,
+          `[Desktop Auth Server] Listening on http://127.0.0.1:${activePort}`,
         );
         resolve();
       });
-      server.on("error", (err: any) => {
+      server.on("error", async (err: any) => {
         if (err.code === "EADDRINUSE") {
           console.log(
-            `[Desktop Auth Server] Port ${port} in use; using running instance`,
+            `[Desktop Auth Server] Port ${port} in use; verifying running instance...`,
           );
+          const isHealthy = await verifyRunningAuthServer(port);
+          if (isHealthy) {
+            console.log(
+              `[Desktop Auth Server] Verified compatible running auth service on port ${port}`,
+            );
+            process.env["VITE_API_BASE_URL"] = `http://127.0.0.1:${port}`;
+            resolve();
+            return;
+          }
+
+          console.warn(
+            `[Desktop Auth Server] Port ${port} is occupied by an incompatible process. Relocating to dynamic port...`,
+          );
+          const fallbackServer = createServer({ db });
+          fallbackServer.listen(0, "127.0.0.1", () => {
+            embeddedAuthServer = fallbackServer;
+            const fallbackAddr = fallbackServer.address() as { port: number };
+            const fallbackPort = fallbackAddr?.port;
+            process.env["VITE_API_BASE_URL"] =
+              `http://127.0.0.1:${fallbackPort}`;
+            console.log(
+              `[Desktop Auth Server] Relocated to dynamic port http://127.0.0.1:${fallbackPort}`,
+            );
+            resolve();
+          });
+          fallbackServer.on("error", (fallbackErr) => {
+            console.error(
+              "[Desktop Auth Server] Dynamic port allocation failed:",
+              fallbackErr,
+            );
+            resolve();
+          });
         } else {
           console.warn("[Desktop Auth Server] Start notice:", err);
+          resolve();
         }
-        resolve();
       });
     });
   } catch (err) {

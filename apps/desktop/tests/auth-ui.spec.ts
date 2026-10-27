@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { mount } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import App from "../src/workspace/App.vue";
 import { useAppStore } from "@vrm/app-core";
 
@@ -91,5 +91,94 @@ describe("Workspace Desktop Authentication UI & Navigation Flow", () => {
     expect(wrapper.find("#nav-tab-memory").exists()).toBe(true);
     expect(wrapper.find("#nav-user-pill").exists()).toBe(true);
     expect(wrapper.find("#nav-signout-btn").exists()).toBe(true);
+  });
+
+  it("submits desktop registration via window.desktopAPI and transitions to chat", async () => {
+    let registrationPayload: any = null;
+    (window as any).desktopAPI = {
+      getDiagnostics: async () => ({}) as any,
+      auth: {
+        register: async (creds: any) => {
+          registrationPayload = creds;
+          return {
+            user: {
+              id: "usr_reg_123",
+              email: creds.email,
+              displayName: creds.displayName || "New Companion User",
+              status: "active",
+              emailVerified: false,
+              emailStatusNotice:
+                "Email address is self-asserted and unverified.",
+              avatarUrl: null,
+              locale: "en-US",
+              timezone: "UTC",
+              createdAt: new Date().toISOString(),
+            },
+          };
+        },
+      },
+    };
+
+    const wrapper = mount(App);
+    const store = useAppStore();
+    store.setTab("signup");
+    await wrapper.vm.$nextTick();
+
+    const emailInput = wrapper.find("#signup-email");
+    const nameInput = wrapper.find("#signup-name");
+    const passwordInput = wrapper.find("#signup-password");
+
+    await emailInput.setValue("newuser@desktop.local");
+    await nameInput.setValue("Local Companion User");
+    await passwordInput.setValue("ValidPassword123456789!");
+
+    const form = wrapper.find(".auth-form");
+    await form.trigger("submit.prevent");
+    await flushPromises();
+    await wrapper.vm.$nextTick();
+
+    expect(registrationPayload).toEqual({
+      email: "newuser@desktop.local",
+      displayName: "Local Companion User",
+      password: "ValidPassword123456789!",
+    });
+
+    expect(store.state.isAuthenticated).toBe(true);
+    expect(store.state.user?.email).toBe("newuser@desktop.local");
+    expect(store.state.currentTab).toBe("chat");
+
+    delete (window as any).desktopAPI;
+  });
+
+  it("displays actionable server error in UI when desktop registration fails", async () => {
+    (window as any).desktopAPI = {
+      getDiagnostics: async () => ({}) as any,
+      auth: {
+        register: async () => {
+          throw new Error("An account with this email address already exists.");
+        },
+      },
+    };
+
+    const wrapper = mount(App);
+    const store = useAppStore();
+    store.setTab("signup");
+    await wrapper.vm.$nextTick();
+
+    await wrapper.find("#signup-email").setValue("duplicate@desktop.local");
+    await wrapper.find("#signup-password").setValue("ValidPassword123456789!");
+
+    const form = wrapper.find(".auth-form");
+    await form.trigger("submit.prevent");
+    await flushPromises();
+    await wrapper.vm.$nextTick();
+
+    expect(store.state.isAuthenticated).toBe(false);
+    expect(wrapper.find(".alert-error").exists()).toBe(true);
+    expect(wrapper.find(".alert-error").text()).toContain(
+      "An account with this email address already exists.",
+    );
+
+    delete (window as any).desktopAPI;
   });
 });

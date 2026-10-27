@@ -24,6 +24,8 @@ const desktopAPI: DesktopAPI = {
   auth: {
     login: (credentials) =>
       ipcRenderer.invoke(IPC_CHANNELS.AUTH_LOGIN, credentials),
+    register: (credentials) =>
+      ipcRenderer.invoke(IPC_CHANNELS.AUTH_REGISTER, credentials),
     logout: () => ipcRenderer.invoke(IPC_CHANNELS.AUTH_LOGOUT),
     getStoredSession: () =>
       ipcRenderer.invoke(IPC_CHANNELS.AUTH_GET_STORED_SESSION),

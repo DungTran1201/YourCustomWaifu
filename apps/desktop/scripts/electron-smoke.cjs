@@ -80,6 +80,14 @@ app.whenReady().then(async () => {
       }
     }
 
+    const hasAuthRegister = await win.webContents.executeJavaScript(
+      "typeof window.desktopAPI?.auth?.register === 'function'"
+    );
+    log("auth.register function exists:", hasAuthRegister);
+    if (!hasAuthRegister) {
+      error("FAILED: auth.register is not exposed on desktopAPI.auth!");
+    }
+
     const hasEnsureSampleVrm = await win.webContents.executeJavaScript(
       "typeof window.desktopAPI?.stage?.ensureSampleVrm === 'function'"
     );

@@ -43,10 +43,7 @@ export function createServer(options: ServerOptions): http.Server {
 
     // CORS Handling
     const origin = req.headers["origin"];
-    if (
-      origin &&
-      (allowedOrigins.includes(origin) || process.env.NODE_ENV === "test")
-    ) {
+    if (origin && allowedOrigins.includes(origin)) {
       res.setHeader("Access-Control-Allow-Origin", origin);
       res.setHeader("Access-Control-Allow-Credentials", "true");
       res.setHeader(
@@ -194,7 +191,10 @@ export function createServer(options: ServerOptions): http.Server {
     ) {
       limit = 10;
       windowSec = 900; // 15 mins
-    } else if (pathname === "/api/v1/auth/register") {
+    } else if (
+      pathname === "/api/v1/auth/register" ||
+      pathname === "/api/v1/auth/desktop-register"
+    ) {
       limit = 10;
       windowSec = 3600; // 1 hour
     } else if (pathname === "/api/v1/auth/forgot-password") {
@@ -245,6 +245,22 @@ export function createServer(options: ServerOptions): http.Server {
             ...rateHeaders,
           },
         );
+        return;
+      }
+
+      // 1b. Desktop Direct Registration
+      if (
+        req.method === "POST" &&
+        pathname === "/api/v1/auth/desktop-register"
+      ) {
+        const result = await authService.desktopRegister(
+          body.email,
+          body.password,
+          body.displayName,
+          body.deviceName,
+          ipSubnet,
+        );
+        sendJson(201, result, rateHeaders);
         return;
       }
 

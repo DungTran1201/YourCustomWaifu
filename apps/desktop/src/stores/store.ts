@@ -471,6 +471,19 @@ export function useAppStore() {
     state.authError = null;
     state.authNotice = null;
     try {
+      if (isElectronEnvironment() && window.desktopAPI?.auth?.register) {
+        const res = await window.desktopAPI.auth.register({
+          email: emailRaw,
+          password: passwordRaw,
+          displayName: displayNameRaw,
+        });
+        state.user = res.user;
+        state.isAuthenticated = true;
+        setTab("chat");
+        fetchCompanionData().catch(() => {});
+        return;
+      }
+
       const res = await apiRequest("/api/v1/auth/register", {
         method: "POST",
         body: JSON.stringify({
