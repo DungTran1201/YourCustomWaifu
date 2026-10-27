@@ -11,7 +11,9 @@ import {
   generateRandomToken,
   hashToken,
   encryptSecret,
+  decryptSecret,
 } from "./crypto.js";
+import { CompanionRepository } from "./companion-repository.js";
 
 export interface UserRow {
   id: string;
@@ -105,6 +107,14 @@ export class AuthService {
       throw err;
     }
 
+    // Seed initial default companion data (Aiko agent, default skills, rules, tools, conversation)
+    try {
+      const companionRepo = new CompanionRepository(this.db);
+      companionRepo.seedDefaultCompanionData(userId);
+    } catch {
+      // Ignored if domain tables are absent in an isolated test
+    }
+
     const session = this.createSession(
       userId,
       clientType,
@@ -157,6 +167,14 @@ export class AuthService {
     this.db
       .prepare("UPDATE users SET failed_login_attempts = 0 WHERE id = ?")
       .run(userRow.id);
+
+    // Ensure companion data exists for existing or legacy users
+    try {
+      const companionRepo = new CompanionRepository(this.db);
+      companionRepo.seedDefaultCompanionData(userRow.id);
+    } catch {
+      // Ignored
+    }
 
     const session = this.createSession(
       userRow.id,
@@ -607,6 +625,29 @@ export class AuthService {
         "DELETE FROM user_secrets_vault WHERE user_id = ? AND provider = ?",
       )
       .run(userId, provider);
+  }
+
+  /**
+   * Trusted service method: retrieves decrypted API key in memory for provider execution.
+   * NEVER exposed over HTTP endpoints or returned to the Vue renderer.
+   */
+  public getDecryptedSecret(
+    userId: string,
+    provider: "gemini" | "openai" | "anthropic" | string,
+  ): string | null {
+    const row = this.db
+      .prepare(
+        "SELECT ciphertext, nonce, tag FROM user_secrets_vault WHERE user_id = ? AND provider = ?",
+      )
+      .get(userId, provider) as
+      { ciphertext: string; nonce: string; tag: string } | undefined;
+
+    if (!row) return null;
+    try {
+      return decryptSecret(row.ciphertext, row.nonce, row.tag);
+    } catch {
+      return null;
+    }
   }
 
   public resolveSession(

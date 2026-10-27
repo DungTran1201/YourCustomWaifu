@@ -412,9 +412,95 @@ describe("Authentication & Account Management API Tests", () => {
       });
       expect(afterList.body.secrets).toHaveLength(0);
     });
+
+    it("allows trusted backend AuthService to retrieve decrypted secret in memory while keeping HTTP responses safe", async () => {
+      const regRes = await request("/api/v1/auth/register", {
+        method: "POST",
+        body: {
+          email: "vault_decrypt_test@example.com",
+          password: "CorrectHorseBatteryStaple123!",
+        },
+      });
+      const cookie = regRes.headers.get("set-cookie")!.split(";")[0];
+      const userId = regRes.body.user.id;
+
+      const rawApiKey = "sk-live-test-super-secret-key-12345678";
+      await request("/api/v1/users/me/secrets", {
+        method: "POST",
+        cookie,
+        body: {
+          provider: "openai",
+          apiKey: rawApiKey,
+        },
+      });
+
+      // Trusted AuthService method decrypts the key accurately
+      const { AuthService } =
+        await import("../electron/server/auth-service.js");
+      const authService = new AuthService(db);
+      const decrypted = authService.getDecryptedSecret(userId, "openai");
+      expect(decrypted).toBe(rawApiKey);
+
+      // Non-existent provider returns null
+      expect(authService.getDecryptedSecret(userId, "anthropic")).toBeNull();
+
+      // HTTP GET response exposes ONLY safe hint, never raw key
+      const getRes = await request("/api/v1/users/me/secrets", { cookie });
+      expect(getRes.body.secrets[0].keyHint).toBe("...5678");
+      expect(JSON.stringify(getRes.body)).not.toContain(
+        "sk-live-test-super-secret",
+      );
+    });
   });
 
-  describe("IDOR / BOLA Prevention on Sessions (SEC-IDOR)", () => {
+  describe("Account Deletion Cascade for Companion Domain", () => {
+    it("deleting user permanently cascades to all companion domain tables", async () => {
+      const regRes = await request("/api/v1/auth/register", {
+        method: "POST",
+        body: {
+          email: "delete_cascade_test@example.com",
+          password: "CorrectHorseBatteryStaple123!",
+        },
+      });
+      const cookie = regRes.headers.get("set-cookie")!.split(";")[0];
+      const userId = regRes.body.user.id;
+
+      // Verify default companion seeding happened
+      const agentCountBefore = db
+        .prepare("SELECT COUNT(*) as c FROM agents WHERE user_id = ?")
+        .get(userId) as { c: number };
+      expect(agentCountBefore.c).toBeGreaterThan(0);
+
+      // Perform account deletion
+      const delRes = await request("/api/v1/users/me/delete", {
+        method: "POST",
+        cookie,
+        body: {
+          currentPassword: "CorrectHorseBatteryStaple123!",
+          confirmationPhrase: "DELETE MY ACCOUNT",
+        },
+      });
+      expect(delRes.status).toBe(200);
+
+      // Verify all companion domain rows were removed
+      const agentCountAfter = db
+        .prepare("SELECT COUNT(*) as c FROM agents WHERE user_id = ?")
+        .get(userId) as { c: number };
+      expect(agentCountAfter.c).toBe(0);
+
+      const skillCountAfter = db
+        .prepare("SELECT COUNT(*) as c FROM skills WHERE user_id = ?")
+        .get(userId) as { c: number };
+      expect(skillCountAfter.c).toBe(0);
+
+      const memoryCountAfter = db
+        .prepare("SELECT COUNT(*) as c FROM memories WHERE user_id = ?")
+        .get(userId) as { c: number };
+      expect(memoryCountAfter.c).toBe(0);
+    });
+  });
+
+  describe("IDOR / BOLA Prevention on Sessions & Secrets (SEC-IDOR)", () => {
     it("prevents user A from revoking user B session", async () => {
       // User A
       const resA = await request("/api/v1/auth/register", {
@@ -455,6 +541,52 @@ describe("Authentication & Account Management API Tests", () => {
       // Verify User B session is still active
       const checkB = await request("/api/v1/users/me", { cookie: cookieB });
       expect(checkB.status).toBe(200);
+    });
+
+    it("prevents user A from accessing or deleting user B secrets", async () => {
+      // User A
+      const resA = await request("/api/v1/auth/register", {
+        method: "POST",
+        body: {
+          email: "secret_usera@example.com",
+          password: "CorrectHorseBatteryStaple123!",
+        },
+      });
+      const cookieA = resA.headers.get("set-cookie")!.split(";")[0];
+
+      // User B saves a secret
+      const resB = await request("/api/v1/auth/register", {
+        method: "POST",
+        body: {
+          email: "secret_userb@example.com",
+          password: "CorrectHorseBatteryStaple123!",
+        },
+      });
+      const cookieB = resB.headers.get("set-cookie")!.split(";")[0];
+
+      await request("/api/v1/users/me/secrets", {
+        method: "POST",
+        cookie: cookieB,
+        body: { provider: "gemini", apiKey: "UserBSecretKey12345" },
+      });
+
+      // User A lists secrets -> should be empty
+      const listA = await request("/api/v1/users/me/secrets", {
+        cookie: cookieA,
+      });
+      expect(listA.body.secrets).toHaveLength(0);
+
+      // User A deletes gemini secret -> should only affect User A (no-op)
+      await request("/api/v1/users/me/secrets/gemini", {
+        method: "DELETE",
+        cookie: cookieA,
+      });
+
+      // User B's secret is still intact
+      const listB = await request("/api/v1/users/me/secrets", {
+        cookie: cookieB,
+      });
+      expect(listB.body.secrets).toHaveLength(1);
     });
   });
 });
