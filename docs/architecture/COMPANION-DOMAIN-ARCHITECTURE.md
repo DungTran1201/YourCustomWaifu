@@ -1,7 +1,7 @@
 # YourCustomWaifu — Companion Domain Architecture & System Flows
 
 **Document Status:** Canonical Architecture Document  
-**Version:** 1.0.0 (Phase 0 Baseline & Target Blueprint)  
+**Version:** 1.1.0 (As-Built End-to-End Implementation)  
 **Author:** Operation Dev (Engineering Lead & Delivery Owner)  
 **Last Updated:** October 2026
 
@@ -10,25 +10,26 @@
 ## 1. Executive Summary & Audit Baseline
 
 YourCustomWaifu is a desktop-first personal AI companion built with Electron, Vue 3, TypeScript, and Three.js/VRM. The application operates with two independent windows:
+
 1. **Workspace Window:** Multi-tab companion management (Chat, Agents, Skills, Rules, Tools, Model Connections, Memory, Avatar Settings, Account, Security, Secrets, Diagnostics).
 2. **Avatar Stage Window:** Transparent, frameless window rendering an interactive 3D VRM avatar with real-time gaze tracking and facial expressions.
 
-### 1.1 As-Is Feature Classification & Audit Evidence
+### 1.1 As-Built Feature Classification & Implementation Evidence
 
 An evidence-based audit of the local repository checkout confirms the following status across all requested domains:
 
-| Domain / Feature | Status | Implementation Evidence | Key Gaps & Observations |
-| :--- | :--- | :--- | :--- |
-| **Account & Authentication** | `PERSISTED & WORKING` | `apps/desktop/electron/server/auth-service.ts`, `database.ts`, `server.ts` | Complete scrypt hashing, sessions, password reset, account deletion, and profile management. No email verification gate by design. |
-| **Hardware / Secret Vault** | `PERSISTED & WORKING` | `auth-service.ts` (`saveSecret`, `getSecrets`), `crypto.ts` (`encryptSecret`, `decryptSecret`) | AES-256-GCM envelope encryption storing ciphertext, nonce, tag, and safe key hint in `user_secrets_vault`. Only safe hints exposed to renderer. |
-| **AI Model & Provider Config** | `PARTIAL / MOCK` | `store.ts` (`modelConnections`, `testConnection`) | `testConnection` simulates readiness using `setTimeout(r, 400)` without network or adapter calls. Provider selection is in-memory only. |
-| **Agent & System Prompts** | `IN-MEMORY / MOCK` | `store.ts` (`state.agents`, `updateAgent`), `AgentsView.vue` | In-memory reactive array initialized with sample agent "Aiko". Changes do not persist to database; no DB tables exist. |
-| **Skills Management** | `IN-MEMORY / MOCK` | `store.ts` (`state.skills`, `addSkill`, `updateSkill`, `deleteSkill`), `SkillsView.vue` | Reactive array with 3 sample items. Operations update memory only; no backend persistence or runtime consumption. |
-| **Rules Management** | `IN-MEMORY / MOCK` | `store.ts` (`state.rules`, `addRule`, `updateRule`, `deleteRule`), `RulesView.vue` | Reactive array with 3 sample rules. Priority/scope not enforced by any runtime; no backend persistence. |
-| **Tools & Permissions** | `IN-MEMORY / MOCK` | `store.ts` (`state.tools`, `toggleTool`, `updateTool`), `ToolsView.vue` | Mock catalog of 3 tools. No handler registry, argument schema validation, or execution permissions in trusted runtime. |
-| **Memory & Privacy Vault** | `IN-MEMORY / MOCK` | `store.ts` (`state.memories`, `addMemory`, `deleteMemory`, `clearAllMemories`), `MemoryView.vue` | Mock array with 2 sample records. No search scoring, retention toggle enforcement, agent scoping, or DB storage. |
-| **Chat & Agent Runtime** | `IN-MEMORY / MOCK` | `store.ts` (`sendChatMessage`, `clearChatMessages`), `ChatView.vue` | Canned response path using `setTimeout(r, 600)` and substring matching (`stage`, `who are you`, `memory`). No real model calls. |
-| **Avatar Stage Coordination** | `PERSISTED & WORKING` | `apps/desktop/electron/main/index.ts`, `stage-main.ts`, `stage.html` | Independent transparent window, native IPC, cursor tracking, VRM loading, side-mounted kebab menu, and window presets. |
+| Domain / Feature               | Status                | Implementation Evidence                                                                        | Key Guarantees & Verified Behaviors                                                                                                                                                                            |
+| :----------------------------- | :-------------------- | :--------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Account & Authentication**   | `PERSISTED & WORKING` | `apps/desktop/electron/server/auth-service.ts`, `database.ts`, `server.ts`                     | Complete scrypt hashing, sessions, password reset, account deletion, profile management. No email verification gate by design.                                                                                 |
+| **Hardware / Secret Vault**    | `PERSISTED & WORKING` | `auth-service.ts` (`saveSecret`, `getSecrets`), `crypto.ts` (`encryptSecret`, `decryptSecret`) | AES-256-GCM envelope encryption storing ciphertext, nonce, tag, and safe key hint in `user_secrets_vault`. Only safe hints exposed to renderer; full keys never leave trusted memory.                          |
+| **AI Model & Provider Config** | `PERSISTED & WORKING` | `provider-adapters.ts`, `companion-repository.ts`, `server.ts`                                 | Real connectivity checks for Gemini, OpenAI, and Anthropic. `ready` state results strictly from adapter verification. Zero fake timers.                                                                        |
+| **Agent & System Prompts**     | `PERSISTED & WORKING` | `companion-repository.ts`, `AgentsView.vue`, `server.ts`                                       | Full SQLite persistence in `agents` table. Personality, style, system instructions, token calculation, and live effective-prompt preview.                                                                      |
+| **Skills Management**          | `PERSISTED & WORKING` | `companion-repository.ts`, `SkillsView.vue`, `server.ts`                                       | Full SQLite persistence in `skills` and `agent_skills`. Category, content, and agent associations compiled deterministically into chat runtime.                                                                |
+| **Rules Management**           | `PERSISTED & WORKING` | `companion-repository.ts`, `RulesView.vue`, `server.ts`                                        | Full SQLite persistence in `rules`. Scope (`global` vs `agent`), priority ordering, and enabled toggle enforced by prompt composer.                                                                            |
+| **Tools & Permissions**        | `PERSISTED & WORKING` | `companion-repository.ts`, `ToolsView.vue`, `server.ts`                                        | Full SQLite persistence in `tools` and `agent_tools`. Categories, permission levels (`read-only`, `user-action`, `system`), and confirmation requirements.                                                     |
+| **Memory & Privacy Vault**     | `PERSISTED & WORKING` | `companion-repository.ts`, `MemoryView.vue`, `server.ts`                                       | User-scoped SQLite persistence in `memories`. Transparent privacy disclosures, agent scoping, retention pause toggle, lexical relevance search, and explicit clear-all confirmation.                           |
+| **Chat & Agent Runtime**       | `PERSISTED & WORKING` | `provider-adapters.ts`, `companion-repository.ts`, `server.ts`, `ChatView.vue`                 | Genuine provider execution (Gemini, OpenAI, Claude). Deterministic prompt composition (Base Policy + Agent + Rules + Skills + Memory). Persistent conversation history in `conversations` and `chat_messages`. |
+| **Avatar Stage Coordination**  | `PERSISTED & WORKING` | `apps/desktop/electron/main/index.ts`, `stage-main.ts`, `stage.html`                           | Independent transparent window, native IPC, cursor tracking, VRM loading, side-mounted kebab menu, and window presets.                                                                                         |
 
 ---
 
@@ -44,7 +45,7 @@ flowchart TB
         SampleData["Hardcoded Sample Arrays\n(agents, skills, rules, tools, memories)"]
         MockChat["Canned Chat Path\n(setTimeout + keyword matching)"]
         MockTest["Simulated testConnection()\n(setTimeout 400ms -> ready)"]
-        
+
         UI_Views --> AppStore
         AppStore --> SampleData
         AppStore --> MockChat
@@ -79,7 +80,7 @@ flowchart TB
         UI_Components["Workspace Views (Chat, Agents, Skills, Rules, Tools, Memory)"]
         AppStoreCore["useAppStore() (Connected to Real Domain Services)"]
         ApiTransport["API & IPC Transport Client"]
-        
+
         UI_Components --> AppStoreCore
         AppStoreCore --> ApiTransport
     end
@@ -380,7 +381,7 @@ sequenceDiagram
     Vue->>Main: invoke("chat:send-message", { messageId, agentId, conversationId })
     Main->>DB: Query active Agent configuration & preferences
     DB-->>Main: AgentProfile (systemInstructions, preferredModel, provider)
-    
+
     alt Memory Retention Enabled
         Main->>MemorySvc: Retrieve relevant memories (query, userId, agentId)
         MemorySvc->>DB: Lexical / keyword search query on memories
@@ -442,12 +443,12 @@ flowchart TD
     CheckEnabled -->|Yes| ValidateSchema{Validate Arguments\nAgainst JSON Schema}
     ValidateSchema -->|Invalid| RejectSchema[Reject: Invalid Arguments\nReturn validation error]
     ValidateSchema -->|Valid| CheckPermission{Requires User\nConfirmation?}
-    
+
     CheckPermission -->|Yes| ShowPrompt[Display Confirmation Modal in Workspace\nDetails: Action, Params, Risk]
     ShowPrompt --> UserDecision{User Approves?}
     UserDecision -->|Rejected| CancelAction[Abort Action\nReturn 'User Declined' to model]
     UserDecision -->|Approved| ExecuteHandler[Execute Registered Native Handler\nin Trusted Main Process]
-    
+
     CheckPermission -->|No| ExecuteHandler
     ExecuteHandler --> ReturnResult[Format Clean JSON Result\nInject into Conversation as Tool Output]
 ```
@@ -457,6 +458,7 @@ flowchart TD
 ## 6. Security Architecture & Data Ownership
 
 ### 6.1 Trust Boundaries & Process Isolation
+
 1. **Renderer Process (Workspace & Stage):**
    - Strictly isolated with `contextIsolation: true` and `nodeIntegration: false`.
    - Accesses backend capabilities exclusively via narrow, typed IPC bridges or loopback HTTP.
@@ -468,6 +470,7 @@ flowchart TD
    - Resolves authenticated identity from verified session tokens; never accepts client-provided `userId` parameters as proof of identity.
 
 ### 6.2 Data Isolation & Cascade Policy
+
 - Every domain record (`agents`, `skills`, `rules`, `tools`, `memories`, `conversations`, `chat_messages`, `user_provider_settings`) has a foreign key to `users(id)` with `ON DELETE CASCADE`.
 - Account deletion requires verifying the current password and typing the explicit confirmation phrase (`DELETE MY ACCOUNT`).
 - All queries in the domain repositories must include `WHERE user_id = ?` to enforce complete multi-tenant tenant isolation.
