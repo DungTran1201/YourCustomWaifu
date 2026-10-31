@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.0] - 2026-10-27
+
+### Added — Operation Dev Feature Completion & Evidence-Based Remediation
+- **P0 Master Key Lifecycle & OS Secure Storage**:
+  - Eliminated static dev fallback key in `apps/desktop/electron/server/crypto.ts`.
+  - Implemented dynamic 256-bit AES master key protected via Electron `safeStorage` (Windows DPAPI / macOS Keychain / Linux Secret Service).
+  - Added fail-safe error handling (`SecureStorageUnavailableError`) when secure storage is unavailable without an explicit `KMS_MASTER_KEY` environment variable.
+  - Implemented transparent legacy migration for secrets previously encrypted under the development seed.
+- **P1 Provider Security & Zero URL Secret Leakage**:
+  - Re-architected `GeminiAdapter` to transmit API credentials strictly via standard `x-goog-api-key` HTTP header.
+  - Completely stripped `?key=` query parameters from all model discovery and chat generation URLs.
+- **P1 Shared Contract & IPC Invariant Wiring**:
+  - Wired `STAGE_GET_BLINK_DIAGNOSTIC` across platform contracts, preload contextBridge, Electron main IPC handlers, and web fallbacks.
+- **P1 Store Consistency & Optimistic Rollback**:
+  - Replaced error-suppressing catch blocks with snapshot-based rollbacks across all Agent, Skill, Rule, Tool, and Memory mutations in `store.ts`.
+  - Added actionable error notifications and state restoration upon network or backend failure.
+- **P1 Provider Timeout, Cancellation & Error Normalization**:
+  - Implemented 30-second default request deadlines via `AbortController` and client disconnect cancellation (`req.on("close")`).
+  - Normalized provider errors into structured HTTP status codes (504 timeout, 429 rate limit, 401 provider auth error).
+- **P1 Closed-Loop Model Tool Execution Loop**:
+  - Implemented structured tool-call detection, argument validation via `ToolExecutor`, permission/confirmation enforcement, and bounded conversational synthesis follow-up.
+- **Auditing, Architecture Diagrams & Test Suites**:
+  - Authored comprehensive audit artifacts in `docs/audit/` and modular functional specifications in `docs/modules/` (F01–F12).
+  - Authored Mermaid sequence and architecture diagrams in `diagrams/`.
+  - Added automated regression test suites (`crypto-security.spec.ts`, `store-rollback.spec.ts`, `provider-security-tool-loop.spec.ts`), expanding test coverage to 26 test suites and 218 passing tests.
+
 ## [0.2.0] - 2026-10-25
 
 ### Changed — Operation Dev Desktop-Only Hard Reset

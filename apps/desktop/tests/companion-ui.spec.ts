@@ -87,4 +87,47 @@ describe("Desktop Companion Workspace UI Navigation & Interaction", () => {
     expect(store.state.currentTab).toBe("memory");
     expect(wrapper.text()).toContain("Memory & Privacy Vault");
   });
+
+  it("allows selecting and switching AI models directly from the Chat view", async () => {
+    const store = useAppStore();
+    store.setTab("chat");
+    const wrapper = mount(App);
+    await wrapper.vm.$nextTick();
+
+    // 1. Initial state check
+    const selectorBtn = wrapper.find("#chat-model-selector-btn");
+    expect(selectorBtn.exists()).toBe(true);
+    expect(selectorBtn.text()).toContain("gemini-2.5-flash");
+
+    // 2. Open dropdown menu
+    expect(wrapper.find("#chat-model-dropdown-menu").exists()).toBe(false);
+    await selectorBtn.trigger("click");
+    expect(wrapper.find("#chat-model-dropdown-menu").exists()).toBe(true);
+    expect(wrapper.text()).toContain("Active AI Model");
+
+    // 3. Select another model (e.g. gemini-2.5-pro)
+    const proOption = wrapper.find("#model-option-gemini-2-5-pro");
+    expect(proOption.exists()).toBe(true);
+    await proOption.trigger("click");
+    await wrapper.vm.$nextTick();
+
+    // 4. Verify model updated in store and UI
+    const activeAgent = store.state.agents[0];
+    expect(activeAgent).toBeDefined();
+    expect(activeAgent!.preferredModel).toBe("gemini-2.5-pro");
+    expect(wrapper.find("#chat-model-selector-btn").text()).toContain(
+      "gemini-2.5-pro",
+    );
+    expect(wrapper.find("#chat-model-dropdown-menu").exists()).toBe(false);
+
+    // 5. Native select fallback is also reactive
+    const nativeSelect = wrapper.find("#chat-model-select");
+    expect(nativeSelect.exists()).toBe(true);
+    await nativeSelect.setValue("gpt-4o");
+    await nativeSelect.trigger("change");
+    await wrapper.vm.$nextTick();
+
+    expect(store.state.agents[0]!.preferredModel).toBe("gpt-4o");
+    expect(store.state.agents[0]!.preferredProvider).toBe("openai");
+  });
 });

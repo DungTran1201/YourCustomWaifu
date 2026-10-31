@@ -1,0 +1,27 @@
+sequenceDiagram
+  autonumber
+  actor User as User
+  participant View as Vue Component
+  participant Store as Pinia/Reactive Store (store.ts)
+  participant Server as Backend API (/api/v1/...)
+  participant DB as SQLite Database
+
+  User->>View: Click "Delete Skill" or "Update Agent"
+  View->>Store: deleteSkill(skillId) / updateAgent(agentId, data)
+  Store->>Store: Capture local state snapshot (clone array / object)
+  Store->>Store: Optimistic UI mutation (e.g. filter array or update fields)
+  
+  Store->>Server: HTTP PATCH / DELETE / POST
+  
+  alt Authoritative Server Success (200 / 201)
+    Server->>DB: Commit changes to SQLite
+    DB-->>Server: OK
+    Server-->>Store: 200 OK (Authoritative state / ID confirmation)
+    Store->>View: Mutation confirmed, UI remains updated
+  else Server / Network Failure (4xx, 5xx, or Network Error)
+    Server-->>Store: 400 / 500 Error { message: "Validation or constraint failed" }
+    Store->>Store: ROLLBACK: Restore previous snapshot into reactive state
+    Store->>Store: Set state.errorMessage = "Failed to update: ..."
+    Store-->>View: Throw or surface actionable error notification
+    View-->>User: Display Toast / Banner: "Failed to persist changes. Restored previous state."
+  end

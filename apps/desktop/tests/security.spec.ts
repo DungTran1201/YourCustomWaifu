@@ -2,10 +2,23 @@ import { describe, it, expect } from "vitest";
 import { CSP_HEADER, validateIpcSender } from "../electron/main/security.js";
 
 describe("Desktop Security Invariants", () => {
-  it("enforces a strict Content Security Policy restricting script execution", () => {
+  it("enforces a strict Content Security Policy restricting script execution and allowing loopback API calls", async () => {
     expect(CSP_HEADER).toContain("default-src 'self'");
     expect(CSP_HEADER).toContain("script-src 'self'");
     expect(CSP_HEADER).not.toContain("'unsafe-eval'");
+    expect(CSP_HEADER).toContain("http://localhost:*");
+    expect(CSP_HEADER).toContain("http://127.0.0.1:*");
+
+    // Ensure src/index.html has matching connect-src for packaged/local file:// execution
+    const fs = await import("node:fs/promises");
+    const path = await import("node:path");
+    const indexHtml = await fs.readFile(
+      path.resolve(__dirname, "../src/index.html"),
+      "utf-8",
+    );
+    expect(indexHtml).toContain(
+      "connect-src 'self' http://localhost:* http://127.0.0.1:*",
+    );
   });
 
   it("rejects IPC events from null or destroyed browser windows", () => {

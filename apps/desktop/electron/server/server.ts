@@ -667,16 +667,36 @@ export function createServer(options: ServerOptions): http.Server {
           },
         );
 
+        // Model and Provider resolution (support request overrides & agent preference)
+        const requestedModel =
+          (typeof body.model === "string" && body.model.trim()) ||
+          agent.preferredModel;
+        let requestedProvider: "gemini" | "openai" | "anthropic" =
+          body.provider || agent.preferredProvider;
+        if (!body.provider && body.model) {
+          if (requestedModel.startsWith("gemini")) {
+            requestedProvider = "gemini";
+          } else if (
+            requestedModel.startsWith("gpt") ||
+            requestedModel.startsWith("o1") ||
+            requestedModel.startsWith("o3")
+          ) {
+            requestedProvider = "openai";
+          } else if (requestedModel.startsWith("claude")) {
+            requestedProvider = "anthropic";
+          }
+        }
+
         // Retrieve decrypted provider key from Hardware Vault
         const decryptedKey = authService.getDecryptedSecret(
           sessionUser.user.id,
-          agent.preferredProvider,
+          requestedProvider,
         );
         if (!decryptedKey) {
           sendError(
             400,
             "missing_provider_key",
-            `No API key configured for ${agent.preferredProvider}. Please add your key in AI Keys.`,
+            `No API key configured for ${requestedProvider}. Please add your key in AI Keys.`,
           );
           return;
         }
@@ -758,7 +778,7 @@ export function createServer(options: ServerOptions): http.Server {
 
         if (toolsText) {
           promptSections.push(
-            `Available Tools and Capabilities:\n${toolsText}`,
+            `Available Tools and Capabilities:\n${toolsText}\n\nTo execute a tool call, output a block in the following format:\n\`\`\`tool_call\n{"tool": "<tool_name_or_id>", "args": { ... }}\n\`\`\`\nYou will receive the execution result and can then provide your conversational response.`,
           );
         }
 
@@ -775,13 +795,113 @@ export function createServer(options: ServerOptions): http.Server {
           content: m.content,
         }));
 
+        // Request timeout & client cancellation orchestration
+        const abortController = new AbortController();
+        const timeoutMs = 30000;
+        let timedOut = false;
+        const timeoutHandle = setTimeout(() => {
+          timedOut = true;
+          abortController.abort(new Error("PROVIDER_REQUEST_TIMEOUT"));
+        }, timeoutMs);
+
+        const onClose = () => {
+          if (!res.writableEnded) {
+            abortController.abort(new Error("CLIENT_DISCONNECTED"));
+          }
+        };
+        req.on("close", onClose);
+
         try {
-          const adapter = providerRouter.getAdapter(agent.preferredProvider);
+          const adapter = providerRouter.getAdapter(requestedProvider);
           const completion = await adapter.generateChatResponse(decryptedKey, {
-            model: agent.preferredModel,
+            model: requestedModel,
             messages: chatHistory,
             systemPrompt,
+            signal: abortController.signal,
           });
+
+          let finalContent = completion.content;
+          let finalUsage = completion.usage;
+          const executedTools: Array<{
+            toolId: string;
+            result?: unknown;
+            error?: unknown;
+          }> = [];
+
+          // Bounded Model Tool-Calling Loop (max 2 tool turns)
+          const toolCallMatch = completion.content.match(
+            /```tool_call\s*(\{[\s\S]*?\})\s*```/,
+          );
+          if (toolCallMatch && toolCallMatch[1]) {
+            try {
+              const parsedCall = JSON.parse(toolCallMatch[1]);
+              const toolNameOrId = String(parsedCall.tool || "");
+              const toolArgs =
+                parsedCall.args && typeof parsedCall.args === "object"
+                  ? parsedCall.args
+                  : {};
+
+              const execResult = await toolExecutor.execute(
+                sessionUser.user.id,
+                toolNameOrId,
+                { toolId: toolNameOrId, args: toolArgs, confirmed: false },
+                { timeoutMs: 5000 },
+              );
+
+              executedTools.push({
+                toolId: toolNameOrId,
+                result: execResult.result,
+                error: execResult.error,
+              });
+
+              if (execResult.success) {
+                // Synthesize final follow-up response with tool output
+                const followUpHistory: Array<{
+                  role: "user" | "assistant" | "system";
+                  content: string;
+                }> = [
+                  ...chatHistory,
+                  { role: "assistant", content: completion.content },
+                  {
+                    role: "user",
+                    content: `[Tool Execution Result for ${toolNameOrId}]:\n${JSON.stringify(execResult.result)}`,
+                  },
+                ];
+
+                const followUp = await adapter.generateChatResponse(
+                  decryptedKey,
+                  {
+                    model: agent.preferredModel,
+                    messages: followUpHistory,
+                    systemPrompt,
+                    signal: abortController.signal,
+                  },
+                );
+
+                finalContent = followUp.content;
+                if (followUp.usage) {
+                  finalUsage = {
+                    promptTokens:
+                      (finalUsage?.promptTokens || 0) +
+                      (followUp.usage.promptTokens || 0),
+                    completionTokens:
+                      (finalUsage?.completionTokens || 0) +
+                      (followUp.usage.completionTokens || 0),
+                    totalTokens:
+                      (finalUsage?.totalTokens || 0) +
+                      (followUp.usage.totalTokens || 0),
+                  };
+                }
+              } else {
+                finalContent = `${completion.content}\n\n[Tool Notice: ${execResult.error?.message || "Tool execution halted"}]`;
+              }
+            } catch {
+              finalContent = completion.content;
+            }
+          }
+
+          clearTimeout(timeoutHandle);
+          req.off("close", onClose);
 
           // Persist Assistant Message
           const assistantMsg = companionRepo.addMessage(
@@ -789,26 +909,82 @@ export function createServer(options: ServerOptions): http.Server {
             conversationId,
             {
               role: "assistant",
-              content: completion.content,
+              content: finalContent,
               agentId: agent.id,
               status: "complete",
             },
           );
+
+          if (
+            requestedModel !== agent.preferredModel ||
+            requestedProvider !== agent.preferredProvider
+          ) {
+            try {
+              companionRepo.updateAgent(sessionUser.user.id, agent.id, {
+                preferredModel: requestedModel,
+                preferredProvider: requestedProvider,
+              });
+            } catch {
+              // Non-critical persistence fallback
+            }
+          }
 
           sendJson(
             200,
             {
               message: assistantMsg,
               userMessage: userMsg,
-              usage: completion.usage,
+              usage: finalUsage,
+              toolExecutions:
+                executedTools.length > 0 ? executedTools : undefined,
             },
             rateHeaders,
           );
         } catch (err: any) {
+          clearTimeout(timeoutHandle);
+          req.off("close", onClose);
+
+          if (
+            timedOut ||
+            err.message === "PROVIDER_REQUEST_TIMEOUT" ||
+            (err.name === "AbortError" && timedOut)
+          ) {
+            sendError(
+              504,
+              "provider_timeout",
+              "The AI model provider request timed out after 30 seconds",
+            );
+            return;
+          }
+
+          if (res.writableEnded) {
+            return;
+          }
+
+          const errMsg = err?.message || "";
+          if (
+            errMsg.includes("429") ||
+            errMsg.toLowerCase().includes("quota") ||
+            errMsg.toLowerCase().includes("rate limit")
+          ) {
+            sendError(429, "rate_limit_exceeded", errMsg);
+            return;
+          }
+
+          if (
+            errMsg.includes("401") ||
+            errMsg.includes("403") ||
+            errMsg.toLowerCase().includes("authentication") ||
+            errMsg.toLowerCase().includes("invalid api key")
+          ) {
+            sendError(401, "provider_auth_error", errMsg);
+            return;
+          }
+
           sendError(
             502,
             "model_generation_failed",
-            err.message || "Failed to generate completion from provider",
+            errMsg || "Failed to generate completion from provider",
           );
         }
         return;

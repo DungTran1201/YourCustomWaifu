@@ -22,6 +22,7 @@ import {
   type WorkspaceBounds,
   type WindowBounds,
   type GazeData,
+  type BlinkDiagnostic,
 } from "@vrm/platform-contracts";
 import {
   APP_METADATA,
@@ -1210,6 +1211,16 @@ function registerIpcHandlers(): void {
     return { success: false, error: "Avatar Stage window is not active" };
   });
 
+  ipcMain.handle(
+    IPC_CHANNELS.STAGE_GET_BLINK_DIAGNOSTIC,
+    (event): BlinkDiagnostic | null => {
+      if (!validateIpcSender(event.sender, allowedWindows())) {
+        throw new Error("Unauthorized IPC sender");
+      }
+      return stageStatus.blinkDiagnostic || null;
+    },
+  );
+
   // 4. Workspace Window Control Handlers
   ipcMain.handle(IPC_CHANNELS.WORKSPACE_SHOW, (event, tab?: string) => {
     if (!validateIpcSender(event.sender, allowedWindows())) {
@@ -1263,6 +1274,10 @@ async function startEmbeddedAuthServer(): Promise<void> {
   try {
     const { getDatabase } = await import("../server/database.js");
     const { createServer } = await import("../server/server.js");
+    const { initMasterKey } = await import("../server/crypto.js");
+    await initMasterKey(app.getPath("userData")).catch((err) => {
+      console.warn("[Crypto] Master key init:", err.message);
+    });
     const db = getDatabase();
     const desktopCorsOrigins = [
       "http://localhost:5173",

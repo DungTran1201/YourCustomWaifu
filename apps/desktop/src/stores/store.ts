@@ -1071,11 +1071,16 @@ export function useAppStore() {
     state.messages.push(userMsg);
 
     try {
+      const activeAgent =
+        state.agents.find((a) => a.id === state.activeAgentId) ||
+        state.agents[0];
       const res = await apiRequest("/api/v1/chat/completions", {
         method: "POST",
         body: JSON.stringify({
           message: content,
           agentId: state.activeAgentId,
+          model: activeAgent?.preferredModel,
+          provider: activeAgent?.preferredProvider,
         }),
       });
 
@@ -1094,6 +1099,52 @@ export function useAppStore() {
       state.messages.push(errorMsg);
     } finally {
       state.chatSending = false;
+    }
+  }
+
+  async function setChatModel(
+    model: string,
+    provider?: "gemini" | "openai" | "anthropic",
+  ) {
+    const resolvedProvider: "gemini" | "openai" | "anthropic" =
+      provider ||
+      (model.startsWith("gemini")
+        ? "gemini"
+        : model.startsWith("gpt") ||
+            model.startsWith("o1") ||
+            model.startsWith("o3")
+          ? "openai"
+          : model.startsWith("claude")
+            ? "anthropic"
+            : "gemini");
+
+    const targetAgent =
+      state.agents.find((a) => a.id === state.activeAgentId) || state.agents[0];
+
+    if (targetAgent) {
+      targetAgent.preferredModel = model;
+      targetAgent.preferredProvider = resolvedProvider;
+
+      if (state.isAuthenticated && !state.isGuest) {
+        await updateAgent(targetAgent.id, {
+          preferredModel: model,
+          preferredProvider: resolvedProvider,
+        }).catch(() => {});
+        await apiRequest("/api/v1/providers/settings", {
+          method: "POST",
+          body: JSON.stringify({
+            provider: resolvedProvider,
+            selectedModel: model,
+          }),
+        }).catch(() => {});
+      }
+    }
+
+    const conn = state.modelConnections.find(
+      (c) => c.provider === resolvedProvider,
+    );
+    if (conn) {
+      conn.selectedModel = model;
     }
   }
 
@@ -1117,6 +1168,7 @@ export function useAppStore() {
 
   // --- Agent & Personalization Actions ---
   async function updateAgent(agentId: string, partial: Partial<AgentProfile>) {
+    const prevAgents = JSON.parse(JSON.stringify(state.agents));
     const target = state.agents.find((a) => a.id === agentId);
     if (target) {
       Object.assign(target, partial);
@@ -1126,25 +1178,32 @@ export function useAppStore() {
         method: "PATCH",
         body: JSON.stringify(partial),
       });
-    } catch {
-      // offline or mock fallback
+    } catch (err: any) {
+      state.agents = prevAgents;
+      state.errorMessage =
+        err?.message || "Failed to update agent configuration";
+      throw err;
     }
   }
 
   async function setActiveAgent(agentId: string) {
+    const prevActive = state.activeAgentId;
     state.activeAgentId = agentId;
     try {
       await apiRequest(`/api/v1/agents/${agentId}/active`, {
         method: "POST",
         body: "{}",
       });
-    } catch {
-      // fallback
+    } catch (err: any) {
+      state.activeAgentId = prevActive;
+      state.errorMessage = err?.message || "Failed to set active agent";
+      throw err;
     }
   }
 
   // --- Skills Actions ---
   async function addSkill(skill: Omit<SkillItem, "id">) {
+    const prevSkills = [...state.skills];
     const newSkill: SkillItem = {
       ...skill,
       id: `skill_${Date.now()}`,
@@ -1156,12 +1215,15 @@ export function useAppStore() {
         body: JSON.stringify(skill),
       });
       if (res?.id) newSkill.id = res.id;
-    } catch {
-      // fallback
+    } catch (err: any) {
+      state.skills = prevSkills;
+      state.errorMessage = err?.message || "Failed to add skill";
+      throw err;
     }
   }
 
   async function updateSkill(id: string, partial: Partial<SkillItem>) {
+    const prevSkills = JSON.parse(JSON.stringify(state.skills));
     const item = state.skills.find((s) => s.id === id);
     if (item) Object.assign(item, partial);
     try {
@@ -1169,22 +1231,28 @@ export function useAppStore() {
         method: "PATCH",
         body: JSON.stringify(partial),
       });
-    } catch {
-      // fallback
+    } catch (err: any) {
+      state.skills = prevSkills;
+      state.errorMessage = err?.message || "Failed to update skill";
+      throw err;
     }
   }
 
   async function deleteSkill(id: string) {
+    const prevSkills = [...state.skills];
     state.skills = state.skills.filter((s) => s.id !== id);
     try {
       await apiRequest(`/api/v1/skills/${id}`, { method: "DELETE" });
-    } catch {
-      // fallback
+    } catch (err: any) {
+      state.skills = prevSkills;
+      state.errorMessage = err?.message || "Failed to delete skill";
+      throw err;
     }
   }
 
   // --- Rules Actions ---
   async function addRule(rule: Omit<RuleItem, "id">) {
+    const prevRules = [...state.rules];
     const newRule: RuleItem = {
       ...rule,
       id: `rule_${Date.now()}`,
@@ -1196,12 +1264,15 @@ export function useAppStore() {
         body: JSON.stringify(rule),
       });
       if (res?.id) newRule.id = res.id;
-    } catch {
-      // fallback
+    } catch (err: any) {
+      state.rules = prevRules;
+      state.errorMessage = err?.message || "Failed to add rule";
+      throw err;
     }
   }
 
   async function updateRule(id: string, partial: Partial<RuleItem>) {
+    const prevRules = JSON.parse(JSON.stringify(state.rules));
     const item = state.rules.find((r) => r.id === id);
     if (item) Object.assign(item, partial);
     try {
@@ -1209,22 +1280,28 @@ export function useAppStore() {
         method: "PATCH",
         body: JSON.stringify(partial),
       });
-    } catch {
-      // fallback
+    } catch (err: any) {
+      state.rules = prevRules;
+      state.errorMessage = err?.message || "Failed to update rule";
+      throw err;
     }
   }
 
   async function deleteRule(id: string) {
+    const prevRules = [...state.rules];
     state.rules = state.rules.filter((r) => r.id !== id);
     try {
       await apiRequest(`/api/v1/rules/${id}`, { method: "DELETE" });
-    } catch {
-      // fallback
+    } catch (err: any) {
+      state.rules = prevRules;
+      state.errorMessage = err?.message || "Failed to delete rule";
+      throw err;
     }
   }
 
   // --- Tools Actions ---
   async function toggleTool(id: string) {
+    const prevTools = JSON.parse(JSON.stringify(state.tools));
     const tool = state.tools.find((t) => t.id === id);
     if (tool) {
       tool.enabled = !tool.enabled;
@@ -1233,22 +1310,29 @@ export function useAppStore() {
           method: "PATCH",
           body: JSON.stringify({ enabled: tool.enabled }),
         });
-      } catch {
-        // fallback
+      } catch (err: any) {
+        state.tools = prevTools;
+        state.errorMessage = err?.message || "Failed to toggle tool";
+        throw err;
       }
     }
   }
 
   async function updateTool(id: string, partial: Partial<ToolItem>) {
+    const prevTools = JSON.parse(JSON.stringify(state.tools));
     const tool = state.tools.find((t) => t.id === id);
-    if (tool) Object.assign(tool, partial);
-    try {
-      await apiRequest(`/api/v1/tools/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(partial),
-      });
-    } catch {
-      // fallback
+    if (tool) {
+      Object.assign(tool, partial);
+      try {
+        await apiRequest(`/api/v1/tools/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify(partial),
+        });
+      } catch (err: any) {
+        state.tools = prevTools;
+        state.errorMessage = err?.message || "Failed to update tool";
+        throw err;
+      }
     }
   }
 
@@ -1309,6 +1393,7 @@ export function useAppStore() {
     category: MemoryItem["category"] = "fact",
     agentId?: string,
   ) {
+    const prevMemories = [...state.memories];
     const newMemory: MemoryItem = {
       id: `mem_${Date.now()}`,
       category,
@@ -1324,29 +1409,37 @@ export function useAppStore() {
         body: JSON.stringify({ content, category, agentId }),
       });
       if (res?.id) newMemory.id = res.id;
-    } catch {
-      // fallback
+    } catch (err: any) {
+      state.memories = prevMemories;
+      state.errorMessage = err?.message || "Failed to save memory";
+      throw err;
     }
   }
 
   async function deleteMemory(id: string) {
+    const prevMemories = [...state.memories];
     state.memories = state.memories.filter((m) => m.id !== id);
     try {
       await apiRequest(`/api/v1/memories/${id}`, { method: "DELETE" });
-    } catch {
-      // fallback
+    } catch (err: any) {
+      state.memories = prevMemories;
+      state.errorMessage = err?.message || "Failed to delete memory";
+      throw err;
     }
   }
 
   async function clearAllMemories() {
+    const prevMemories = [...state.memories];
     state.memories = [];
     try {
       await apiRequest("/api/v1/memories/clear", {
         method: "POST",
         body: "{}",
       });
-    } catch {
-      // fallback
+    } catch (err: any) {
+      state.memories = prevMemories;
+      state.errorMessage = err?.message || "Failed to clear memories";
+      throw err;
     }
   }
 
@@ -1403,6 +1496,7 @@ export function useAppStore() {
     fetchCompanionData,
     sendChatMessage,
     clearChatMessages,
+    setChatModel,
     updateAgent,
     setActiveAgent,
     addSkill,

@@ -11,7 +11,7 @@ import {
   generateRandomToken,
   hashToken,
   encryptSecret,
-  decryptSecret,
+  decryptSecretWithMeta,
 } from "./crypto.js";
 import { CompanionRepository } from "./companion-repository.js";
 
@@ -687,7 +687,20 @@ export class AuthService {
 
     if (!row) return null;
     try {
-      return decryptSecret(row.ciphertext, row.nonce, row.tag);
+      const result = decryptSecretWithMeta(row.ciphertext, row.nonce, row.tag);
+      if (
+        result.migratedFromLegacy &&
+        (provider === "gemini" ||
+          provider === "openai" ||
+          provider === "anthropic")
+      ) {
+        try {
+          this.saveSecret(userId, provider, result.plaintext);
+        } catch {
+          // If re-encryption fails, keep existing record intact
+        }
+      }
+      return result.plaintext;
     } catch {
       return null;
     }

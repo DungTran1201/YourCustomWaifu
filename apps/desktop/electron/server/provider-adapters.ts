@@ -57,10 +57,13 @@ export class GeminiAdapter implements ModelProviderAdapter {
     }
 
     try {
-      const url = `${this.baseUrl}/v1beta/models?key=${encodeURIComponent(apiKey.trim())}`;
+      const url = `${this.baseUrl}/v1beta/models`;
       const res = await fetch(url, {
         method: "GET",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey.trim(),
+        },
       });
 
       if (!res.ok) {
@@ -116,7 +119,7 @@ export class GeminiAdapter implements ModelProviderAdapter {
   ): Promise<ChatCompletionResponse> {
     const model = req.model || "gemini-2.5-flash";
     const cleanModel = model.replace(/^models\//, "");
-    const url = `${this.baseUrl}/v1beta/models/${cleanModel}:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
+    const url = `${this.baseUrl}/v1beta/models/${cleanModel}:generateContent`;
 
     // Map conversation contents
     const contents: any[] = [];
@@ -140,7 +143,10 @@ export class GeminiAdapter implements ModelProviderAdapter {
 
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey.trim(),
+      },
       body: JSON.stringify(payload),
       signal: req.signal,
     });

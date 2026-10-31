@@ -1,0 +1,47 @@
+sequenceDiagram
+  autonumber
+  actor User as User
+  participant UI as Workspace Chat UI
+  participant Store as Vue Reactive Store
+  participant Server as Backend Server (server.ts)
+  participant Repo as Companion Repository
+  participant ToolExec as ToolExecutor (tool-executor.ts)
+  participant Adapter as Provider Adapter (Gemini/OpenAI/Claude)
+  participant Provider as Remote AI Provider
+
+  User->>UI: Submit Message ("Check memory and change expression to happy")
+  UI->>Store: sendChatMessage(text)
+  Store->>UI: Append optimistic user message
+  Store->>Server: POST /api/v1/chat/completions { message, agentId }
+  
+  Server->>Repo: Persist User Message to DB
+  Server->>Repo: Fetch active Agent, enabled Skills, prioritized Rules, and relevant Memories
+  Server->>ToolExec: Enrich active Tools schema & descriptions
+  Server->>Server: Compose deterministic Multi-Layer System Prompt & Tool Schemas
+  Server->>Server: Fetch bounded conversation history (last 12 turns)
+  Server->>Server: Initialize 30s AbortController & client disconnect listener
+  
+  Server->>Adapter: generateChatResponse(apiKey, requestWithSignal)
+  Adapter->>Provider: HTTPS POST (Secret in Header, finite timeout)
+  Provider-->>Adapter: 200 OK (Model outputs structured tool_call block)
+  Adapter-->>Server: ChatCompletionResponse with tool_call payload
+
+  opt Model requests Tool Call
+    Server->>ToolExec: execute(userId, toolId, { args, confirmed: false })
+    alt Tool requires confirmation and unconfirmed
+      ToolExec-->>Server: { success: false, error: "confirmation_required" }
+      Server->>Server: Record tool request needing user approval
+    else Tool authorized & validated
+      ToolExec->>ToolExec: Validate schema arguments & execute handler with 5s timeout
+      ToolExec-->>Server: { success: true, result: { applied: true, expression: "happy" } }
+      Server->>Server: Append tool execution result to prompt context
+      Server->>Adapter: generateChatResponse(follow-up conversational turn)
+      Adapter->>Provider: HTTPS POST with tool execution result
+      Provider-->>Adapter: Final synthesized companion message
+      Adapter-->>Server: ChatCompletionResponse
+    end
+  end
+
+  Server->>Repo: Persist Assistant Message to DB
+  Server-->>Store: 200 OK { message, userMessage, usage, toolExecutions }
+  Store->>UI: Append assistant message & trigger any Stage visual reaction

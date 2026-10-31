@@ -1,0 +1,38 @@
+sequenceDiagram
+  autonumber
+  actor User as User / Settings UI
+  participant Store as Vue Reactive Store
+  participant Server as Embedded Backend (server.ts)
+  participant Auth as AuthService (auth-service.ts)
+  participant Crypto as Crypto Module (crypto.ts)
+  participant SafeStorage as Electron safeStorage (OS DPAPI/Keychain)
+  participant DB as SQLite user_secrets_vault
+  participant Provider as Remote AI Provider (Gemini / OpenAI / Anthropic)
+
+  Note over User,Store: Phase 1: Key Storage & Protection
+  User->>Store: Enter API key (e.g. AIzaSy...)
+  Store->>Server: POST /api/v1/providers/keys { provider, apiKey }
+  Server->>Auth: saveSecret(userId, provider, apiKey)
+  Auth->>Crypto: encryptSecret(plaintextKey)
+  Crypto->>SafeStorage: Retrieve / Decrypt random master key from kms-master.enc
+  SafeStorage-->>Crypto: Decrypted 256-bit Master Key Buffer
+  Crypto->>Crypto: AES-256-GCM encrypt (random 12-byte nonce)
+  Crypto-->>Auth: { ciphertext, nonce, tag, keyHint: "...1234" }
+  Auth->>DB: UPSERT user_secrets_vault (ciphertext, nonce, tag, keyHint)
+  Auth-->>Server: Return { provider, keyHint }
+  Server-->>Store: 200 OK { provider, keyHint } (Full key NEVER returned to UI)
+  Store-->>User: Display masked key hint "...1234"
+
+  Note over Server,Provider: Phase 2: Trusted Retrieval & Execution
+  Server->>Auth: getDecryptedSecret(userId, provider)
+  Auth->>DB: SELECT ciphertext, nonce, tag WHERE userId AND provider
+  DB-->>Auth: { ciphertext, nonce, tag }
+  Auth->>Crypto: decryptSecret(ciphertext, nonce, tag)
+  Crypto->>SafeStorage: Decrypt 256-bit Master Key
+  SafeStorage-->>Crypto: Master Key Buffer
+  Crypto->>Crypto: AES-256-GCM decrypt with auth tag verification
+  Crypto-->>Auth: Plaintext API Key
+  Auth-->>Server: Plaintext API Key in ephemeral memory
+  Server->>Provider: HTTPS POST (Secret in HTTP Header ONLY: x-goog-api-key / Bearer)
+  Provider-->>Server: 200 OK Model Response
+  Note over Server: Plaintext key immediately dereferenced from memory

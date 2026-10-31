@@ -69,6 +69,8 @@ const desktopAPI: DesktopAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.STAGE_ENSURE_SAMPLE_VRM),
     triggerTestBlink: () =>
       ipcRenderer.invoke(IPC_CHANNELS.STAGE_TRIGGER_TEST_BLINK),
+    getBlinkDiagnostic: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.STAGE_GET_BLINK_DIAGNOSTIC),
     reportModelStatus: (status: any) =>
       ipcRenderer.invoke(IPC_CHANNELS.STAGE_REPORT_MODEL_STATUS, status),
     onTriggerTestBlink: (callback: () => void) => {

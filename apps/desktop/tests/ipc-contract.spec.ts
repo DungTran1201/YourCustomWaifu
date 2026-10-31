@@ -13,6 +13,13 @@ describe("Desktop IPC Contract & Channels", () => {
     expect(IPC_CHANNELS.AUTH_GET_STORED_SESSION).toBe(
       "app:auth-get-stored-session",
     );
+    expect(IPC_CHANNELS.STAGE_GET_STATUS).toBe("stage:get-status");
+    expect(IPC_CHANNELS.STAGE_GET_BLINK_DIAGNOSTIC).toBe(
+      "stage:get-blink-diagnostic",
+    );
+    expect(IPC_CHANNELS.STAGE_TRIGGER_TEST_BLINK).toBe(
+      "stage:trigger-test-blink",
+    );
   });
 
   it("matches application version constant with semver pattern", () => {

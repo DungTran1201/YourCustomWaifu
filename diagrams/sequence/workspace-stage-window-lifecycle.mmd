@@ -1,0 +1,43 @@
+stateDiagram-v2
+  [*] --> App_Launching
+
+  state App_Launching {
+    [*] --> Init_Electron_Main
+    Init_Electron_Main --> Load_Persisted_Bounds
+    Load_Persisted_Bounds --> Start_Embedded_Server
+    Start_Embedded_Server --> Create_Workspace_Window
+    Start_Embedded_Server --> Create_Stage_Window
+  }
+
+  App_Launching --> Windows_Running
+
+  state Windows_Running {
+    state Workspace_State {
+      Workspace_Visible --> Workspace_Hidden: User clicks 'X' (minimize-to-tray) or Ctrl+Shift+W
+      Workspace_Hidden --> Workspace_Visible: Tray menu 'Show Workspace' or Hotkey
+    }
+    --
+    state Stage_State {
+      Stage_Visible --> Stage_Hidden: Tray menu 'Hide Avatar Stage' or Ctrl+Shift+A
+      Stage_Hidden --> Stage_Visible: Tray menu 'Show Avatar Stage' or Hotkey
+      Stage_Visible --> Stage_ClickThrough: Toggle Click-Through
+      Stage_ClickThrough --> Stage_Visible: Untoggle Click-Through
+    }
+  }
+
+  note right of Windows_Running
+    CRITICAL INVARIANT:
+    Workspace hide/close DOES NOT close Stage.
+    Stage hide DOES NOT log out user or terminate server runtime.
+    Only explicit Application Quit closes both and shuts down backend.
+  end note
+
+  Windows_Running --> App_Quitting: Tray -> "Quit YourCustomWaifu"
+  
+  state App_Quitting {
+    Save_Persisted_Bounds --> Stop_Embedded_Server
+    Stop_Embedded_Server --> Destroy_Windows
+    Destroy_Windows --> [*]
+  }
+
+  App_Quitting --> [*]

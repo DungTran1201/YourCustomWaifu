@@ -1,0 +1,56 @@
+graph TB
+  subgraph Renderer_Workspace ["Workspace Window (Renderer Process)"]
+    VueApp["Vue 3 Pinia/Reactive Store<br/>(store.ts)"]
+    ChatUI["Chat Interface"]
+    AgentsUI["Agents / Persona Config"]
+    SkillsUI["Skills & Rules Manager"]
+    ToolsUI["Tools & Permissions UI"]
+    KeysUI["Provider Keys Vault UI"]
+    AvatarUI["Avatar Settings UI"]
+  end
+
+  subgraph Renderer_Stage ["Avatar Stage Window (Renderer Process)"]
+    ThreeScene["Three.js Scene & Camera"]
+    VRMModel["VRM Humanoid Avatar"]
+    BlinkCtrl["Autonomic Blink Controller"]
+    LookAtCtrl["LookAt Gaze Controller"]
+  end
+
+  subgraph Main_Process ["Electron Main Process (Privileged Node.js)"]
+    WinMgr["Dual Window Manager<br/>(bounds.ts, index.ts)"]
+    TrayShortcuts["Tray Menu & Global Hotkeys<br/>(Ctrl+Shift+W/A/B)"]
+    GazeLoop["Cursor Tracking Loop (30Hz)"]
+    SafeStorage["OS-Backed Secure Storage<br/>(safeStorage DPAPI/Keychain)"]
+  end
+
+  subgraph Embedded_Backend ["Embedded Backend Server (Loopback 127.0.0.1)"]
+    HttpServer["Node.js HTTP Server<br/>(server.ts)"]
+    AuthSvc["Auth Service & Sessions<br/>(scrypt + SHA256)"]
+    CompRepo["Companion Repository<br/>(companion-repository.ts)"]
+    ToolExec["Tool Executor & Permissions<br/>(tool-executor.ts)"]
+    ProvRouter["Model Provider Router<br/>(provider-adapters.ts)"]
+    SQLiteDb[("SQLite Database<br/>(vrm-auth.db)")]
+  end
+
+  subgraph External_Providers ["External AI Model Providers"]
+    GeminiAPI["Google Gemini API<br/>(x-goog-api-key header)"]
+    OpenAIAPI["OpenAI API<br/>(Bearer token)"]
+    AnthropicAPI["Anthropic Claude API<br/>(x-api-key header)"]
+  end
+
+  VueApp -->|Typed IPC Bridge| Main_Process
+  Main_Process -->|Broadcast Events| Renderer_Stage
+  Main_Process -->|Gaze Coordinates (30Hz)| LookAtCtrl
+  VueApp -->|HTTP REST + CSRF| HttpServer
+
+  HttpServer --> AuthSvc
+  HttpServer --> CompRepo
+  HttpServer --> ToolExec
+  HttpServer --> ProvRouter
+  AuthSvc --> SQLiteDb
+  CompRepo --> SQLiteDb
+  AuthSvc -->|Wrap/Unwrap Master Key| SafeStorage
+
+  ProvRouter -->|HTTPS POST| GeminiAPI
+  ProvRouter -->|HTTPS POST| OpenAIAPI
+  ProvRouter -->|HTTPS POST| AnthropicAPI

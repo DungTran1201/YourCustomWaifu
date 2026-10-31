@@ -137,6 +137,7 @@ export function createWebFallbackAPI(): DesktopAPI {
         error: "Sample VRM download requires native desktop environment",
       }),
       setIgnoreMouseEvents: async () => {},
+      getBlinkDiagnostic: async () => null,
       onStatusChanged: () => () => {},
       onConfigChanged: () => () => {},
       onCursorMove: () => () => {},

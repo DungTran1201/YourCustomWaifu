@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, watch } from "vue";
+import { ref, computed, nextTick, watch, onMounted, onUnmounted } from "vue";
 import { useAppStore } from "@vrm/app-core";
 import AppIcon from "../../components/AppIcon.vue";
 
@@ -13,6 +13,7 @@ const defaultAgent = {
   name: "Aiko",
   personality: "Warm, perceptive, and supportive",
   preferredModel: "gemini-2.5-flash",
+  preferredProvider: "gemini" as const,
 };
 
 const activeAgent = computed(() => {
@@ -21,6 +22,82 @@ const activeAgent = computed(() => {
     store.state.agents[0] ||
     defaultAgent
   );
+});
+
+// --- Dynamic Model Selector State ---
+const isModelMenuOpen = ref(false);
+const modelDropdownRef = ref<HTMLDivElement | null>(null);
+
+const modelGroups = computed(() => {
+  return store.state.modelConnections.map((conn) => {
+    const hasKey = store.state.secrets.some(
+      (s) => s.provider === conn.provider,
+    );
+    return {
+      provider: conn.provider as "gemini" | "openai" | "anthropic",
+      displayName: conn.displayName,
+      hasKey,
+      models:
+        conn.availableModels && conn.availableModels.length > 0
+          ? conn.availableModels
+          : [conn.selectedModel],
+      selectedModel: conn.selectedModel,
+    };
+  });
+});
+
+function toggleModelDropdown() {
+  isModelMenuOpen.value = !isModelMenuOpen.value;
+}
+
+async function selectModel(
+  model: string,
+  provider: "gemini" | "openai" | "anthropic",
+) {
+  isModelMenuOpen.value = false;
+  await store.setChatModel(model, provider);
+}
+
+function onNativeSelectChange(event: Event) {
+  const target = event.target as HTMLSelectElement;
+  const chosenModel = target.value;
+  for (const group of modelGroups.value) {
+    if (group.models.includes(chosenModel)) {
+      selectModel(chosenModel, group.provider);
+      return;
+    }
+  }
+}
+
+function navigateToKeys() {
+  isModelMenuOpen.value = false;
+  store.setTab("secrets");
+}
+
+function handleClickOutside(event: MouseEvent) {
+  if (
+    isModelMenuOpen.value &&
+    modelDropdownRef.value &&
+    !modelDropdownRef.value.contains(event.target as Node)
+  ) {
+    isModelMenuOpen.value = false;
+  }
+}
+
+function handleGlobalKeydown(event: KeyboardEvent) {
+  if (event.key === "Escape" && isModelMenuOpen.value) {
+    isModelMenuOpen.value = false;
+  }
+}
+
+onMounted(() => {
+  document.addEventListener("click", handleClickOutside);
+  document.addEventListener("keydown", handleGlobalKeydown);
+});
+
+onUnmounted(() => {
+  document.removeEventListener("click", handleClickOutside);
+  document.removeEventListener("keydown", handleGlobalKeydown);
 });
 
 const quickPrompts = [
@@ -117,7 +194,143 @@ async function copyMessage(id: string, text: string) {
           </div>
           <span class="agent-subtitle">{{ activeAgent.personality }}</span>
         </div>
-        <span class="model-tag">{{ activeAgent.preferredModel }}</span>
+
+        <!-- Interactive Model Selector -->
+        <div ref="modelDropdownRef" class="model-selector-container">
+          <button
+            id="chat-model-selector-btn"
+            type="button"
+            class="model-selector-trigger"
+            :class="{ 'is-open': isModelMenuOpen }"
+            :title="`Active model: ${activeAgent.preferredModel}. Click to switch.`"
+            aria-haspopup="listbox"
+            :aria-expanded="isModelMenuOpen"
+            @click.stop="toggleModelDropdown"
+          >
+            <span
+              class="provider-dot"
+              :class="`dot-${activeAgent.preferredProvider || 'gemini'}`"
+            ></span>
+            <span class="model-name-text">{{
+              activeAgent.preferredModel
+            }}</span>
+            <span
+              class="model-chevron"
+              :class="{ 'chevron-rotated': isModelMenuOpen }"
+            >
+              <AppIcon name="chevron-down" size="12" />
+            </span>
+          </button>
+
+          <!-- Accessible native select for testing & keyboard navigation -->
+          <select
+            id="chat-model-select"
+            class="model-native-select"
+            :value="activeAgent.preferredModel"
+            aria-label="Select AI Model"
+            @change="onNativeSelectChange"
+          >
+            <optgroup
+              v-for="group in modelGroups"
+              :key="group.provider"
+              :label="`${group.displayName} ${group.hasKey ? '(Key Ready)' : '(No Key)'}`"
+            >
+              <option v-for="m in group.models" :key="m" :value="m">
+                {{ m }}
+              </option>
+            </optgroup>
+          </select>
+
+          <!-- Custom Floating Dropdown Menu -->
+          <transition name="dropdown-fade">
+            <div
+              v-if="isModelMenuOpen"
+              id="chat-model-dropdown-menu"
+              class="model-dropdown-menu"
+              role="listbox"
+            >
+              <div class="dropdown-header">
+                <span class="dropdown-header-title">Active AI Model</span>
+                <span class="dropdown-header-hint">Instant switch</span>
+              </div>
+
+              <div class="dropdown-groups">
+                <div
+                  v-for="group in modelGroups"
+                  :key="group.provider"
+                  class="model-provider-group"
+                >
+                  <div class="provider-group-header">
+                    <span class="provider-group-name">{{
+                      group.displayName
+                    }}</span>
+                    <span
+                      class="provider-key-status"
+                      :class="
+                        group.hasKey ? 'status-linked' : 'status-unlinked'
+                      "
+                    >
+                      {{ group.hasKey ? "Key Linked" : "No Key" }}
+                    </span>
+                  </div>
+
+                  <div class="provider-models-list">
+                    <button
+                      v-for="m in group.models"
+                      :key="m"
+                      :id="'model-option-' + m.replace(/\./g, '-')"
+                      type="button"
+                      class="model-option-btn"
+                      :class="{
+                        'is-selected': activeAgent.preferredModel === m,
+                      }"
+                      role="option"
+                      :aria-selected="activeAgent.preferredModel === m"
+                      @click="selectModel(m, group.provider)"
+                    >
+                      <div class="model-option-content">
+                        <span class="model-id">{{ m }}</span>
+                        <span
+                          v-if="m === 'gemini-2.5-flash'"
+                          class="model-badge badge-recommended"
+                          >Recommended</span
+                        >
+                        <span
+                          v-else-if="
+                            m.includes('pro') ||
+                            m.includes('sonnet') ||
+                            m.includes('4o')
+                          "
+                          class="model-badge badge-pro"
+                          >High Intelligence</span
+                        >
+                      </div>
+                      <AppIcon
+                        v-if="activeAgent.preferredModel === m"
+                        name="check"
+                        size="13"
+                        class="check-icon"
+                      />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Footer with key vault link -->
+              <div class="dropdown-footer">
+                <button
+                  id="chat-manage-keys-btn"
+                  type="button"
+                  class="manage-keys-link"
+                  @click="navigateToKeys"
+                >
+                  <AppIcon name="secrets" size="13" />
+                  <span>Configure API Keys in Vault &rarr;</span>
+                </button>
+              </div>
+            </div>
+          </transition>
+        </div>
       </div>
 
       <div class="header-actions">
@@ -148,8 +361,17 @@ async function copyMessage(id: string, text: string) {
           </div>
           <h2 class="empty-title">Conversation with {{ activeAgent.name }}</h2>
           <p class="empty-description">
-            Your personal companion is ready. Model:
-            <code class="model-code">{{ activeAgent.preferredModel }}</code>
+            Your personal companion is ready. Active model:
+            <button
+              id="empty-state-model-btn"
+              type="button"
+              class="model-code-btn"
+              title="Click to switch model"
+              @click.stop="toggleModelDropdown"
+            >
+              <code class="model-code">{{ activeAgent.preferredModel }}</code>
+              <AppIcon name="chevron-down" size="11" />
+            </button>
           </p>
 
           <div class="quick-prompts-container">
@@ -370,15 +592,324 @@ async function copyMessage(id: string, text: string) {
   text-overflow: ellipsis;
 }
 
-.model-tag {
-  font-size: 0.68rem;
-  padding: 2px 7px;
+/* Model Selector */
+.model-selector-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.model-selector-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 9px;
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
-  color: var(--text-secondary);
+  color: var(--text-primary);
+  font-size: 0.74rem;
   font-family: var(--font-family-mono);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  user-select: none;
+}
+
+.model-selector-trigger:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-default);
+  color: var(--text-primary);
+}
+
+.model-selector-trigger.is-open {
+  border-color: #06b6d4;
+  box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.2);
+  background: var(--bg-hover);
+}
+
+.provider-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
   flex-shrink: 0;
+  display: inline-block;
+}
+
+.dot-gemini {
+  background: #06b6d4;
+  box-shadow: 0 0 6px rgba(6, 182, 212, 0.6);
+}
+
+.dot-openai {
+  background: #10a37f;
+  box-shadow: 0 0 6px rgba(16, 163, 127, 0.6);
+}
+
+.dot-anthropic {
+  background: #d97706;
+  box-shadow: 0 0 6px rgba(217, 119, 6, 0.6);
+}
+
+.model-name-text {
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.model-chevron {
+  color: var(--text-muted);
+  transition: transform var(--transition-fast);
+}
+
+.model-chevron.chevron-rotated {
+  transform: rotate(180deg);
+  color: var(--text-primary);
+}
+
+/* Native select for accessibility / automation */
+.model-native-select {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  pointer-events: none;
+}
+
+/* Floating Dropdown */
+.model-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 310px;
+  max-height: 420px;
+  overflow-y: auto;
+  background: #12151c;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow:
+    0 16px 36px rgba(0, 0, 0, 0.65),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+  padding: 8px;
+  z-index: 100;
+  backdrop-filter: blur(16px);
+  animation: dropdownIn 0.15s ease-out;
+}
+
+@keyframes dropdownIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dropdown-fade-enter-active,
+.dropdown-fade-leave-active {
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+
+.dropdown-fade-enter-from,
+.dropdown-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+.dropdown-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 6px;
+}
+
+.dropdown-header-title {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.dropdown-header-hint {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.dropdown-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.model-provider-group {
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.model-provider-group:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.provider-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  margin-bottom: 2px;
+}
+
+.provider-group-name {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.provider-key-status {
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  font-weight: 500;
+}
+
+.provider-key-status.status-linked {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.provider-key-status.status-unlinked {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.provider-models-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.model-option-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: left;
+  transition: all var(--transition-fast);
+  font-family: var(--font-family-mono);
+}
+
+.model-option-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+}
+
+.model-option-btn.is-selected {
+  background: rgba(6, 182, 212, 0.12);
+  border-color: rgba(6, 182, 212, 0.35);
+  color: #06b6d4;
+  font-weight: 600;
+}
+
+.model-option-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.model-id {
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.model-badge {
+  font-size: 0.62rem;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: var(--font-family-sans);
+  font-weight: 500;
+}
+
+.badge-recommended {
+  background: rgba(6, 182, 212, 0.18);
+  color: #06b6d4;
+}
+
+.badge-pro {
+  background: rgba(168, 85, 247, 0.18);
+  color: #a855f7;
+}
+
+.check-icon {
+  color: #06b6d4;
+  flex-shrink: 0;
+}
+
+.dropdown-footer {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.manage-keys-link {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.manage-keys-link:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-default);
+}
+
+/* Empty state clickable model code button */
+.model-code-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  vertical-align: middle;
+}
+
+.model-code-btn .model-code {
+  transition: all var(--transition-fast);
+}
+
+.model-code-btn:hover .model-code {
+  background: var(--bg-hover);
+  color: #06b6d4;
+  border-color: rgba(6, 182, 212, 0.4);
 }
 
 .header-actions {
