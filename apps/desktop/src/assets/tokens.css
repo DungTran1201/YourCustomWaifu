@@ -44,6 +44,25 @@
 
   --transition-fast: 120ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-normal: 180ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Obsidian Glass Chamber Authentication Tokens */
+  --obsidian-void: #05060a;
+  --obsidian-chamber: #0a0c14;
+  --obsidian-glass: rgba(14, 16, 26, 0.68);
+  --obsidian-panel: #10121c;
+  --obsidian-panel-elevated: #161927;
+  --obsidian-input-bg: #090b12;
+  --obsidian-border: #25283d;
+  --obsidian-border-hover: rgba(145, 133, 217, 0.44);
+  --obsidian-accent: #9185d9;
+  --obsidian-accent-secondary: #b9789b;
+  --obsidian-text: #ececf4;
+  --obsidian-text-secondary: #abaec6;
+  --obsidian-text-muted: #727693;
+  --obsidian-shadow:
+    0 30px 76px rgba(0, 0, 0, 0.88),
+    0 10px 26px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(236, 236, 244, 0.06);
 }
 
 [data-theme='light'] {

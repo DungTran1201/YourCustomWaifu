@@ -1,47 +1,67 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, inject } from "vue";
 import { useAppStore } from "@vrm/app-core";
+import { PASSWORD_POLICY } from "@vrm/shared";
 import AppIcon from "../../components/AppIcon.vue";
+import { AUTH_ENVIRONMENT_KEY } from "../auth/auth-environment-context.js";
 
 const store = useAppStore();
+const authEnv = inject(AUTH_ENVIRONMENT_KEY, null);
 
 const token = ref(store.state.resetToken || "");
 const newPassword = ref("");
+const showPassword = ref(false);
 const isSubmitting = ref(false);
 const formError = ref<string | null>(null);
 
-const isPasswordLongEnough = computed(() => newPassword.value.length >= 15);
+const isPasswordLongEnough = computed(
+  () =>
+    newPassword.value.length >= PASSWORD_POLICY.minLength &&
+    newPassword.value.length <= PASSWORD_POLICY.maxLength,
+);
 
 async function handleSubmit() {
-  if (!token.value || !newPassword.value) {
+  if (!token.value.trim() || !newPassword.value) {
     formError.value = "Please provide both the reset token and new password";
     return;
   }
-  if (newPassword.value.length < 15) {
-    formError.value = "New password must be at least 15 characters long";
+  if (newPassword.value.length < PASSWORD_POLICY.minLength) {
+    formError.value = `New password must be at least ${PASSWORD_POLICY.minLength} characters long`;
+    return;
+  }
+  if (newPassword.value.length > PASSWORD_POLICY.maxLength) {
+    formError.value = `New password must not exceed ${PASSWORD_POLICY.maxLength} characters`;
     return;
   }
 
   formError.value = null;
   isSubmitting.value = true;
+  authEnv?.notifySubmitting(true);
   try {
-    await store.resetPassword(token.value, newPassword.value);
+    await store.resetPassword(token.value.trim(), newPassword.value);
   } catch (err: any) {
     formError.value =
       err?.message || "Password reset failed. The link may have expired.";
   } finally {
     isSubmitting.value = false;
+    authEnv?.notifySubmitting(false);
   }
 }
 </script>
 
 <template>
-  <div class="auth-view">
-    <div class="auth-card">
-      <div class="auth-header">
-        <div class="auth-icon"><AppIcon name="security" size="24" /></div>
-        <h1 class="auth-title">Set New Password</h1>
-        <p class="auth-subtitle">
+  <div
+    class="noir-auth-view"
+    :class="authEnv?.isEmbeddedIn3DStage ? 'embedded-3d' : 'standalone-noir'"
+  >
+    <div class="noir-auth-card">
+      <div class="noir-auth-header">
+        <div class="noir-eyebrow">
+          <AppIcon name="security" size="13" />
+          <span>Credential Renewal</span>
+        </div>
+        <h1 class="noir-auth-title">Set New Password</h1>
+        <p class="noir-auth-subtitle">
           All existing active sessions will be terminated upon reset
         </p>
       </div>
@@ -50,36 +70,58 @@ async function handleSubmit() {
         {{ formError }}
       </div>
 
-      <form class="auth-form" @submit.prevent="handleSubmit">
+      <form class="auth-form" novalidate @submit.prevent="handleSubmit">
         <div class="form-group">
           <label for="reset-token-input" class="form-label">Reset Token</label>
-          <input
-            id="reset-token-input"
-            v-model="token"
-            type="text"
-            required
-            class="form-input font-mono"
-            placeholder="Paste reset token from email"
-            :disabled="isSubmitting"
-          />
+          <div class="input-wrapper">
+            <input
+              id="reset-token-input"
+              v-model="token"
+              type="text"
+              required
+              class="form-input font-mono"
+              placeholder="Paste reset token"
+              :disabled="isSubmitting"
+              @focus="authEnv?.notifyInputFocus()"
+              @blur="authEnv?.notifyInputBlur()"
+              @input="authEnv?.notifyUserTyping()"
+            />
+          </div>
         </div>
 
         <div class="form-group">
           <label for="reset-new-password" class="form-label"
             >New Password</label
           >
-          <input
-            id="reset-new-password"
-            v-model="newPassword"
-            type="password"
-            autocomplete="new-password"
-            required
-            class="form-input"
-            placeholder="At least 15 characters"
-            :disabled="isSubmitting"
-          />
+          <div class="input-wrapper">
+            <input
+              id="reset-new-password"
+              v-model="newPassword"
+              :type="showPassword ? 'text' : 'password'"
+              autocomplete="new-password"
+              required
+              :minlength="PASSWORD_POLICY.minLength"
+              :maxlength="PASSWORD_POLICY.maxLength"
+              class="form-input has-trailing-btn"
+              placeholder="At least 8 characters"
+              :disabled="isSubmitting"
+              @focus="authEnv?.notifyInputFocus()"
+              @blur="authEnv?.notifyInputBlur()"
+              @input="authEnv?.notifyUserTyping()"
+            />
+            <button
+              type="button"
+              class="pwd-toggle-btn"
+              :aria-label="showPassword ? 'Hide password' : 'Show password'"
+              :title="showPassword ? 'Hide password' : 'Show password'"
+              @click="showPassword = !showPassword"
+            >
+              <AppIcon :name="showPassword ? 'close' : 'eye'" size="15" />
+            </button>
+          </div>
           <div class="input-hint" :class="{ valid: isPasswordLongEnough }">
-            {{ newPassword.length }} / 15 characters minimum
+            {{ newPassword.length }} /
+            {{ PASSWORD_POLICY.minLength }} characters minimum
           </div>
         </div>
 
@@ -109,191 +151,4 @@ async function handleSubmit() {
   </div>
 </template>
 
-<style scoped>
-.auth-view {
-  width: 100%;
-  min-width: 0;
-  min-height: 100%;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: clamp(16px, 3vw, 40px) 16px;
-}
-
-.auth-card {
-  width: 100%;
-  max-width: 440px;
-  min-width: 0;
-  box-sizing: border-box;
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  padding: clamp(20px, 4vw, 32px);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
-}
-
-.auth-header {
-  text-align: center;
-  margin-bottom: 24px;
-}
-
-.auth-icon {
-  font-size: 2rem;
-  margin-bottom: 8px;
-}
-
-.auth-title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 6px;
-}
-
-.auth-subtitle {
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-}
-
-.alert {
-  padding: 12px 16px;
-  border-radius: var(--radius-sm);
-  font-size: 0.85rem;
-  margin-bottom: 20px;
-}
-
-.alert-error {
-  background: rgba(239, 68, 68, 0.15);
-  border: 1px solid var(--accent-danger);
-  color: #fca5a5;
-}
-
-.auth-form {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.form-label {
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-}
-
-.form-input {
-  width: 100%;
-  padding: 10px 14px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-size: 0.95rem;
-}
-
-.form-input:focus {
-  outline: none;
-  border-color: var(--border-focus);
-  box-shadow: 0 0 0 2px var(--accent-cyan-glow);
-}
-
-.font-mono {
-  font-family: var(--font-family-mono);
-  font-size: 0.85rem;
-}
-
-.input-hint {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
-
-.input-hint.valid {
-  color: var(--accent-success);
-}
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px 16px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  border: none;
-}
-
-.btn-primary {
-  background: var(--accent-indigo);
-  color: #ffffff;
-  margin-top: 6px;
-}
-
-.link-btn {
-  background: none;
-  border: none;
-  color: var(--accent-cyan);
-  font-size: 0.85rem;
-  cursor: pointer;
-  padding: 0;
-}
-
-.link-btn:hover {
-  text-decoration: underline;
-}
-
-.auth-footer {
-  margin-top: 24px;
-  padding-top: 20px;
-  border-top: 1px solid var(--border-subtle);
-  display: flex;
-  justify-content: center;
-}
-
-.spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: #ffffff;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (max-height: 620px) {
-  .auth-view {
-    padding: 12px 16px;
-  }
-  .auth-card {
-    padding: 18px 22px;
-  }
-  .auth-header {
-    margin-bottom: 14px;
-  }
-  .auth-icon {
-    margin-bottom: 4px;
-  }
-  .auth-title {
-    font-size: 1.3rem;
-    margin-bottom: 4px;
-  }
-  .auth-form {
-    gap: 12px;
-  }
-  .auth-footer {
-    margin-top: 14px;
-    padding-top: 12px;
-  }
-}
-</style>
+<style scoped src="../auth/auth-panel.css"></style>

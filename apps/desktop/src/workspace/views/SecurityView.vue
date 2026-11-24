@@ -17,7 +17,9 @@ const confirmPhrase = ref("");
 const isDeleting = ref(false);
 const deleteError = ref<string | null>(null);
 
-const isNewPasswordValid = computed(() => newPassword.value.length >= 15);
+const isNewPasswordValid = computed(
+  () => newPassword.value.length >= 8 && newPassword.value.length <= 128,
+);
 
 onMounted(async () => {
   await store.fetchSessions();
@@ -28,8 +30,12 @@ async function handlePasswordChange() {
     passwordError.value = "Please complete all password fields";
     return;
   }
-  if (newPassword.value.length < 15) {
-    passwordError.value = "New password must be at least 15 characters long";
+  if (newPassword.value.length < 8) {
+    passwordError.value = "New password must be at least 8 characters long";
+    return;
+  }
+  if (newPassword.value.length > 128) {
+    passwordError.value = "New password must not exceed 128 characters";
     return;
   }
 
@@ -100,8 +106,7 @@ async function handleDeleteAccount() {
       <section class="security-card" aria-labelledby="heading-password">
         <h2 id="heading-password" class="card-title">Change Password</h2>
         <p class="card-description">
-          Choose a strong, unique password of at least 15 characters (NIST SP
-          800-63B-4 standard).
+          Choose a strong, unique password of at least 8 characters.
         </p>
 
         <div v-if="passwordNotice" class="alert alert-success" role="status">
@@ -134,12 +139,14 @@ async function handleDeleteAccount() {
               type="password"
               autocomplete="new-password"
               required
+              minlength="8"
+              maxlength="128"
               class="form-input"
-              placeholder="At least 15 characters"
+              placeholder="At least 8 characters"
               :disabled="isChangingPassword"
             />
             <div class="input-hint" :class="{ valid: isNewPasswordValid }">
-              {{ newPassword.length }} / 15 characters minimum
+              {{ newPassword.length }} / 8 characters minimum
             </div>
           </div>
 

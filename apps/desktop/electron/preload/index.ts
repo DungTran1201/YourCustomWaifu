@@ -65,6 +65,8 @@ const desktopAPI: DesktopAPI = {
     selectVrmFile: () => ipcRenderer.invoke(IPC_CHANNELS.STAGE_SELECT_VRM_FILE),
     loadVrmBuffer: (filePath?: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.STAGE_LOAD_VRM_BUFFER, filePath),
+    loadDefaultVrm: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.STAGE_LOAD_DEFAULT_VRM),
     ensureSampleVrm: () =>
       ipcRenderer.invoke(IPC_CHANNELS.STAGE_ENSURE_SAMPLE_VRM),
     triggerTestBlink: () =>

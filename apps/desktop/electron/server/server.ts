@@ -1,5 +1,8 @@
 import http from "node:http";
 import crypto from "node:crypto";
+import fs from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { DatabaseSync } from "node:sqlite";
 import { AuthService } from "./auth-service.js";
 import { ToolExecutor } from "./tool-executor.js";
@@ -189,6 +192,48 @@ export function createServer(options: ServerOptions): http.Server {
       (pathname === "/api/v1/health" || pathname === "/health")
     ) {
       sendJson(200, { status: "healthy", version: "0.1.0", timestamp });
+      return;
+    }
+
+    // Read-only bundled default VRM binary for Authentication 3D scene fallback
+    if (req.method === "GET" && pathname === "/api/v1/assets/default-vrm") {
+      const serverDir = dirname(fileURLToPath(import.meta.url));
+      const vrmCandidates = [
+        join(serverDir, "../../assets/sample-vrm/AvatarSample_B.vrm"),
+        join(process.cwd(), "assets/sample-vrm/AvatarSample_B.vrm"),
+        join(
+          process.cwd(),
+          "apps/desktop/assets/sample-vrm/AvatarSample_B.vrm",
+        ),
+      ];
+      const foundPath = vrmCandidates.find((p) => {
+        try {
+          const st = fs.statSync(p);
+          return st.isFile() && st.size > 1024 && st.size <= 35 * 1024 * 1024;
+        } catch {
+          return false;
+        }
+      });
+
+      if (!foundPath) {
+        sendError(404, "asset_not_found", "Default VRM asset not found");
+        return;
+      }
+
+      const stat = fs.statSync(foundPath);
+      res.writeHead(200, {
+        "Content-Type": "model/gltf-binary",
+        "Content-Length": String(stat.size),
+        "Cache-Control": "public, max-age=86400",
+      });
+      const stream = fs.createReadStream(foundPath);
+      stream.on("error", () => {
+        if (!res.headersSent) {
+          res.writeHead(500);
+        }
+        res.end();
+      });
+      stream.pipe(res);
       return;
     }
 
@@ -1278,7 +1323,7 @@ export function createServer(options: ServerOptions): http.Server {
         sendError(
           422,
           "password_too_short",
-          "Password must be at least 15 characters long",
+          "Password must be at least 8 characters long",
         );
       } else if (errMsg === "password_too_long") {
         sendError(

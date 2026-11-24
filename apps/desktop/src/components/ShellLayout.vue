@@ -7,10 +7,7 @@ import StatusBadge from "./StatusBadge.vue";
 import AppIcon from "./AppIcon.vue";
 import SettingsView from "../workspace/views/SettingsView.vue";
 import DiagnosticsView from "../workspace/views/DiagnosticsView.vue";
-import SignInView from "../workspace/views/SignInView.vue";
-import SignUpView from "../workspace/views/SignUpView.vue";
-import ForgotPasswordView from "../workspace/views/ForgotPasswordView.vue";
-import ResetPasswordView from "../workspace/views/ResetPasswordView.vue";
+import AuthEnvironment from "../workspace/auth/AuthEnvironment.vue";
 import ProfileView from "../workspace/views/ProfileView.vue";
 import SecurityView from "../workspace/views/SecurityView.vue";
 import SecretsView from "../workspace/views/SecretsView.vue";
@@ -28,7 +25,26 @@ const store = useAppStore();
 
 const platformLabel = computed(() => "Desktop App");
 
+const AUTH_MODE_TABS = new Set([
+  "signin",
+  "signup",
+  "forgot-password",
+  "reset-password",
+]);
+
+const isAuthenticationMode = computed(
+  () =>
+    !store.state.isGuest &&
+    !store.state.isAuthenticated &&
+    (AUTH_MODE_TABS.has(store.state.currentTab) ||
+      (store.state.currentTab !== "settings" &&
+        store.state.currentTab !== "diagnostics")),
+);
+
 const activeTabTitle = computed(() => {
+  if (isAuthenticationMode.value) {
+    return "";
+  }
   switch (store.state.currentTab) {
     case "chat":
       return "Companion Chat";
@@ -59,13 +75,10 @@ const activeTabTitle = computed(() => {
     case "diagnostics":
       return "System Diagnostics";
     case "signin":
-      return "Sign In";
     case "signup":
-      return "Account Registration";
     case "forgot-password":
-      return "Forgot Password";
     case "reset-password":
-      return "Reset Password";
+      return "";
     default:
       return "Workspace";
   }
@@ -78,227 +91,250 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="shell-layout">
-    <!-- Restrained Native Desktop Topbar -->
-    <header class="shell-topbar" role="banner">
-      <div class="topbar-left">
-        <!-- Sidebar Collapse / Expand Toggle Button -->
-        <button
-          id="sidebar-toggle-btn"
-          class="sidebar-toggle-btn"
-          :title="
-            store.state.sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'
-          "
-          :aria-label="
-            store.state.sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'
-          "
-          @click="store.toggleSidebar()"
-        >
-          <AppIcon
-            :name="
-              store.state.sidebarCollapsed ? 'chevron-right' : 'chevron-left'
-            "
-            size="14"
-          />
-        </button>
+  <div :class="['shell-layout', { 'auth-shell-active': isAuthenticationMode }]">
+    <!-- Borderless Full-Bleed Authentication Mode: Zero Sidebar, Zero Topbar, Zero Page Border -->
+    <template v-if="isAuthenticationMode">
+      <main class="shell-main auth-scene-active" role="main">
+        <AuthEnvironment />
+      </main>
+    </template>
 
-        <div class="brand">
-          <div class="logo-mark">
-            <AppIcon name="stage" size="14" />
+    <!-- Standard Authenticated / Guest / System Workspace Shell -->
+    <template v-else>
+      <!-- Restrained Native Desktop Topbar -->
+      <header
+        :class="[
+          'shell-topbar',
+          { 'has-native-overlay': store.platform.value === 'electron' },
+        ]"
+        role="banner"
+      >
+        <div class="topbar-left">
+          <!-- Sidebar Collapse / Expand Toggle Button -->
+          <button
+            id="sidebar-toggle-btn"
+            class="sidebar-toggle-btn"
+            :title="
+              store.state.sidebarCollapsed
+                ? 'Expand Sidebar'
+                : 'Collapse Sidebar'
+            "
+            :aria-label="
+              store.state.sidebarCollapsed
+                ? 'Expand Sidebar'
+                : 'Collapse Sidebar'
+            "
+            @click="store.toggleSidebar()"
+          >
+            <AppIcon
+              :name="
+                store.state.sidebarCollapsed ? 'chevron-right' : 'chevron-left'
+              "
+              size="14"
+            />
+          </button>
+
+          <div class="brand">
+            <div class="logo-mark">
+              <AppIcon name="stage" size="14" />
+            </div>
+            <div class="brand-text">
+              <span class="app-name">{{ APP_METADATA.shortName }}</span>
+              <span class="app-version">v{{ APP_METADATA.version }}</span>
+            </div>
           </div>
-          <div class="brand-text">
-            <span class="app-name">{{ APP_METADATA.shortName }}</span>
-            <span class="app-version">v{{ APP_METADATA.version }}</span>
-          </div>
+
+          <StatusBadge
+            v-if="!store.hasBridgeError.value"
+            status="ready"
+            :label="platformLabel"
+          />
+          <span
+            v-else
+            id="bridge-error-badge"
+            class="bridge-error-badge"
+            title="Electron IPC Bridge missing. Check preload script."
+          >
+            BRIDGE ERROR
+          </span>
+          <span
+            v-if="store.state.isGuest"
+            id="guest-preview-badge"
+            class="guest-preview-badge"
+            title="Running in local development preview mode"
+          >
+            GUEST PREVIEW
+          </span>
         </div>
 
-        <StatusBadge
-          v-if="!store.hasBridgeError.value"
-          status="ready"
-          :label="platformLabel"
-        />
-        <span
-          v-else
-          id="bridge-error-badge"
-          class="bridge-error-badge"
-          title="Electron IPC Bridge missing. Check preload script."
-        >
-          BRIDGE ERROR
-        </span>
-        <span
-          v-if="store.state.isGuest"
-          id="guest-preview-badge"
-          class="guest-preview-badge"
-          title="Running in local development preview mode"
-        >
-          GUEST PREVIEW
-        </span>
-      </div>
+        <div class="topbar-center">
+          <span class="current-view-title">{{ activeTabTitle }}</span>
+        </div>
 
-      <div class="topbar-center">
-        <span class="current-view-title">{{ activeTabTitle }}</span>
-      </div>
-
-      <div class="topbar-right">
-        <!-- Stage Quick-Toggle Button -->
-        <button
-          id="nav-stage-toggle-btn"
-          :class="[
-            'stage-pill-btn',
-            store.state.stageStatus.stageVisible
-              ? 'stage-active'
-              : 'stage-inactive',
-          ]"
-          :title="
-            store.state.stageStatus.stageVisible
-              ? 'Avatar Stage is visible (Click to hide)'
-              : 'Avatar Stage is hidden (Click to launch)'
-          "
-          @click="store.toggleStage()"
-        >
-          <span class="stage-dot"></span>
-          <span class="stage-label">{{
-            store.state.stageStatus.stageVisible ? "Stage Active" : "Show Stage"
-          }}</span>
-        </button>
-
-        <!-- Guest Actions -->
-        <template v-if="store.state.isGuest">
+        <div class="topbar-right">
+          <!-- Stage Quick-Toggle Button -->
           <button
-            id="exit-guest-preview-btn"
-            class="nav-auth-btn guest-exit-btn"
-            title="Exit Guest Preview"
-            @click="store.exitGuestPreview()"
+            id="nav-stage-toggle-btn"
+            :class="[
+              'stage-pill-btn',
+              store.state.stageStatus.stageVisible
+                ? 'stage-active'
+                : 'stage-inactive',
+            ]"
+            :title="
+              store.state.stageStatus.stageVisible
+                ? 'Avatar Stage is visible (Click to hide)'
+                : 'Avatar Stage is hidden (Click to launch)'
+            "
+            @click="store.toggleStage()"
           >
-            Exit Guest Preview
-          </button>
-        </template>
-
-        <!-- Auth Actions -->
-        <template v-else-if="store.state.isAuthenticated">
-          <button
-            id="nav-user-pill"
-            class="user-pill-btn"
-            title="Account Profile"
-            @click="store.setTab('profile')"
-          >
-            <AppIcon name="user" size="13" class="user-pill-icon" />
-            <span class="user-pill-name">{{
-              store.state.user?.displayName ||
-              store.state.user?.email?.split("@")[0]
+            <span class="stage-dot"></span>
+            <span class="stage-label">{{
+              store.state.stageStatus.stageVisible
+                ? "Stage Active"
+                : "Show Stage"
             }}</span>
           </button>
-          <button
-            id="nav-signout-btn"
-            class="nav-auth-btn"
-            title="Sign Out"
-            @click="store.logout()"
-          >
-            Sign Out
-          </button>
-        </template>
-        <template v-else>
-          <button
-            id="nav-signin-btn"
-            class="nav-auth-btn"
-            @click="store.setTab('signin')"
-          >
-            Sign In
-          </button>
-          <button
-            id="nav-signup-btn"
-            class="nav-auth-primary-btn"
-            @click="store.setTab('signup')"
-          >
-            Register
-          </button>
-        </template>
 
-        <!-- Theme Toggle -->
-        <button
-          id="theme-toggle-btn"
-          class="action-icon-btn"
-          title="Toggle Theme"
-          :aria-label="
-            store.state.settings.theme === 'dark'
-              ? 'Switch to light theme'
-              : 'Switch to dark theme'
-          "
-          @click="
-            store.updateSettings({
-              theme: store.state.settings.theme === 'dark' ? 'light' : 'dark',
-            })
-          "
+          <!-- Guest Actions -->
+          <template v-if="store.state.isGuest">
+            <button
+              id="exit-guest-preview-btn"
+              class="nav-auth-btn guest-exit-btn"
+              title="Exit Guest Preview"
+              @click="store.exitGuestPreview()"
+            >
+              Exit Guest Preview
+            </button>
+          </template>
+
+          <!-- Auth Actions -->
+          <template v-else-if="store.state.isAuthenticated">
+            <button
+              id="nav-user-pill"
+              class="user-pill-btn"
+              title="Account Profile"
+              @click="store.setTab('profile')"
+            >
+              <AppIcon name="user" size="13" class="user-pill-icon" />
+              <span class="user-pill-name">{{
+                store.state.user?.displayName ||
+                store.state.user?.email?.split("@")[0]
+              }}</span>
+            </button>
+            <button
+              id="nav-signout-btn"
+              class="nav-auth-btn"
+              title="Sign Out"
+              @click="store.logout()"
+            >
+              Sign Out
+            </button>
+          </template>
+          <template v-else>
+            <button
+              id="nav-signin-btn"
+              class="nav-auth-btn"
+              @click="store.setTab('signin')"
+            >
+              Sign In
+            </button>
+            <button
+              id="nav-signup-btn"
+              class="nav-auth-primary-btn"
+              @click="store.setTab('signup')"
+            >
+              Register
+            </button>
+          </template>
+
+          <!-- Theme Toggle Button -->
+          <button
+            id="theme-toggle-btn"
+            class="icon-btn"
+            :title="
+              store.state.settings.theme === 'dark'
+                ? 'Switch to Light Mode'
+                : 'Switch to Dark Mode'
+            "
+            :aria-label="
+              store.state.settings.theme === 'dark'
+                ? 'Switch to Light Mode'
+                : 'Switch to Dark Mode'
+            "
+            @click="
+              store.updateSettings({
+                theme: store.state.settings.theme === 'dark' ? 'light' : 'dark',
+              })
+            "
+          >
+            <AppIcon
+              :name="store.state.settings.theme === 'dark' ? 'sun' : 'moon'"
+              size="14"
+            />
+          </button>
+        </div>
+      </header>
+
+      <!-- Shell Body: Collapsible Left Sidebar + Central Content Area -->
+      <div class="shell-body">
+        <NavigationBar />
+
+        <main
+          :class="[
+            'shell-main',
+            {
+              'chat-view-active': store.state.currentTab === 'chat',
+            },
+          ]"
+          role="main"
         >
-          <AppIcon
-            :name="store.state.settings.theme === 'dark' ? 'sun' : 'moon'"
-            size="14"
-          />
-        </button>
+          <!-- Guest Preview routing: focus on Avatar Stage and settings -->
+          <template v-if="store.state.isGuest">
+            <AvatarSettingsView v-if="store.state.currentTab === 'avatar'" />
+            <SettingsView v-else-if="store.state.currentTab === 'settings'" />
+            <DiagnosticsView
+              v-else-if="store.state.currentTab === 'diagnostics'"
+            />
+            <AvatarSettingsView v-else />
+          </template>
+
+          <!-- Unauthenticated routing: mount unified 3D VRM Authentication Environment unless viewing system tools -->
+          <template v-else-if="!store.state.isAuthenticated">
+            <SettingsView v-if="store.state.currentTab === 'settings'" />
+            <DiagnosticsView
+              v-else-if="store.state.currentTab === 'diagnostics'"
+            />
+            <AuthEnvironment v-else />
+          </template>
+
+          <!-- Authenticated routing: display Chatspace by default -->
+          <template v-else>
+            <ChatView v-if="store.state.currentTab === 'chat'" />
+            <AvatarSettingsView
+              v-else-if="store.state.currentTab === 'avatar'"
+            />
+            <AgentsView v-else-if="store.state.currentTab === 'agents'" />
+            <SkillsView v-else-if="store.state.currentTab === 'skills'" />
+            <RulesView v-else-if="store.state.currentTab === 'rules'" />
+            <ToolsView v-else-if="store.state.currentTab === 'tools'" />
+            <ConnectionsView
+              v-else-if="store.state.currentTab === 'connections'"
+            />
+            <MemoryView v-else-if="store.state.currentTab === 'memory'" />
+            <ActivityView v-else-if="store.state.currentTab === 'activity'" />
+            <ProfileView v-else-if="store.state.currentTab === 'profile'" />
+            <SecurityView v-else-if="store.state.currentTab === 'security'" />
+            <SecretsView v-else-if="store.state.currentTab === 'secrets'" />
+            <SettingsView v-else-if="store.state.currentTab === 'settings'" />
+            <DiagnosticsView
+              v-else-if="store.state.currentTab === 'diagnostics'"
+            />
+            <ChatView v-else />
+          </template>
+        </main>
       </div>
-    </header>
-
-    <!-- Shell Body: Collapsible Left Sidebar + Central Content Area -->
-    <div class="shell-body">
-      <NavigationBar />
-
-      <main
-        :class="[
-          'shell-main',
-          { 'chat-view-active': store.state.currentTab === 'chat' },
-        ]"
-        role="main"
-      >
-        <!-- Guest Preview routing: focus on Avatar Stage and settings -->
-        <template v-if="store.state.isGuest">
-          <AvatarSettingsView v-if="store.state.currentTab === 'avatar'" />
-          <SettingsView v-else-if="store.state.currentTab === 'settings'" />
-          <DiagnosticsView
-            v-else-if="store.state.currentTab === 'diagnostics'"
-          />
-          <AvatarSettingsView v-else />
-        </template>
-
-        <!-- Unauthenticated routing: display SignInView by default unless on explicit auth/system views -->
-        <template v-else-if="!store.state.isAuthenticated">
-          <SignUpView v-if="store.state.currentTab === 'signup'" />
-          <ForgotPasswordView
-            v-else-if="store.state.currentTab === 'forgot-password'"
-          />
-          <ResetPasswordView
-            v-else-if="store.state.currentTab === 'reset-password'"
-          />
-          <SettingsView v-else-if="store.state.currentTab === 'settings'" />
-          <DiagnosticsView
-            v-else-if="store.state.currentTab === 'diagnostics'"
-          />
-          <SignInView v-else />
-        </template>
-
-        <!-- Authenticated routing: display Chatspace by default -->
-        <template v-else>
-          <ChatView v-if="store.state.currentTab === 'chat'" />
-          <AvatarSettingsView v-else-if="store.state.currentTab === 'avatar'" />
-          <AgentsView v-else-if="store.state.currentTab === 'agents'" />
-          <SkillsView v-else-if="store.state.currentTab === 'skills'" />
-          <RulesView v-else-if="store.state.currentTab === 'rules'" />
-          <ToolsView v-else-if="store.state.currentTab === 'tools'" />
-          <ConnectionsView
-            v-else-if="store.state.currentTab === 'connections'"
-          />
-          <MemoryView v-else-if="store.state.currentTab === 'memory'" />
-          <ActivityView v-else-if="store.state.currentTab === 'activity'" />
-          <ProfileView v-else-if="store.state.currentTab === 'profile'" />
-          <SecurityView v-else-if="store.state.currentTab === 'security'" />
-          <SecretsView v-else-if="store.state.currentTab === 'secrets'" />
-          <SettingsView v-else-if="store.state.currentTab === 'settings'" />
-          <DiagnosticsView
-            v-else-if="store.state.currentTab === 'diagnostics'"
-          />
-          <ChatView v-else />
-        </template>
-      </main>
-    </div>
+    </template>
   </div>
 </template>
 
@@ -329,6 +365,17 @@ onMounted(() => {
   z-index: 20;
   min-width: 0;
   gap: 8px;
+  -webkit-app-region: drag;
+}
+
+.shell-topbar.has-native-overlay {
+  padding-right: 146px;
+}
+
+.topbar-left,
+.topbar-right,
+.shell-topbar button {
+  -webkit-app-region: no-drag;
 }
 
 .topbar-left {
@@ -592,8 +639,25 @@ onMounted(() => {
   min-width: 0;
 }
 
-.shell-main.chat-view-active {
+.shell-main.chat-view-active,
+.shell-main.auth-scene-active {
   overflow: hidden;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+/* Obsidian Glass Chamber Full-Bleed Shell (Zero Topbar, Zero Sidebar, Zero Page Border) */
+.shell-layout.auth-shell-active {
+  width: 100vw;
+  height: 100vh;
+  background-color: var(--obsidian-void, #05060a);
+  color: var(--obsidian-text, #ececf4);
+  border: none;
+  margin: 0;
+  padding: 0;
 }
 
 /* Responsive Topbar reflow */

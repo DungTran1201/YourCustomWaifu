@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, inject } from "vue";
 import { useAppStore } from "@vrm/app-core";
 import AppIcon from "../../components/AppIcon.vue";
+import { AUTH_ENVIRONMENT_KEY } from "../auth/auth-environment-context.js";
 
 const store = useAppStore();
+const authEnv = inject(AUTH_ENVIRONMENT_KEY, null);
 
 const email = ref("");
 const isSubmitting = ref(false);
@@ -12,43 +14,48 @@ const responseMessage = ref("");
 const formError = ref<string | null>(null);
 
 async function handleSubmit() {
-  if (!email.value) {
+  if (!email.value.trim()) {
     formError.value = "Please enter your email address";
     return;
   }
   formError.value = null;
   isSubmitting.value = true;
+  authEnv?.notifySubmitting(true);
   try {
-    const msg = await store.forgotPassword(email.value);
+    const msg = await store.forgotPassword(email.value.trim());
     responseMessage.value = msg;
     submitted.value = true;
   } catch (err: any) {
     formError.value = err?.message || "Failed to submit request";
   } finally {
     isSubmitting.value = false;
+    authEnv?.notifySubmitting(false);
   }
 }
 </script>
 
 <template>
-  <div class="auth-view">
-    <div class="auth-card">
-      <div class="auth-header">
-        <div class="auth-icon" aria-hidden="true">
-          <AppIcon name="key" size="24" />
+  <div
+    class="noir-auth-view"
+    :class="authEnv?.isEmbeddedIn3DStage ? 'embedded-3d' : 'standalone-noir'"
+  >
+    <div class="noir-auth-card">
+      <div class="noir-auth-header">
+        <div class="noir-eyebrow">
+          <AppIcon name="key" size="13" />
+          <span>Account Recovery</span>
         </div>
-        <h1 class="auth-title">Reset Password</h1>
-        <p class="auth-subtitle">
-          We will send a 15-minute recovery link to your contact address
+        <h1 class="noir-auth-title">Reset Password</h1>
+        <p class="noir-auth-subtitle">
+          Request a 15-minute single-use recovery token for your account
         </p>
       </div>
 
       <div v-if="submitted" class="alert alert-success" role="status">
         <div class="alert-title">Recovery Request Dispatched</div>
-        <div class="alert-body">{{ responseMessage }}</div>
+        <div>{{ responseMessage }}</div>
         <div class="alert-hint">
-          If you do not see the email, check your spam folder or verify whether
-          you registered with a typo.
+          Once you have your reset token, enter it on the password update form.
         </div>
       </div>
 
@@ -56,19 +63,29 @@ async function handleSubmit() {
         {{ formError }}
       </div>
 
-      <form v-if="!submitted" class="auth-form" @submit.prevent="handleSubmit">
+      <form
+        v-if="!submitted"
+        class="auth-form"
+        novalidate
+        @submit.prevent="handleSubmit"
+      >
         <div class="form-group">
           <label for="reset-email" class="form-label">Email Address</label>
-          <input
-            id="reset-email"
-            v-model="email"
-            type="email"
-            autocomplete="email"
-            required
-            class="form-input"
-            placeholder="alex@example.com"
-            :disabled="isSubmitting"
-          />
+          <div class="input-wrapper">
+            <input
+              id="reset-email"
+              v-model="email"
+              type="email"
+              autocomplete="email"
+              required
+              class="form-input"
+              placeholder="alex@example.com"
+              :disabled="isSubmitting"
+              @focus="authEnv?.notifyInputFocus()"
+              @blur="authEnv?.notifyInputBlur()"
+              @input="authEnv?.notifyUserTyping()"
+            />
+          </div>
         </div>
 
         <button
@@ -91,205 +108,18 @@ async function handleSubmit() {
         >
           &larr; Back to sign in
         </button>
+        <span class="text-muted">&bull;</span>
+        <button
+          id="goto-reset-token-btn"
+          type="button"
+          class="link-btn"
+          @click="store.setTab('reset-password')"
+        >
+          Enter reset token
+        </button>
       </div>
     </div>
   </div>
 </template>
 
-<style scoped>
-.auth-view {
-  width: 100%;
-  min-width: 0;
-  min-height: 100%;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: clamp(16px, 3vw, 40px) 16px;
-}
-
-.auth-card {
-  width: 100%;
-  max-width: 440px;
-  min-width: 0;
-  box-sizing: border-box;
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  padding: clamp(20px, 4vw, 32px);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
-}
-
-.auth-header {
-  text-align: center;
-  margin-bottom: 24px;
-}
-
-.auth-icon {
-  font-size: 2rem;
-  margin-bottom: 8px;
-}
-
-.auth-title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 6px;
-}
-
-.auth-subtitle {
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-}
-
-.alert {
-  padding: 14px 16px;
-  border-radius: var(--radius-sm);
-  font-size: 0.85rem;
-  margin-bottom: 20px;
-}
-
-.alert-error {
-  background: rgba(239, 68, 68, 0.15);
-  border: 1px solid var(--accent-danger);
-  color: #fca5a5;
-}
-
-.alert-success {
-  background: rgba(16, 185, 129, 0.15);
-  border: 1px solid var(--accent-success);
-  color: #86efac;
-}
-
-.alert-title {
-  font-weight: 600;
-  margin-bottom: 4px;
-}
-
-.alert-hint {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  margin-top: 8px;
-}
-
-.auth-form {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.form-label {
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-}
-
-.form-input {
-  width: 100%;
-  padding: 10px 14px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-size: 0.95rem;
-  transition: border-color var(--transition-fast);
-}
-
-.form-input:focus {
-  outline: none;
-  border-color: var(--border-focus);
-  box-shadow: 0 0 0 2px var(--accent-cyan-glow);
-}
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px 16px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  border: none;
-}
-
-.btn-primary {
-  background: var(--accent-indigo);
-  color: #ffffff;
-  margin-top: 6px;
-}
-
-.link-btn {
-  background: none;
-  border: none;
-  color: var(--accent-cyan);
-  font-size: 0.85rem;
-  cursor: pointer;
-  padding: 0;
-}
-
-.link-btn:hover {
-  text-decoration: underline;
-}
-
-.auth-footer {
-  margin-top: 24px;
-  padding-top: 20px;
-  border-top: 1px solid var(--border-subtle);
-  display: flex;
-  justify-content: center;
-}
-
-.font-semibold {
-  font-weight: 600;
-}
-
-.spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: #ffffff;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (max-height: 620px) {
-  .auth-view {
-    padding: 12px 16px;
-  }
-  .auth-card {
-    padding: 18px 22px;
-  }
-  .auth-header {
-    margin-bottom: 14px;
-  }
-  .auth-icon {
-    margin-bottom: 4px;
-  }
-  .auth-title {
-    font-size: 1.3rem;
-    margin-bottom: 4px;
-  }
-  .auth-form {
-    gap: 12px;
-  }
-  .auth-footer {
-    margin-top: 14px;
-    padding-top: 12px;
-  }
-}
-</style>
+<style scoped src="../auth/auth-panel.css"></style>

@@ -15,15 +15,19 @@ describe("Workspace Desktop Authentication UI & Navigation Flow", () => {
     store.state.authNotice = null;
   });
 
-  it("renders unauthenticated state on startup with sign in form and no legacy overview", () => {
+  it("renders unauthenticated borderless Obsidian Chamber on startup with zero Sidebar, zero Topbar, and no legacy overview", () => {
     const wrapper = mount(App);
     const store = useAppStore();
 
     expect(store.state.isAuthenticated).toBe(false);
     expect(wrapper.find("#signin-email").exists()).toBe(true);
     expect(wrapper.find("#signin-password").exists()).toBe(true);
-    expect(wrapper.find("#nav-signin-btn").exists()).toBe(true);
-    expect(wrapper.find("#nav-signup-btn").exists()).toBe(true);
+    expect(wrapper.find("#auth-tab-signin").exists()).toBe(true);
+    expect(wrapper.find("#auth-tab-signup").exists()).toBe(true);
+
+    // Obsidian Glass Chamber invariant: NO Sidebar and NO Shell Topbar in Authentication Mode
+    expect(wrapper.find(".shell-topbar").exists()).toBe(false);
+    expect(wrapper.find(".workspace-sidebar").exists()).toBe(false);
 
     // Strict regression assertion: legacy overview marketing strings must not exist
     expect(wrapper.text()).not.toContain("Architecture Reset Complete");
@@ -33,11 +37,14 @@ describe("Workspace Desktop Authentication UI & Navigation Flow", () => {
     expect(wrapper.find("#overview-signin-btn").exists()).toBe(false);
   });
 
-  it("navigates to Sign In view and verifies form elements", async () => {
+  it("navigates to Sign In view via centered panel mode switcher and verifies form elements", async () => {
     const wrapper = mount(App);
     const store = useAppStore();
 
-    await wrapper.find("#nav-signin-btn").trigger("click");
+    await wrapper.find("#auth-tab-signup").trigger("click");
+    expect(store.state.currentTab).toBe("signup");
+
+    await wrapper.find("#auth-tab-signin").trigger("click");
     expect(store.state.currentTab).toBe("signin");
     expect(wrapper.text()).toContain("Welcome Back");
     expect(wrapper.find("#signin-email").exists()).toBe(true);
@@ -45,20 +52,68 @@ describe("Workspace Desktop Authentication UI & Navigation Flow", () => {
     expect(wrapper.find("#signin-submit-btn").exists()).toBe(true);
   });
 
-  it("navigates to Sign Up view and displays NIST 15-char requirement and unverified notice", async () => {
+  it("navigates to Sign Up view and displays 8-char requirement and unverified notice while keeping single 3D environment", async () => {
     const wrapper = mount(App);
     const store = useAppStore();
 
-    await wrapper.find("#nav-signup-btn").trigger("click");
+    expect(wrapper.find('[data-testid="auth-3d-environment"]').exists()).toBe(
+      true,
+    );
+    expect(wrapper.findAll(".auth-3d-stage")).toHaveLength(1);
+
+    await wrapper.find("#auth-tab-signup").trigger("click");
     expect(store.state.currentTab).toBe("signup");
     expect(wrapper.text()).toContain("Create Account");
     expect(wrapper.text()).toContain("No Email Verification Required");
-    expect(wrapper.text()).toContain(
-      "15 characters minimum (NIST SP 800-63B-4 standard)",
-    );
+    expect(wrapper.text()).toContain("8 characters minimum");
     expect(wrapper.find("#signup-email").exists()).toBe(true);
     expect(wrapper.find("#signup-password").exists()).toBe(true);
     expect(wrapper.find("#signup-submit-btn").exists()).toBe(true);
+    expect(wrapper.find(".shell-topbar").exists()).toBe(false);
+    expect(wrapper.find(".workspace-sidebar").exists()).toBe(false);
+    // Single 3D stage persists across Sign In <-> Register switch
+    expect(wrapper.findAll(".auth-3d-stage")).toHaveLength(1);
+  });
+
+  it("hides .shell-topbar, NavigationBar, and 'Sign In' topbar title across Sign In, Register, Forgot Password, and Reset Password, and restores ShellLayout for Guest Preview & Authenticated Workspace", async () => {
+    const wrapper = mount(App);
+    const store = useAppStore();
+
+    for (const authTab of [
+      "signin",
+      "signup",
+      "forgot-password",
+      "reset-password",
+    ] as const) {
+      store.setTab(authTab);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.find(".shell-topbar").exists()).toBe(false);
+      expect(wrapper.find(".workspace-sidebar").exists()).toBe(false);
+      expect(wrapper.find(".current-view-title").exists()).toBe(false);
+      expect(wrapper.find('[data-testid="auth-3d-environment"]').exists()).toBe(
+        true,
+      );
+    }
+
+    // Guest Preview restores ShellLayout (Topbar + Sidebar)
+    store.state.isGuest = true;
+    store.setTab("avatar");
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find(".shell-topbar").exists()).toBe(true);
+    expect(wrapper.find(".workspace-sidebar").exists()).toBe(true);
+    expect(wrapper.find('[data-testid="auth-3d-environment"]').exists()).toBe(
+      false,
+    );
+
+    // Reset guest & verify Authenticated Workspace restores ShellLayout
+    store.state.isGuest = false;
+    store.state.isAuthenticated = true;
+    store.setTab("chat");
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find(".shell-topbar").exists()).toBe(true);
+    expect(wrapper.find(".workspace-sidebar").exists()).toBe(true);
+    expect(wrapper.find(".current-view-title").text()).toBe("Companion Chat");
   });
 
   it("dynamically shows companion tabs and user pill when authenticated", async () => {
@@ -81,6 +136,8 @@ describe("Workspace Desktop Authentication UI & Navigation Flow", () => {
 
     await wrapper.vm.$nextTick();
 
+    expect(wrapper.find(".shell-topbar").exists()).toBe(true);
+    expect(wrapper.find(".workspace-sidebar").exists()).toBe(true);
     expect(wrapper.find("#nav-tab-chat").exists()).toBe(true);
     expect(wrapper.find("#nav-tab-avatar").exists()).toBe(true);
     expect(wrapper.find("#nav-tab-agents").exists()).toBe(true);
@@ -91,6 +148,11 @@ describe("Workspace Desktop Authentication UI & Navigation Flow", () => {
     expect(wrapper.find("#nav-tab-memory").exists()).toBe(true);
     expect(wrapper.find("#nav-user-pill").exists()).toBe(true);
     expect(wrapper.find("#nav-signout-btn").exists()).toBe(true);
+    // 3D Auth Environment must be completely unmounted when authenticated
+    expect(wrapper.find('[data-testid="auth-3d-environment"]').exists()).toBe(
+      false,
+    );
+    expect(wrapper.find(".auth-3d-stage").exists()).toBe(false);
   });
 
   it("submits desktop registration via window.desktopAPI and transitions to chat", async () => {

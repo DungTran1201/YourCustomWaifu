@@ -9,6 +9,11 @@ export const APP_METADATA = {
   license: "MIT",
 } as const;
 
+export const PASSWORD_POLICY = {
+  minLength: 8,
+  maxLength: 128,
+} as const;
+
 export const DEFAULT_SETTINGS = {
   theme: "dark" as const,
   telemetryEnabled: false,

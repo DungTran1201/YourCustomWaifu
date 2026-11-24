@@ -5,6 +5,7 @@ import type {
   UserSession,
   ProviderSecretItem,
 } from "@vrm/platform-contracts";
+import { PASSWORD_POLICY } from "@vrm/shared";
 import {
   hashPassword,
   verifyPassword,
@@ -65,11 +66,11 @@ export class AuthService {
       throw new Error("invalid_email_format");
     }
 
-    if (!passwordRaw || passwordRaw.length < 15) {
+    if (!passwordRaw || passwordRaw.length < PASSWORD_POLICY.minLength) {
       throw new Error("password_too_short");
     }
 
-    if (passwordRaw.length > 128) {
+    if (passwordRaw.length > PASSWORD_POLICY.maxLength) {
       throw new Error("password_too_long");
     }
 
@@ -140,6 +141,16 @@ export class AuthService {
     deviceName: string = "web-browser",
   ): Promise<{ user: UserProfile; sessionToken: string; csrfToken: string }> {
     const email = emailRaw.trim().toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new Error("invalid_email_format");
+    }
+    if (!passwordRaw || passwordRaw.length < PASSWORD_POLICY.minLength) {
+      throw new Error("password_too_short");
+    }
+    if (passwordRaw.length > PASSWORD_POLICY.maxLength) {
+      throw new Error("password_too_long");
+    }
+
     const userRow = this.db
       .prepare("SELECT * FROM users WHERE email = ?")
       .get(email) as UserRow | undefined;
@@ -371,10 +382,10 @@ export class AuthService {
   }
 
   public resetPassword(tokenRaw: string, newPasswordRaw: string): void {
-    if (!newPasswordRaw || newPasswordRaw.length < 15) {
+    if (!newPasswordRaw || newPasswordRaw.length < PASSWORD_POLICY.minLength) {
       throw new Error("password_too_short");
     }
-    if (newPasswordRaw.length > 128) {
+    if (newPasswordRaw.length > PASSWORD_POLICY.maxLength) {
       throw new Error("password_too_long");
     }
 
@@ -493,8 +504,11 @@ export class AuthService {
     revokeOthers: boolean = true,
     currentSessionId?: string,
   ): void {
-    if (!newPasswordRaw || newPasswordRaw.length < 15) {
+    if (!newPasswordRaw || newPasswordRaw.length < PASSWORD_POLICY.minLength) {
       throw new Error("password_too_short");
+    }
+    if (newPasswordRaw.length > PASSWORD_POLICY.maxLength) {
+      throw new Error("password_too_long");
     }
 
     const userRow = this.db

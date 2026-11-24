@@ -120,17 +120,103 @@ describe("Authentication & Account Management API Tests", () => {
       expect(resetTokens.count).toBe(0);
     });
 
-    it("rejects password shorter than 15 characters (SEC-PWD-001)", async () => {
+    it("rejects password shorter than 8 characters (SEC-PWD-001)", async () => {
       const res = await request("/api/v1/auth/register", {
         method: "POST",
         body: {
           email: "short@example.com",
-          password: "Short123!",
+          password: "Short1!",
         },
       });
 
       expect(res.status).toBe(422);
       expect(res.body.error).toBe("password_too_short");
+      expect(res.body.message).toContain("at least 8 characters");
+    });
+
+    it("enforces 8-character minimum consistently across Register, Sign In, Reset Password, and Change Password", async () => {
+      process.env.NODE_ENV = "test";
+
+      // 1. Register with exact 8-character password succeeds
+      const regOk = await request("/api/v1/auth/register", {
+        method: "POST",
+        body: {
+          email: "eightchar@example.com",
+          password: "Valid8Ch",
+        },
+      });
+      expect(regOk.status).toBe(201);
+
+      // 2. Sign In rejects <8 characters (422) and accepts exact 8-character password (200)
+      const loginShort = await request("/api/v1/auth/login", {
+        method: "POST",
+        body: {
+          email: "eightchar@example.com",
+          password: "7Chars!",
+        },
+      });
+      expect(loginShort.status).toBe(422);
+      expect(loginShort.body.error).toBe("password_too_short");
+
+      const loginOk = await request("/api/v1/auth/login", {
+        method: "POST",
+        body: {
+          email: "eightchar@example.com",
+          password: "Valid8Ch",
+        },
+      });
+      expect(loginOk.status).toBe(200);
+      const cookie = loginOk.headers.get("set-cookie")!.split(";")[0]!;
+
+      // 3. Change Password rejects <8 characters and accepts 8 characters
+      const changeShort = await request("/api/v1/users/me/change-password", {
+        method: "POST",
+        cookie,
+        body: {
+          currentPassword: "Valid8Ch",
+          newPassword: "7Chars!",
+        },
+      });
+      expect(changeShort.status).toBe(422);
+      expect(changeShort.body.error).toBe("password_too_short");
+
+      const changeOk = await request("/api/v1/users/me/change-password", {
+        method: "POST",
+        cookie,
+        body: {
+          currentPassword: "Valid8Ch",
+          newPassword: "New8Char",
+          revokeOtherSessions: false,
+        },
+      });
+      expect(changeOk.status).toBe(200);
+
+      // 4. Reset Password rejects <8 characters and accepts 8 characters
+      const forgotRes = await request("/api/v1/auth/forgot-password", {
+        method: "POST",
+        body: { email: "eightchar@example.com" },
+      });
+      const resetToken = forgotRes.body.testToken;
+      expect(resetToken).toBeDefined();
+
+      const resetShort = await request("/api/v1/auth/reset-password", {
+        method: "POST",
+        body: {
+          token: resetToken,
+          newPassword: "7Chars!",
+        },
+      });
+      expect(resetShort.status).toBe(422);
+      expect(resetShort.body.error).toBe("password_too_short");
+
+      const resetOk = await request("/api/v1/auth/reset-password", {
+        method: "POST",
+        body: {
+          token: resetToken,
+          newPassword: "Reset8Ch",
+        },
+      });
+      expect(resetOk.status).toBe(200);
     });
 
     it("rejects duplicate email with generic anti-enumeration response", async () => {
@@ -344,12 +430,12 @@ describe("Authentication & Account Management API Tests", () => {
       expect(refreshRes.body.refreshToken).not.toBe(res.body.refreshToken);
     });
 
-    it("rejects password shorter than 15 characters on desktop registration", async () => {
+    it("rejects password shorter than 8 characters on desktop registration", async () => {
       const res = await request("/api/v1/auth/desktop-register", {
         method: "POST",
         body: {
           email: "short_desktop@example.com",
-          password: "TooShort1!",
+          password: "Short1!",
         },
       });
 

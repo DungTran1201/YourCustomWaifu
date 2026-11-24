@@ -1,0 +1,526 @@
+/* Obsidian Glass Chamber — Crisp Centered 2D Authentication Panel (Zero Backdrop Blur Wash) */
+.noir-auth-view {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--obsidian-text, #ececf4);
+}
+
+.noir-auth-view.standalone-noir {
+  min-height: 100%;
+  padding: clamp(16px, 3vw, 36px) 16px;
+  background:
+    radial-gradient(
+      circle at 74% 42%,
+      rgba(145, 133, 217, 0.12) 0%,
+      rgba(10, 12, 20, 0.85) 48%,
+      var(--obsidian-void, #05060a) 85%
+    ),
+    var(--obsidian-void, #05060a);
+}
+
+.noir-auth-view.embedded-3d {
+  padding: 0;
+}
+
+.noir-auth-card {
+  position: relative;
+  width: 100%;
+  max-width: 404px;
+  min-width: 0;
+  box-sizing: border-box;
+  /* Crisp Smoked Obsidian Panel — opaque enough that background never blurs/washes text */
+  background: linear-gradient(
+    180deg,
+    rgba(17, 19, 30, 0.97) 0%,
+    rgba(11, 13, 21, 0.985) 100%
+  );
+  border: 1px solid var(--obsidian-border, #25283d);
+  border-top-color: rgba(145, 133, 217, 0.34);
+  border-radius: 14px;
+  padding: clamp(20px, 3vw, 26px);
+  box-shadow: var(
+    --obsidian-shadow,
+    0 30px 76px rgba(0, 0, 0, 0.88),
+    0 10px 26px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(236, 236, 244, 0.06)
+  );
+}
+
+/* Mode Switcher Tabs (Sign In <-> Register) */
+.noir-mode-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 18px;
+  background: var(--obsidian-input-bg, #090b12);
+  border: 1px solid var(--obsidian-border, #25283d);
+  border-radius: 10px;
+}
+
+.noir-mode-tab {
+  padding: 7px 12px;
+  border-radius: 7px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--obsidian-text-muted, #727693);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.noir-mode-tab:hover:not(.active) {
+  color: var(--obsidian-text, #ececf4);
+  background: rgba(22, 25, 39, 0.65);
+}
+
+.noir-mode-tab.active {
+  color: var(--obsidian-text, #ececf4);
+  background: var(--obsidian-panel-elevated, #161927);
+  border-color: rgba(145, 133, 217, 0.38);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
+}
+
+.noir-auth-header {
+  text-align: left;
+  margin-bottom: 16px;
+}
+
+.noir-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.69rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--obsidian-accent, #9185d9);
+  margin-bottom: 5px;
+}
+
+.noir-auth-title {
+  font-size: 1.38rem;
+  font-weight: 700;
+  color: var(--obsidian-text, #ececf4);
+  letter-spacing: -0.015em;
+  margin-bottom: 4px;
+}
+
+.noir-auth-subtitle {
+  font-size: 0.83rem;
+  color: var(--obsidian-text-secondary, #abaec6);
+  line-height: 1.45;
+}
+
+/* Advisory & Alerts */
+.noir-advisory {
+  background: rgba(13, 15, 25, 0.92);
+  border: 1px solid rgba(145, 133, 217, 0.26);
+  border-left: 3px solid var(--obsidian-accent, #9185d9);
+  border-radius: 8px;
+  padding: 9px 12px;
+  margin-bottom: 14px;
+}
+
+.noir-advisory-title {
+  font-size: 0.77rem;
+  font-weight: 600;
+  color: var(--obsidian-accent, #9185d9);
+  margin-bottom: 2px;
+}
+
+.noir-advisory-text {
+  font-size: 0.74rem;
+  color: var(--obsidian-text-secondary, #abaec6);
+  line-height: 1.38;
+}
+
+.alert {
+  padding: 10px 13px;
+  border-radius: 8px;
+  font-size: 0.81rem;
+  line-height: 1.4;
+  margin-bottom: 14px;
+}
+
+.alert-error {
+  background: rgba(185, 68, 92, 0.18);
+  border: 1px solid rgba(225, 95, 120, 0.48);
+  color: #f9bac6;
+}
+
+.alert-success {
+  background: rgba(16, 185, 129, 0.16);
+  border: 1px solid rgba(52, 211, 153, 0.42);
+  color: #a7f3d0;
+}
+
+.alert-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.alert-hint {
+  font-size: 0.73rem;
+  color: var(--obsidian-text-secondary, #abaec6);
+  margin-top: 6px;
+}
+
+/* Form Elements */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.form-label {
+  font-size: 0.79rem;
+  font-weight: 500;
+  color: var(--obsidian-text-secondary, #abaec6);
+}
+
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.form-input {
+  width: 100%;
+  padding: 10px 13px;
+  background: var(--obsidian-input-bg, #090b12);
+  border: 1px solid var(--obsidian-border, #25283d);
+  border-radius: 8px;
+  color: var(--obsidian-text, #ececf4);
+  font-size: 0.89rem;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    background-color 150ms ease;
+}
+
+.form-input.has-trailing-btn {
+  padding-right: 40px;
+}
+
+.form-input::placeholder {
+  color: rgba(114, 118, 147, 0.68);
+}
+
+.form-input:hover:not(:disabled):not(:focus) {
+  border-color: var(--obsidian-border-hover, rgba(145, 133, 217, 0.44));
+  background: #0b0e17;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--obsidian-accent, #9185d9);
+  background: #0c101b;
+  box-shadow: 0 0 0 3px rgba(145, 133, 217, 0.18);
+}
+
+.form-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.pwd-toggle-btn {
+  position: absolute;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--obsidian-text-muted, #727693);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition:
+    color 140ms ease,
+    background-color 140ms ease;
+}
+
+.pwd-toggle-btn:hover {
+  color: var(--obsidian-text, #ececf4);
+  background: rgba(145, 133, 217, 0.12);
+}
+
+.pwd-meter-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.pwd-meter-track {
+  flex: 1;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(37, 40, 61, 0.9);
+  overflow: hidden;
+}
+
+.pwd-meter-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--obsidian-accent-secondary, #b9789b),
+    var(--obsidian-accent, #9185d9)
+  );
+  transition: width 180ms ease;
+}
+
+.pwd-meter-fill.valid {
+  background: linear-gradient(
+    90deg,
+    var(--obsidian-accent, #9185d9),
+    #34d399
+  );
+}
+
+.input-hint {
+  font-size: 0.72rem;
+  color: var(--obsidian-text-muted, #727693);
+}
+
+.input-hint.valid {
+  color: #6ee7b7;
+}
+
+/* Buttons & Links */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  font-size: 0.89rem;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    transform 150ms ease,
+    box-shadow 150ms ease,
+    background 150ms ease,
+    border-color 150ms ease,
+    opacity 150ms ease;
+  border: 1px solid transparent;
+}
+
+.btn-primary {
+  margin-top: 4px;
+  background: linear-gradient(
+    135deg,
+    #9185d9 0%,
+    #7e72c9 58%,
+    #b9789b 100%
+  );
+  color: #090b12;
+  box-shadow: 0 8px 22px rgba(145, 133, 217, 0.25);
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px rgba(145, 133, 217, 0.35);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-primary:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--obsidian-accent, #9185d9);
+  font-size: 0.79rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+  transition: color 140ms ease;
+}
+
+.link-btn:hover {
+  color: #b7aeec;
+  text-decoration: underline;
+}
+
+.font-semibold {
+  font-weight: 600;
+}
+
+.font-mono {
+  font-family: var(--font-family-mono);
+  font-size: 0.82rem;
+}
+
+/* Guest Preview Action */
+.guest-preview-container {
+  margin-top: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.guest-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: var(--obsidian-text-muted, #727693);
+  font-size: 0.67rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.guest-divider::before,
+.guest-divider::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid var(--obsidian-border, #25283d);
+}
+
+.guest-divider span {
+  padding: 0 10px;
+}
+
+.btn-guest-preview {
+  background: rgba(185, 120, 155, 0.12);
+  color: #e2b8cf;
+  border: 1px solid rgba(185, 120, 155, 0.36);
+  font-size: 0.81rem;
+  font-weight: 600;
+  padding: 9px 14px;
+  border-radius: 8px;
+}
+
+.btn-guest-preview:hover {
+  background: rgba(185, 120, 155, 0.2);
+  border-color: var(--obsidian-accent-secondary, #b9789b);
+  color: var(--obsidian-text, #ececf4);
+}
+
+/* Footer */
+.auth-footer {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--obsidian-border, #25283d);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.81rem;
+}
+
+.text-muted {
+  color: var(--obsidian-text-muted, #727693);
+}
+
+.spinner {
+  width: 15px;
+  height: 15px;
+  border: 2px solid rgba(9, 11, 18, 0.3);
+  border-top-color: #090b12;
+  border-radius: 50%;
+  animation: noirSpin 0.75s linear infinite;
+}
+
+@keyframes noirSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-height: 660px) {
+  .noir-auth-card {
+    padding: 14px 18px;
+  }
+  .noir-mode-tabs {
+    margin-bottom: 10px;
+    padding: 3px;
+  }
+  .noir-mode-tab {
+    padding: 5px 10px;
+    font-size: 0.76rem;
+  }
+  .noir-auth-header {
+    margin-bottom: 10px;
+  }
+  .noir-eyebrow {
+    margin-bottom: 3px;
+  }
+  .noir-auth-title {
+    font-size: 1.18rem;
+    margin-bottom: 2px;
+  }
+  .noir-auth-subtitle {
+    font-size: 0.77rem;
+  }
+  .noir-advisory {
+    padding: 7px 10px;
+    margin-bottom: 9px;
+  }
+  .noir-advisory-text {
+    font-size: 0.71rem;
+    line-height: 1.32;
+  }
+  .auth-form {
+    gap: 8px;
+  }
+  .form-input {
+    padding: 8px 11px;
+    font-size: 0.84rem;
+  }
+  .btn {
+    padding: 8px 14px;
+    font-size: 0.85rem;
+  }
+  .auth-footer {
+    margin-top: 10px;
+    padding-top: 9px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  .form-input,
+  .noir-mode-tab,
+  .pwd-meter-fill {
+    transition: none;
+  }
+  .btn-primary:hover:not(:disabled) {
+    transform: none;
+  }
+}

@@ -321,6 +321,7 @@ export interface DesktopStageAPI {
   loadVrmBuffer: (
     filePath?: string,
   ) => Promise<{ data: ArrayBuffer; name: string }>;
+  loadDefaultVrm?: () => Promise<{ data: ArrayBuffer; name: string }>;
   ensureSampleVrm: () => Promise<{
     success: boolean;
     filePath: string;
@@ -392,6 +393,7 @@ export const IPC_CHANNELS = {
   STAGE_UPDATE_CONFIG: "stage:update-config",
   STAGE_SELECT_VRM_FILE: "stage:select-vrm-file",
   STAGE_LOAD_VRM_BUFFER: "stage:load-vrm-buffer",
+  STAGE_LOAD_DEFAULT_VRM: "stage:load-default-vrm",
   STAGE_ENSURE_SAMPLE_VRM: "stage:ensure-sample-vrm",
   STAGE_TRIGGER_TEST_BLINK: "stage:trigger-test-blink",
   STAGE_GET_BLINK_DIAGNOSTIC: "stage:get-blink-diagnostic",

@@ -1,28 +1,51 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, inject, onMounted } from "vue";
 import { useAppStore } from "@vrm/app-core";
+import { PASSWORD_POLICY } from "@vrm/shared";
 import AppIcon from "../../components/AppIcon.vue";
+import { AUTH_ENVIRONMENT_KEY } from "../auth/auth-environment-context.js";
 
 const store = useAppStore();
+const authEnv = inject(AUTH_ENVIRONMENT_KEY, null);
 
 const email = ref("");
 const password = ref("");
+const showPassword = ref(false);
 const isSubmitting = ref(false);
 const formError = ref<string | null>(null);
 
+function handleInput() {
+  if (formError.value) {
+    formError.value = null;
+  }
+  authEnv?.notifyUserTyping();
+}
+
 async function handleSubmit() {
-  if (!email.value || !password.value) {
+  const trimmedEmail = email.value.trim();
+  if (!trimmedEmail || !password.value) {
     formError.value = "Please enter both email and password";
     return;
   }
+  if (password.value.length < PASSWORD_POLICY.minLength) {
+    formError.value = `Password must be at least ${PASSWORD_POLICY.minLength} characters long`;
+    return;
+  }
+  if (password.value.length > PASSWORD_POLICY.maxLength) {
+    formError.value = `Password must not exceed ${PASSWORD_POLICY.maxLength} characters`;
+    return;
+  }
+
   formError.value = null;
   isSubmitting.value = true;
+  authEnv?.notifySubmitting(true);
   try {
-    await store.login(email.value, password.value);
+    await store.login(trimmedEmail, password.value);
   } catch (err: any) {
     formError.value = err?.message || "Invalid email or password";
   } finally {
     isSubmitting.value = false;
+    authEnv?.notifySubmitting(false);
   }
 }
 
@@ -36,15 +59,47 @@ async function handleGuestPreview() {
 </script>
 
 <template>
-  <div class="auth-view">
-    <div class="auth-card">
-      <div class="auth-header">
-        <div class="auth-icon" aria-hidden="true">
-          <AppIcon name="signin" size="24" />
+  <div
+    class="noir-auth-view"
+    :class="authEnv?.isEmbeddedIn3DStage ? 'embedded-3d' : 'standalone-noir'"
+  >
+    <div class="noir-auth-card">
+      <!-- Foreground Mode Switcher -->
+      <div
+        class="noir-mode-tabs"
+        role="tablist"
+        aria-label="Authentication Mode"
+      >
+        <button
+          id="auth-tab-signin"
+          type="button"
+          role="tab"
+          aria-selected="true"
+          class="noir-mode-tab active"
+          @click="store.setTab('signin')"
+        >
+          Sign In
+        </button>
+        <button
+          id="auth-tab-signup"
+          type="button"
+          role="tab"
+          aria-selected="false"
+          class="noir-mode-tab"
+          @click="store.setTab('signup')"
+        >
+          Register
+        </button>
+      </div>
+
+      <div class="noir-auth-header">
+        <div class="noir-eyebrow">
+          <AppIcon name="sparkles" size="13" />
+          <span>YourCustomWaifu</span>
         </div>
-        <h1 class="auth-title">Welcome Back</h1>
-        <p class="auth-subtitle">
-          Sign in to your personal companion desktop workspace
+        <h1 class="noir-auth-title">Welcome Back</h1>
+        <p class="noir-auth-subtitle">
+          Sign in to awaken your personal companion workspace
         </p>
       </div>
 
@@ -64,19 +119,24 @@ async function handleGuestPreview() {
         {{ store.state.authNotice }}
       </div>
 
-      <form class="auth-form" @submit.prevent="handleSubmit">
+      <form class="auth-form" novalidate @submit.prevent="handleSubmit">
         <div class="form-group">
           <label for="signin-email" class="form-label">Email Address</label>
-          <input
-            id="signin-email"
-            v-model="email"
-            type="email"
-            autocomplete="email"
-            required
-            class="form-input"
-            placeholder="alex@example.com"
-            :disabled="isSubmitting"
-          />
+          <div class="input-wrapper">
+            <input
+              id="signin-email"
+              v-model="email"
+              type="email"
+              autocomplete="email"
+              required
+              class="form-input"
+              placeholder="alex@example.com"
+              :disabled="isSubmitting"
+              @focus="authEnv?.notifyInputFocus()"
+              @blur="authEnv?.notifyInputBlur()"
+              @input="handleInput"
+            />
+          </div>
         </div>
 
         <div class="form-group">
@@ -90,16 +150,32 @@ async function handleGuestPreview() {
               Forgot password?
             </button>
           </div>
-          <input
-            id="signin-password"
-            v-model="password"
-            type="password"
-            autocomplete="current-password"
-            required
-            class="form-input"
-            placeholder="••••••••••••••••"
-            :disabled="isSubmitting"
-          />
+          <div class="input-wrapper">
+            <input
+              id="signin-password"
+              v-model="password"
+              :type="showPassword ? 'text' : 'password'"
+              autocomplete="current-password"
+              required
+              :minlength="PASSWORD_POLICY.minLength"
+              :maxlength="PASSWORD_POLICY.maxLength"
+              class="form-input has-trailing-btn"
+              placeholder="At least 8 characters"
+              :disabled="isSubmitting"
+              @focus="authEnv?.notifyInputFocus()"
+              @blur="authEnv?.notifyInputBlur()"
+              @input="handleInput"
+            />
+            <button
+              type="button"
+              class="pwd-toggle-btn"
+              :aria-label="showPassword ? 'Hide password' : 'Show password'"
+              :title="showPassword ? 'Hide password' : 'Show password'"
+              @click="showPassword = !showPassword"
+            >
+              <AppIcon :name="showPassword ? 'close' : 'eye'" size="15" />
+            </button>
+          </div>
         </div>
 
         <button
@@ -146,266 +222,4 @@ async function handleGuestPreview() {
   </div>
 </template>
 
-<style scoped>
-.auth-view {
-  width: 100%;
-  min-width: 0;
-  min-height: 100%;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: clamp(16px, 3vw, 40px) 16px;
-}
-
-.auth-card {
-  width: 100%;
-  max-width: 440px;
-  min-width: 0;
-  box-sizing: border-box;
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  padding: clamp(20px, 4vw, 32px);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
-}
-
-.auth-header {
-  text-align: center;
-  margin-bottom: 24px;
-}
-
-.auth-icon {
-  font-size: 2rem;
-  margin-bottom: 8px;
-}
-
-.auth-title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 6px;
-}
-
-.auth-subtitle {
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-}
-
-.alert {
-  padding: 12px 16px;
-  border-radius: var(--radius-sm);
-  font-size: 0.85rem;
-  margin-bottom: 20px;
-}
-
-.alert-error {
-  background: rgba(239, 68, 68, 0.15);
-  border: 1px solid var(--accent-danger);
-  color: #fca5a5;
-}
-
-.alert-success {
-  background: rgba(16, 185, 129, 0.15);
-  border: 1px solid var(--accent-success);
-  color: #86efac;
-}
-
-.auth-form {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.label-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.form-label {
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-}
-
-.form-input {
-  width: 100%;
-  padding: 10px 14px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-size: 0.95rem;
-  transition: border-color var(--transition-fast);
-}
-
-.form-input:focus {
-  outline: none;
-  border-color: var(--border-focus);
-  box-shadow: 0 0 0 2px var(--accent-cyan-glow);
-}
-
-.form-input:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px 16px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  border: none;
-}
-
-.btn-primary {
-  background: var(--accent-indigo);
-  color: #ffffff;
-  margin-top: 6px;
-}
-
-.btn-primary:hover:not(:disabled) {
-  opacity: 0.9;
-  transform: translateY(-1px);
-}
-
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.link-btn {
-  background: none;
-  border: none;
-  color: var(--accent-cyan);
-  font-size: 0.85rem;
-  cursor: pointer;
-  padding: 0;
-}
-
-.link-btn:hover {
-  text-decoration: underline;
-}
-
-.guest-preview-container {
-  margin-top: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.guest-divider {
-  display: flex;
-  align-items: center;
-  text-align: center;
-  color: var(--text-muted);
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.guest-divider::before,
-.guest-divider::after {
-  content: "";
-  flex: 1;
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.guest-divider span {
-  padding: 0 10px;
-}
-
-.btn-guest-preview {
-  background: rgba(6, 182, 212, 0.1);
-  color: var(--accent-cyan);
-  border: 1px solid rgba(6, 182, 212, 0.35);
-  font-size: 0.875rem;
-  font-weight: 600;
-  padding: 10px 16px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.btn-guest-preview:hover {
-  background: rgba(6, 182, 212, 0.2);
-  border-color: var(--accent-cyan);
-  transform: translateY(-1px);
-}
-
-.auth-footer {
-  margin-top: 24px;
-  padding-top: 20px;
-  border-top: 1px solid var(--border-subtle);
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-  font-size: 0.85rem;
-}
-
-.text-muted {
-  color: var(--text-muted);
-}
-
-.font-semibold {
-  font-weight: 600;
-}
-
-.spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: #ffffff;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (max-height: 620px) {
-  .auth-view {
-    padding: 12px 16px;
-  }
-  .auth-card {
-    padding: 18px 22px;
-  }
-  .auth-header {
-    margin-bottom: 14px;
-  }
-  .auth-icon {
-    margin-bottom: 4px;
-  }
-  .auth-title {
-    font-size: 1.3rem;
-    margin-bottom: 4px;
-  }
-  .auth-form {
-    gap: 12px;
-  }
-  .guest-preview-container {
-    margin-top: 12px;
-    gap: 8px;
-  }
-  .auth-footer {
-    margin-top: 14px;
-    padding-top: 12px;
-  }
-}
-</style>
+<style scoped src="../auth/auth-panel.css"></style>

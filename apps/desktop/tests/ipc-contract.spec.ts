@@ -20,6 +20,7 @@ describe("Desktop IPC Contract & Channels", () => {
     expect(IPC_CHANNELS.STAGE_TRIGGER_TEST_BLINK).toBe(
       "stage:trigger-test-blink",
     );
+    expect(IPC_CHANNELS.STAGE_LOAD_DEFAULT_VRM).toBe("stage:load-default-vrm");
   });
 
   it("matches application version constant with semver pattern", () => {

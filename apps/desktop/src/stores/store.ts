@@ -706,8 +706,8 @@ export function useAppStore() {
         method: "POST",
         body: JSON.stringify({ token, newPassword }),
       });
-      state.authNotice = res.message;
       setTab("signin");
+      state.authNotice = res.message;
     } catch (err: any) {
       state.authError = err.message;
       throw err;

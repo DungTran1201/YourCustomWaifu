@@ -26,6 +26,7 @@ import {
 } from "@vrm/platform-contracts";
 import {
   APP_METADATA,
+  PASSWORD_POLICY,
   DEFAULT_AVATAR_CONFIG,
   DEFAULT_WORKSPACE_BOUNDS,
   INITIAL_STAGE_STATUS,
@@ -36,7 +37,7 @@ import {
   validateIpcSender,
 } from "./security.js";
 import { validateWindowBounds } from "./bounds.js";
-import { ensureSampleVrm } from "./sample-vrm.js";
+import { ensureSampleVrm, getSampleVrmPath } from "./sample-vrm.js";
 import { isGuestPreviewAllowed } from "./guest-preview.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -256,7 +257,14 @@ function createWorkspaceWindow(): BrowserWindow {
     minWidth: 800,
     minHeight: 560,
     title: APP_METADATA.name,
-    backgroundColor: "#0d0e12",
+    backgroundColor: "#05060a",
+    titleBarStyle: "hidden",
+    titleBarOverlay: {
+      color: "#05060a",
+      symbolColor: "#ececf4",
+      height: 36,
+    },
+    autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, "../preload/index.cjs"),
       contextIsolation: true,
@@ -267,6 +275,8 @@ function createWorkspaceWindow(): BrowserWindow {
       navigateOnDragDrop: false,
     },
   });
+
+  mainWindow.removeMenu();
 
   enforceWindowSecurity(mainWindow);
 
@@ -665,14 +675,34 @@ function registerIpcHandlers(): void {
     if (!validateIpcSender(event.sender, allowedWindows())) {
       throw new Error("Unauthorized IPC sender");
     }
+    if (!credentials || typeof credentials !== "object") {
+      throw new Error("Invalid login payload");
+    }
+    const email =
+      typeof credentials.email === "string" ? credentials.email.trim() : "";
+    const password =
+      typeof credentials.password === "string" ? credentials.password : "";
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new Error("Please enter a valid email address");
+    }
+    if (!password || password.length < PASSWORD_POLICY.minLength) {
+      throw new Error(
+        `Password must be at least ${PASSWORD_POLICY.minLength} characters long`,
+      );
+    }
+    if (password.length > PASSWORD_POLICY.maxLength) {
+      throw new Error(
+        `Password must not exceed ${PASSWORD_POLICY.maxLength} characters`,
+      );
+    }
     const apiBaseUrl =
       process.env["VITE_API_BASE_URL"] || "http://127.0.0.1:3000";
     const res = await fetch(`${apiBaseUrl}/api/v1/auth/desktop-login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        email: credentials.email,
-        password: credentials.password,
+        email,
+        password,
         deviceName: credentials.deviceName || os.hostname(),
       }),
     });
@@ -722,11 +752,15 @@ function registerIpcHandlers(): void {
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       throw new Error("Please enter a valid email address");
     }
-    if (!password || password.length < 15) {
-      throw new Error("Password must be at least 15 characters long");
+    if (!password || password.length < PASSWORD_POLICY.minLength) {
+      throw new Error(
+        `Password must be at least ${PASSWORD_POLICY.minLength} characters long`,
+      );
     }
-    if (password.length > 128) {
-      throw new Error("Password must not exceed 128 characters");
+    if (password.length > PASSWORD_POLICY.maxLength) {
+      throw new Error(
+        `Password must not exceed ${PASSWORD_POLICY.maxLength} characters`,
+      );
     }
 
     const apiBaseUrl =
@@ -1192,6 +1226,50 @@ function registerIpcHandlers(): void {
       };
     },
   );
+
+  ipcMain.handle(IPC_CHANNELS.STAGE_LOAD_DEFAULT_VRM, async (event) => {
+    if (!validateIpcSender(event.sender, allowedWindows())) {
+      throw new Error("Unauthorized IPC sender");
+    }
+
+    const candidates = [
+      process.resourcesPath
+        ? join(process.resourcesPath, "sample-vrm", "AvatarSample_B.vrm")
+        : "",
+      join(__dirname, "../../assets/sample-vrm/AvatarSample_B.vrm"),
+      join(process.cwd(), "assets", "sample-vrm", "AvatarSample_B.vrm"),
+      join(
+        process.cwd(),
+        "apps",
+        "desktop",
+        "assets",
+        "sample-vrm",
+        "AvatarSample_B.vrm",
+      ),
+      getSampleVrmPath(),
+    ].filter(Boolean);
+
+    const maxBytes = 35 * 1024 * 1024;
+    for (const candidate of candidates) {
+      try {
+        const stat = await fs.stat(candidate);
+        if (stat.isFile() && stat.size > 1024 && stat.size <= maxBytes) {
+          const buffer = await fs.readFile(candidate);
+          return {
+            data: buffer.buffer.slice(
+              buffer.byteOffset,
+              buffer.byteOffset + buffer.byteLength,
+            ),
+            name: basename(candidate),
+          };
+        }
+      } catch {
+        // Try next bundled candidate location
+      }
+    }
+
+    throw new Error("Bundled default VRM model is not available on disk");
+  });
 
   ipcMain.handle(IPC_CHANNELS.STAGE_ENSURE_SAMPLE_VRM, async (event) => {
     if (!validateIpcSender(event.sender, allowedWindows())) {
