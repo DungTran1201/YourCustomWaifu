@@ -172,7 +172,7 @@ function handleCreateRule() {
 
 .create-card {
   background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-md);
   padding: 24px;
   margin-bottom: 24px;
@@ -208,7 +208,7 @@ function handleCreateRule() {
 .custom-input {
   padding: 9px 12px;
   background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-size: 0.875rem;
@@ -217,7 +217,7 @@ function handleCreateRule() {
 .custom-textarea {
   padding: 10px 12px;
   background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-family: var(--font-family-sans);
@@ -238,7 +238,7 @@ function handleCreateRule() {
 
 .rule-card {
   background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-md);
   padding: 20px;
   display: flex;
@@ -273,7 +273,7 @@ function handleCreateRule() {
 
 .scope-pill.agent {
   background: rgba(255, 255, 255, 0.08);
-  border: 1px solid var(--border-default);
+  border: none;
   color: var(--text-primary);
 }
 
@@ -332,7 +332,7 @@ function handleCreateRule() {
   background-color: var(--bg-hover);
   transition: 0.3s;
   border-radius: 20px;
-  border: 1px solid var(--border-subtle);
+  border: none;
 }
 
 .slider:before {

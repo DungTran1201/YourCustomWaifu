@@ -214,7 +214,7 @@ async function handleTest(provider: "gemini" | "openai" | "anthropic") {
   flex-wrap: wrap;
   padding: 12px 18px;
   background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-md);
   margin-bottom: 24px;
   color: var(--text-secondary);
@@ -233,7 +233,7 @@ async function handleTest(provider: "gemini" | "openai" | "anthropic") {
 
 .provider-card {
   background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-md);
   padding: 24px;
   display: flex;
@@ -312,7 +312,7 @@ async function handleTest(provider: "gemini" | "openai" | "anthropic") {
 .btn-secondary {
   padding: 8px 16px;
   background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-size: 0.85rem;
@@ -322,7 +322,7 @@ async function handleTest(provider: "gemini" | "openai" | "anthropic") {
 .btn-danger {
   padding: 8px 14px;
   background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  border: none;
   border-radius: var(--radius-sm);
   color: var(--accent-danger);
   font-size: 0.85rem;
@@ -332,7 +332,7 @@ async function handleTest(provider: "gemini" | "openai" | "anthropic") {
   padding: 16px;
   background: var(--bg-surface);
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border-subtle);
+  border: none;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -352,7 +352,7 @@ async function handleTest(provider: "gemini" | "openai" | "anthropic") {
   flex: 1;
   padding: 8px 12px;
   background: var(--bg-primary);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-family: var(--font-family-mono);
@@ -364,7 +364,6 @@ async function handleTest(provider: "gemini" | "openai" | "anthropic") {
   align-items: center;
   gap: 12px;
   padding-top: 12px;
-  border-top: 1px solid var(--border-subtle);
 }
 
 .model-label {
@@ -375,7 +374,7 @@ async function handleTest(provider: "gemini" | "openai" | "anthropic") {
 .model-select {
   padding: 6px 12px;
   background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-family: var(--font-family-mono);

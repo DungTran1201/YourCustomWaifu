@@ -75,7 +75,7 @@ const emit = defineEmits<{
   display: inline-block;
   width: 36px;
   height: 36px;
-  border: 3px solid var(--border-subtle);
+  border: 3px solid var(--accent-muted);
   border-top-color: var(--accent-cyan);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;

@@ -116,6 +116,33 @@ describe("Workspace Desktop Responsive Layout & Viewport Adaptation", () => {
       expect(wrapper.find(".panel-drag-strip").exists()).toBe(true);
     });
 
+    it("mounts invisible 8-direction WindowResizeHandles for borderless frameless Electron windows", () => {
+      const store = useAppStore();
+      store.state.windowMode = "panel";
+      (window as any).desktopAPI = {
+        getDiagnostics: async () => ({ platform: "electron" }),
+        workspace: {
+          getWindowBounds: async () => ({
+            x: 100,
+            y: 100,
+            width: 920,
+            height: 740,
+          }),
+          setWindowBounds: async (b: any) => b,
+        },
+      };
+
+      const wrapper = mount(ShellLayout);
+      expect(wrapper.find(".window-resize-layer").exists()).toBe(true);
+      expect(wrapper.findAll(".resize-edge")).toHaveLength(4);
+      expect(wrapper.findAll(".resize-corner")).toHaveLength(4);
+      expect(
+        wrapper.find(".window-floating-controls #window-close-btn").exists(),
+      ).toBe(true);
+
+      delete (window as any).desktopAPI;
+    });
+
     it("toggles independent Menubar and Panel visibility via Settings toggles, Menubar controls, and keyboard shortcuts", async () => {
       const store = useAppStore();
       store.setTab("settings");

@@ -142,20 +142,20 @@ void propsSafeSceneState;
         </div>
       </div>
 
-      <!-- Borderless Floating Theme Switcher Pill (Light Glass <-> Dark Glass) -->
+      <!-- Borderless Floating Theme Switcher Pill (White <-> Black) -->
       <button
         id="auth-theme-toggle-btn"
         type="button"
         class="auth-theme-pill"
         :title="
           store.resolvedTheme.value === 'dark'
-            ? 'Switch to Light Glass Theme'
-            : 'Switch to Dark Glass Theme'
+            ? 'Switch to White Glass Theme'
+            : 'Switch to Black Glass Theme'
         "
         :aria-label="
           store.resolvedTheme.value === 'dark'
-            ? 'Switch to Light Glass Theme'
-            : 'Switch to Dark Glass Theme'
+            ? 'Switch to White Glass Theme'
+            : 'Switch to Black Glass Theme'
         "
         @click="store.toggleTheme()"
       >
@@ -164,7 +164,7 @@ void propsSafeSceneState;
           size="14"
         />
         <span>{{
-          store.resolvedTheme.value === "dark" ? "Light Glass" : "Dark Glass"
+          store.resolvedTheme.value === "dark" ? "White" : "Black"
         }}</span>
       </button>
     </div>
@@ -180,7 +180,10 @@ void propsSafeSceneState;
   margin: 0;
   padding: 0;
   border: none;
-  background: var(--canvas-bg);
+  border-radius: var(--radius-window, 24px);
+  background: var(--window-glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   color: var(--auth-text);
   overflow: hidden;
   display: flex;

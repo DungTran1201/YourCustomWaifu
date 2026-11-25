@@ -36,11 +36,11 @@
   min-width: 0;
   box-sizing: border-box;
   border: none;
-  border-radius: 26px;
+  border-radius: var(--radius-auth-card, 26px);
   padding: clamp(22px, 3vw, 28px);
   background: var(--auth-glass);
-  backdrop-filter: blur(16px) saturate(145%);
-  -webkit-backdrop-filter: blur(16px) saturate(145%);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   box-shadow: var(--auth-shadow);
   animation: authCardFloat 6.5s ease-in-out infinite;
   transition:
@@ -61,13 +61,12 @@
   margin-bottom: 18px;
   background: var(--glass-surface-subtle);
   border: none;
-  border-radius: 14px;
-  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.05);
+  border-radius: 16px;
 }
 
 .noir-mode-tab {
   padding: 8px 12px;
-  border-radius: 10px;
+  border-radius: 12px;
   font-size: 0.8rem;
   font-weight: 600;
   letter-spacing: 0.01em;
@@ -213,10 +212,9 @@
   padding: 10px 14px;
   background: var(--auth-input-bg);
   border: none;
-  border-radius: 12px;
+  border-radius: 14px;
   color: var(--auth-text);
   font-size: 0.89rem;
-  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.06);
   transition:
     box-shadow 150ms ease,
     background-color 150ms ease;
@@ -320,7 +318,7 @@
   padding: 11px 16px;
   font-size: 0.89rem;
   font-weight: 600;
-  border-radius: 13px;
+  border-radius: 14px;
   cursor: pointer;
   border: none;
   transition:
@@ -399,8 +397,8 @@
 .guest-divider::after {
   content: "";
   flex: 1;
-  height: 1px;
-  background: var(--border-subtle);
+  height: 0;
+  background: transparent;
 }
 
 .guest-divider span {
@@ -414,8 +412,7 @@
   font-size: 0.81rem;
   font-weight: 600;
   padding: 9px 14px;
-  border-radius: 12px;
-  box-shadow: var(--glass-specular);
+  border-radius: 14px;
 }
 
 .btn-guest-preview:hover {

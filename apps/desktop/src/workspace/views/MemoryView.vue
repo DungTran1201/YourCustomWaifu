@@ -352,7 +352,7 @@ function getAgentName(agentId?: string): string {
 .btn-secondary {
   padding: 8px 16px;
   background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  border: none;
   color: var(--text-primary);
   border-radius: var(--radius-sm);
   font-size: 0.85rem;
@@ -362,7 +362,7 @@ function getAgentName(agentId?: string): string {
 .btn-danger {
   padding: 8px 14px;
   background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  border: none;
   border-radius: var(--radius-sm);
   color: var(--accent-danger);
   font-size: 0.85rem;
@@ -393,13 +393,13 @@ function getAgentName(agentId?: string): string {
 
 .success-banner {
   background: rgba(16, 185, 129, 0.15);
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  border: none;
   color: #10b981;
 }
 
 .error-banner {
   background: rgba(239, 68, 68, 0.15);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  border: none;
   color: #ef4444;
 }
 
@@ -408,7 +408,7 @@ function getAgentName(agentId?: string): string {
   align-items: flex-start;
   gap: 14px;
   background: rgba(245, 158, 11, 0.12);
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  border: none;
   border-radius: var(--radius-md);
   padding: 16px 20px;
   margin-bottom: 20px;
@@ -436,7 +436,7 @@ function getAgentName(agentId?: string): string {
   align-items: flex-start;
   gap: 16px;
   background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-md);
   padding: 20px;
   margin-bottom: 24px;
@@ -459,7 +459,7 @@ function getAgentName(agentId?: string): string {
 
 .add-memory-card {
   background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-md);
   padding: 20px;
   margin-bottom: 24px;
@@ -495,7 +495,7 @@ function getAgentName(agentId?: string): string {
 .custom-select {
   padding: 8px 12px;
   background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-size: 0.85rem;
@@ -504,7 +504,7 @@ function getAgentName(agentId?: string): string {
 .custom-input {
   padding: 9px 12px;
   background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-size: 0.875rem;
@@ -525,7 +525,7 @@ function getAgentName(agentId?: string): string {
   width: 100%;
   padding: 10px 16px;
   background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-md);
   color: var(--text-primary);
   font-size: 0.9rem;
@@ -542,13 +542,13 @@ function getAgentName(agentId?: string): string {
   text-align: center;
   color: var(--text-muted);
   background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-md);
 }
 
 .memory-card {
   background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-md);
   padding: 16px 20px;
   display: flex;
@@ -596,7 +596,7 @@ function getAgentName(agentId?: string): string {
   padding: 2px 8px;
   border-radius: var(--radius-sm);
   background: var(--surface-hover, rgba(255, 255, 255, 0.08));
-  border: 1px solid var(--border-subtle);
+  border: none;
   color: var(--text-secondary);
   font-size: 0.7rem;
 }
@@ -659,7 +659,7 @@ function getAgentName(agentId?: string): string {
 
 .btn-cancel-delete {
   background: transparent;
-  border: 1px solid var(--border-subtle);
+  border: none;
   color: var(--text-secondary);
   border-radius: 4px;
   padding: 2px 8px;
@@ -679,7 +679,7 @@ function getAgentName(agentId?: string): string {
 
 .confirmation-modal {
   background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-md);
   padding: 24px;
   max-width: 440px;

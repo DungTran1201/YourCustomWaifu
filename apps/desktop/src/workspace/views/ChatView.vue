@@ -550,7 +550,7 @@ async function copyMessage(id: string, text: string) {
   height: 28px;
   border-radius: var(--radius-sm);
   background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  border: none;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -612,7 +612,7 @@ async function copyMessage(id: string, text: string) {
   gap: 7px;
   padding: 3px 9px;
   background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-size: 0.74rem;
@@ -624,12 +624,10 @@ async function copyMessage(id: string, text: string) {
 
 .model-selector-trigger:hover {
   background: var(--bg-hover);
-  border-color: var(--border-default);
   color: var(--text-primary);
 }
 
 .model-selector-trigger.is-open {
-  border-color: #06b6d4;
   box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.2);
   background: var(--bg-hover);
 }
@@ -733,7 +731,6 @@ async function copyMessage(id: string, text: string) {
   align-items: center;
   justify-content: space-between;
   padding: 6px 8px 8px;
-  border-bottom: 1px solid var(--border-subtle);
   margin-bottom: 6px;
 }
 
@@ -758,7 +755,6 @@ async function copyMessage(id: string, text: string) {
 
 .model-provider-group {
   padding-bottom: 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .model-provider-group:last-child {
@@ -811,7 +807,7 @@ async function copyMessage(id: string, text: string) {
   padding: 6px 10px;
   border-radius: var(--radius-sm);
   background: transparent;
-  border: 1px solid transparent;
+  border: none;
   color: var(--text-secondary);
   cursor: pointer;
   text-align: left;
@@ -826,7 +822,6 @@ async function copyMessage(id: string, text: string) {
 
 .model-option-btn.is-selected {
   background: rgba(6, 182, 212, 0.12);
-  border-color: rgba(6, 182, 212, 0.35);
   color: #06b6d4;
   font-weight: 600;
 }
@@ -869,7 +864,6 @@ async function copyMessage(id: string, text: string) {
 .dropdown-footer {
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px solid var(--border-subtle);
 }
 
 .manage-keys-link {
@@ -881,7 +875,7 @@ async function copyMessage(id: string, text: string) {
   padding: 6px 10px;
   border-radius: var(--radius-sm);
   background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  border: none;
   color: var(--text-secondary);
   font-size: 0.72rem;
   font-weight: 500;
@@ -892,7 +886,6 @@ async function copyMessage(id: string, text: string) {
 .manage-keys-link:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
-  border-color: var(--border-default);
 }
 
 /* Empty state clickable model code button */
@@ -914,7 +907,6 @@ async function copyMessage(id: string, text: string) {
 .model-code-btn:hover .model-code {
   background: var(--bg-hover);
   color: #06b6d4;
-  border-color: rgba(6, 182, 212, 0.4);
 }
 
 .header-actions {
@@ -931,7 +923,7 @@ async function copyMessage(id: string, text: string) {
   padding: 4px 8px;
   font-size: 0.75rem;
   color: var(--text-muted);
-  border: 1px solid transparent;
+  border: none;
   border-radius: var(--radius-sm);
   background: transparent;
   cursor: pointer;
@@ -941,7 +933,6 @@ async function copyMessage(id: string, text: string) {
 .chat-action-btn:hover {
   color: var(--text-primary);
   background: var(--bg-hover);
-  border-color: var(--border-subtle);
 }
 
 /* Messages area */
@@ -984,7 +975,7 @@ async function copyMessage(id: string, text: string) {
   height: 48px;
   border-radius: var(--radius-md);
   background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  border: none;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1025,7 +1016,7 @@ async function copyMessage(id: string, text: string) {
 .quick-prompt-chip {
   padding: 6px 12px;
   background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
   font-size: 0.78rem;
@@ -1036,7 +1027,6 @@ async function copyMessage(id: string, text: string) {
 .quick-prompt-chip:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
-  border-color: var(--border-default);
 }
 
 /* Message Rows */
@@ -1186,7 +1176,7 @@ async function copyMessage(id: string, text: string) {
   width: calc(100% - 32px);
   padding: 8px 12px;
   background: rgba(239, 68, 68, 0.12);
-  border: 1px solid rgba(239, 68, 68, 0.35);
+  border: none;
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
@@ -1276,7 +1266,6 @@ async function copyMessage(id: string, text: string) {
   align-items: center;
   justify-content: space-between;
   padding-top: 4px;
-  border-top: 1px solid var(--border-subtle);
   gap: 8px;
 }
 
@@ -1290,7 +1279,7 @@ async function copyMessage(id: string, text: string) {
 
 .toolbar-hint kbd {
   background: var(--bg-elevated);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: 3px;
   padding: 1px 4px;
   font-size: 0.65rem;

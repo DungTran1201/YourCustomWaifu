@@ -1,151 +1,162 @@
 :root,
 [data-theme="light"] {
-  /* Primary Light Clear Frosted White Glass over OS Desktop Blur (Acrylic) */
-  --canvas-bg: rgba(255, 255, 255, 0.01);
+  /* Default Pure White Frosted Translucent Glass over Real OS Desktop Blur (Zero Borders) */
+  --canvas-bg: transparent;
+  --window-glass-bg: rgba(255, 255, 255, 0.36);
 
-  --bg-primary: rgba(255, 255, 255, 0.14);
-  --bg-sidebar: rgba(255, 255, 255, 0.2);
-  --bg-secondary: rgba(255, 255, 255, 0.22);
-  --bg-main: rgba(255, 255, 255, 0.14);
-  --bg-surface: rgba(255, 255, 255, 0.24);
-  --bg-tertiary: rgba(255, 255, 255, 0.1);
-  --bg-elevated: rgba(255, 255, 255, 0.42);
-  --bg-card: rgba(255, 255, 255, 0.24);
-  --bg-hover: rgba(255, 255, 255, 0.3);
-  --bg-selected: rgba(255, 255, 255, 0.44);
-  --bg-card-hover: rgba(255, 255, 255, 0.36);
+  --bg-primary: rgba(255, 255, 255, 0.38);
+  --bg-sidebar: rgba(255, 255, 255, 0.42);
+  --bg-secondary: rgba(255, 255, 255, 0.42);
+  --bg-main: rgba(255, 255, 255, 0.4);
+  --bg-surface: rgba(255, 255, 255, 0.5);
+  --bg-tertiary: rgba(255, 255, 255, 0.28);
+  --bg-elevated: rgba(255, 255, 255, 0.68);
+  --bg-card: rgba(255, 255, 255, 0.52);
+  --bg-hover: rgba(255, 255, 255, 0.62);
+  --bg-selected: rgba(255, 255, 255, 0.74);
+  --bg-card-hover: rgba(255, 255, 255, 0.66);
 
-  /* Borderless Glass Tokens */
-  --glass-surface: rgba(255, 255, 255, 0.2);
-  --glass-surface-strong: rgba(255, 255, 255, 0.38);
-  --glass-surface-subtle: rgba(255, 255, 255, 0.1);
-  --glass-input: rgba(255, 255, 255, 0.28);
-  --glass-input-focus: rgba(255, 255, 255, 0.64);
-  --glass-blur: blur(14px) saturate(140%);
-  --glass-specular:
-    inset 0 1px 0 rgba(255, 255, 255, 0.68),
-    inset 0 -1px 0 rgba(15, 23, 42, 0.03);
+  /* Borderless Frosted Glass Tokens (Slightly More Transparent + Lighter Soft Blur) */
+  --glass-surface: rgba(255, 255, 255, 0.42);
+  --notch-surface: rgba(255, 255, 255, 0.9);
+  --glass-surface-strong: rgba(255, 255, 255, 0.64);
+  --glass-surface-subtle: rgba(255, 255, 255, 0.32);
+  --glass-input: rgba(255, 255, 255, 0.58);
+  --glass-input-focus: rgba(255, 255, 255, 0.84);
+  --glass-blur: blur(16px) saturate(135%);
+  --glass-blur-subtle: blur(12px) saturate(125%);
+  --glass-specular: none;
   --glass-shadow:
-    0 18px 42px rgba(15, 23, 42, 0.08),
-    0 4px 12px rgba(15, 23, 42, 0.03);
+    0 16px 38px rgba(0, 0, 0, 0.08),
+    0 4px 12px rgba(0, 0, 0, 0.03);
   --glass-shadow-sm:
-    0 8px 20px rgba(15, 23, 42, 0.05),
-    0 2px 6px rgba(15, 23, 42, 0.02);
+    0 6px 18px rgba(0, 0, 0, 0.05),
+    0 2px 6px rgba(0, 0, 0, 0.02);
 
-  /* Hairlines kept subtle/invisible for borderless aesthetic */
-  --border-subtle: rgba(15, 23, 42, 0.06);
-  --border-default: rgba(15, 23, 42, 0.1);
-  --border-focus: rgba(37, 99, 235, 0.5);
+  /* Borderless System: Transparent Strokes */
+  --border-subtle: transparent;
+  --border-default: transparent;
+  --border-focus: rgba(0, 0, 0, 0.32);
 
-  --text-primary: #0f172a;
-  --text-secondary: #334155;
-  --text-muted: #64748b;
-  --focus-ring: rgba(59, 130, 246, 0.45);
+  --text-primary: #0a0a0c;
+  --text-secondary: #27272a;
+  --text-muted: #52525b;
+  --focus-ring: rgba(0, 0, 0, 0.22);
 
   /* Semantic & Interactive Tokens */
-  --accent-primary: #0f172a;
-  --accent-muted: rgba(15, 23, 42, 0.08);
+  --accent-primary: #0a0a0c;
+  --accent-muted: rgba(0, 0, 0, 0.07);
   --accent-cyan: #0284c7;
   --accent-cyan-glow: rgba(2, 132, 199, 0.16);
-  --accent-indigo: #6366f1;
+  --accent-indigo: #4f46e5;
   --accent-success: #059669;
   --accent-warning: #d97706;
   --accent-danger: #dc2626;
 
-  --btn-primary-bg: #0f172a;
-  --btn-primary-text: #f8fafc;
-  --alert-error-bg: rgba(239, 68, 68, 0.12);
+  --btn-primary-bg: #0a0a0c;
+  --btn-primary-text: #ffffff;
+  --alert-error-bg: rgba(239, 68, 68, 0.14);
   --alert-error-text: #b91c1c;
-  --alert-success-bg: rgba(16, 185, 129, 0.14);
+  --alert-success-bg: rgba(16, 185, 129, 0.15);
   --alert-success-text: #047857;
-  --alert-warning-bg: rgba(245, 158, 11, 0.15);
+  --alert-warning-bg: rgba(245, 158, 11, 0.16);
   --alert-warning-text: #b45309;
-  --status-muted-text: #475569;
+  --status-success-bg: rgba(16, 185, 129, 0.15);
+  --status-success-fg: #047857;
+  --status-warning-bg: rgba(245, 158, 11, 0.16);
+  --status-warning-fg: #b45309;
+  --status-error-bg: rgba(239, 68, 68, 0.14);
+  --status-error-fg: #b91c1c;
+  --status-muted-text: #52525b;
 
-  --scrollbar-thumb: rgba(15, 23, 42, 0.16);
-  --scrollbar-thumb-hover: rgba(15, 23, 42, 0.28);
+  --scrollbar-thumb: rgba(0, 0, 0, 0.16);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.28);
 
   --font-family-sans:
     "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-family-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
 
-  /* Synchronized Asymmetric Glass Radii */
+  /* Generous Rounded Corner System (Auth, Menubar, Panel & Cards) */
+  --radius-window: 24px;
+  --radius-auth-card: 26px;
   --radius-shell-major: 24px;
-  --radius-shell-minor: 12px;
+  --radius-shell-minor: 24px;
   --radius-card: 20px;
-  --radius-sm: 10px;
-  --radius-md: 14px;
+  --radius-sm: 12px;
+  --radius-md: 16px;
   --radius-lg: 20px;
 
-  --shadow-sm: 0 4px 12px rgba(15, 23, 42, 0.05);
-  --shadow-md: 0 12px 30px rgba(15, 23, 42, 0.08);
-  --shadow-lg: 0 22px 54px rgba(15, 23, 42, 0.12);
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 12px 28px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.12);
 
   --transition-fast: 140ms cubic-bezier(0.22, 1, 0.36, 1);
   --transition-normal: 220ms cubic-bezier(0.22, 1, 0.36, 1);
 
-  /* Auth Frosted Glass Tokens (Light Translucent Default) */
+  /* Auth Rounded White Glass Tokens (Default) */
   --auth-canvas: transparent;
-  --auth-glass: rgba(255, 255, 255, 0.22);
-  --auth-panel: rgba(255, 255, 255, 0.26);
-  --auth-panel-elevated: rgba(255, 255, 255, 0.52);
-  --auth-input-bg: rgba(255, 255, 255, 0.28);
-  --auth-input-hover: rgba(255, 255, 255, 0.44);
-  --auth-input-focus: rgba(255, 255, 255, 0.68);
-  --auth-accent: #5b5bd6;
-  --auth-accent-secondary: #a2598d;
-  --auth-text: #0f172a;
-  --auth-text-secondary: #334155;
-  --auth-text-muted: #64748b;
-  --auth-btn-bg: linear-gradient(135deg, #1e293b 0%, #312e81 58%, #4c1d95 100%);
+  --auth-glass: rgba(255, 255, 255, 0.62);
+  --auth-panel: rgba(255, 255, 255, 0.66);
+  --auth-panel-elevated: rgba(255, 255, 255, 0.84);
+  --auth-input-bg: rgba(255, 255, 255, 0.64);
+  --auth-input-hover: rgba(255, 255, 255, 0.76);
+  --auth-input-focus: rgba(255, 255, 255, 0.9);
+  --auth-accent: #18181b;
+  --auth-accent-secondary: #52525b;
+  --auth-text: #0a0a0c;
+  --auth-text-secondary: #27272a;
+  --auth-text-muted: #52525b;
+  --auth-btn-bg: #0a0a0c;
   --auth-btn-text: #ffffff;
   --auth-shadow:
-    0 24px 56px rgba(15, 23, 42, 0.12),
-    0 6px 18px rgba(91, 91, 214, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+    0 20px 50px rgba(0, 0, 0, 0.1),
+    0 4px 14px rgba(0, 0, 0, 0.04);
 }
 
+:root[data-theme="dark"],
 [data-theme="dark"] {
-  /* Dark / Black Translucent Frosted Glass over OS Desktop Blur (Acrylic) */
-  --canvas-bg: rgba(8, 12, 22, 0.14);
+  /* Switchable Pure Black Frosted Translucent Glass over Real OS Desktop Blur (Zero Borders) */
+  --canvas-bg: transparent;
+  --window-glass-bg: rgba(0, 0, 0, 0.42);
 
-  --bg-primary: rgba(12, 16, 28, 0.2);
-  --bg-sidebar: rgba(14, 19, 32, 0.26);
-  --bg-secondary: rgba(14, 19, 32, 0.26);
-  --bg-main: rgba(10, 14, 24, 0.18);
-  --bg-surface: rgba(20, 27, 44, 0.3);
-  --bg-tertiary: rgba(12, 17, 30, 0.16);
-  --bg-elevated: rgba(26, 34, 56, 0.46);
-  --bg-card: rgba(16, 22, 38, 0.28);
-  --bg-hover: rgba(255, 255, 255, 0.08);
-  --bg-selected: rgba(255, 255, 255, 0.15);
-  --bg-card-hover: rgba(26, 34, 56, 0.42);
+  --bg-primary: rgba(0, 0, 0, 0.44);
+  --bg-sidebar: rgba(0, 0, 0, 0.46);
+  --bg-secondary: rgba(0, 0, 0, 0.46);
+  --bg-main: rgba(0, 0, 0, 0.44);
+  --bg-surface: rgba(10, 10, 12, 0.54);
+  --bg-tertiary: rgba(0, 0, 0, 0.34);
+  --bg-elevated: rgba(24, 24, 28, 0.72);
+  --bg-card: rgba(8, 8, 10, 0.54);
+  --bg-hover: rgba(255, 255, 255, 0.12);
+  --bg-selected: rgba(255, 255, 255, 0.2);
+  --bg-card-hover: rgba(24, 24, 28, 0.68);
 
-  --glass-surface: rgba(14, 19, 32, 0.26);
-  --glass-surface-strong: rgba(22, 29, 48, 0.44);
-  --glass-surface-subtle: rgba(10, 14, 24, 0.14);
-  --glass-input: rgba(8, 12, 22, 0.3);
-  --glass-input-focus: rgba(16, 22, 38, 0.56);
-  --glass-specular:
-    inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+  --glass-surface: rgba(0, 0, 0, 0.46);
+  --notch-surface: rgba(10, 10, 12, 0.92);
+  --glass-surface-strong: rgba(12, 12, 14, 0.68);
+  --glass-surface-subtle: rgba(0, 0, 0, 0.34);
+  --glass-input: rgba(0, 0, 0, 0.52);
+  --glass-input-focus: rgba(16, 16, 18, 0.78);
+  --glass-blur: blur(16px) saturate(135%);
+  --glass-blur-subtle: blur(12px) saturate(125%);
+  --glass-specular: none;
   --glass-shadow:
-    0 24px 60px rgba(0, 0, 0, 0.54),
-    0 6px 20px rgba(0, 0, 0, 0.34);
+    0 20px 52px rgba(0, 0, 0, 0.52),
+    0 4px 16px rgba(0, 0, 0, 0.3);
   --glass-shadow-sm:
-    0 10px 28px rgba(0, 0, 0, 0.42),
-    0 2px 8px rgba(0, 0, 0, 0.24);
+    0 8px 24px rgba(0, 0, 0, 0.4),
+    0 2px 8px rgba(0, 0, 0, 0.22);
 
-  --border-subtle: rgba(255, 255, 255, 0.07);
-  --border-default: rgba(255, 255, 255, 0.11);
-  --border-focus: rgba(235, 237, 240, 0.45);
+  --border-subtle: transparent;
+  --border-default: transparent;
+  --border-focus: rgba(255, 255, 255, 0.36);
 
-  --text-primary: #f1f5f9;
-  --text-secondary: #cbd5e1;
-  --text-muted: #94a3b8;
-  --focus-ring: rgba(145, 133, 217, 0.5);
+  --text-primary: #fafafa;
+  --text-secondary: #d4d4d8;
+  --text-muted: #a1a1aa;
+  --focus-ring: rgba(255, 255, 255, 0.28);
 
-  --accent-primary: #f1f5f9;
+  --accent-primary: #ffffff;
   --accent-muted: rgba(255, 255, 255, 0.1);
   --accent-cyan: #38bdf8;
   --accent-cyan-glow: rgba(56, 189, 248, 0.18);
@@ -154,40 +165,88 @@
   --accent-warning: #f59e0b;
   --accent-danger: #ef4444;
 
-  --btn-primary-bg: #f8fafc;
-  --btn-primary-text: #0b0d12;
-  --alert-error-bg: rgba(239, 68, 68, 0.18);
+  --btn-primary-bg: #ffffff;
+  --btn-primary-text: #000000;
+  --alert-error-bg: rgba(239, 68, 68, 0.2);
   --alert-error-text: #fca5a5;
-  --alert-success-bg: rgba(16, 185, 129, 0.18);
+  --alert-success-bg: rgba(16, 185, 129, 0.2);
   --alert-success-text: #86efac;
-  --alert-warning-bg: rgba(245, 158, 11, 0.18);
+  --alert-warning-bg: rgba(245, 158, 11, 0.2);
   --alert-warning-text: #fcd34d;
-  --status-muted-text: #94a3b8;
+  --status-success-bg: rgba(16, 185, 129, 0.2);
+  --status-success-fg: #86efac;
+  --status-warning-bg: rgba(245, 158, 11, 0.2);
+  --status-warning-fg: #fcd34d;
+  --status-error-bg: rgba(239, 68, 68, 0.2);
+  --status-error-fg: #fca5a5;
+  --status-muted-text: #a1a1aa;
 
-  --scrollbar-thumb: rgba(255, 255, 255, 0.16);
-  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.28);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.18);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.3);
 
-  --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.52);
-  --shadow-lg: 0 18px 46px rgba(0, 0, 0, 0.65);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.36);
+  --shadow-md: 0 10px 26px rgba(0, 0, 0, 0.48);
+  --shadow-lg: 0 18px 46px rgba(0, 0, 0, 0.62);
 
-  /* Auth Frosted Glass Tokens (Dark Translucent Glass) */
+  /* Auth Rounded Black Glass Tokens */
   --auth-canvas: transparent;
-  --auth-glass: rgba(12, 16, 28, 0.28);
-  --auth-panel: rgba(16, 22, 38, 0.34);
-  --auth-panel-elevated: rgba(28, 36, 58, 0.56);
-  --auth-input-bg: rgba(8, 12, 22, 0.28);
-  --auth-input-hover: rgba(14, 19, 32, 0.44);
-  --auth-input-focus: rgba(18, 24, 42, 0.64);
-  --auth-accent: #9185d9;
-  --auth-accent-secondary: #b9789b;
-  --auth-text: #ececf4;
-  --auth-text-secondary: #cbd5e1;
-  --auth-text-muted: #94a3b8;
-  --auth-btn-bg: linear-gradient(135deg, #9185d9 0%, #7e72c9 58%, #b9789b 100%);
-  --auth-btn-text: #090b12;
+  --auth-glass: rgba(0, 0, 0, 0.64);
+  --auth-panel: rgba(8, 8, 10, 0.68);
+  --auth-panel-elevated: rgba(255, 255, 255, 0.18);
+  --auth-input-bg: rgba(0, 0, 0, 0.52);
+  --auth-input-hover: rgba(16, 16, 18, 0.68);
+  --auth-input-focus: rgba(20, 20, 24, 0.82);
+  --auth-accent: #ffffff;
+  --auth-accent-secondary: #a1a1aa;
+  --auth-text: #fafafa;
+  --auth-text-secondary: #d4d4d8;
+  --auth-text-muted: #a1a1aa;
+  --auth-btn-bg: #ffffff;
+  --auth-btn-text: #000000;
   --auth-shadow:
-    0 28px 70px rgba(0, 0, 0, 0.68),
-    0 10px 26px rgba(0, 0, 0, 0.48),
-    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+    0 24px 64px rgba(0, 0, 0, 0.65),
+    0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+/*
+ * Cross-OS Adaptive Frosted Fallback:
+ * Automatically activated on machines without OS-level compositor blur
+ * (e.g., Linux GNOME/Wayland, Windows with Transparency turned off, VMs/RDP, Web).
+ * Boosts frosted density + CSS blur so aesthetics remain identical on every machine.
+ */
+:root[data-glass-backdrop="frosted-fallback"],
+:root[data-glass-backdrop="frosted-fallback"][data-theme="light"] {
+  --window-glass-bg: rgba(255, 255, 255, 0.76);
+  --bg-primary: rgba(255, 255, 255, 0.72);
+  --bg-sidebar: rgba(255, 255, 255, 0.78);
+  --bg-main: rgba(255, 255, 255, 0.76);
+  --bg-surface: rgba(255, 255, 255, 0.82);
+  --bg-card: rgba(255, 255, 255, 0.8);
+  --glass-surface: rgba(255, 255, 255, 0.78);
+  --notch-surface: rgba(255, 255, 255, 0.86);
+  --glass-surface-strong: rgba(255, 255, 255, 0.88);
+  --glass-surface-subtle: rgba(255, 255, 255, 0.62);
+  --glass-blur: blur(20px) saturate(145%);
+  --glass-blur-subtle: blur(14px) saturate(130%);
+  --auth-glass: rgba(255, 255, 255, 0.84);
+  --auth-panel: rgba(255, 255, 255, 0.88);
+  --auth-input-bg: rgba(255, 255, 255, 0.82);
+}
+
+:root[data-glass-backdrop="frosted-fallback"][data-theme="dark"] {
+  --window-glass-bg: rgba(0, 0, 0, 0.78);
+  --bg-primary: rgba(0, 0, 0, 0.74);
+  --bg-sidebar: rgba(0, 0, 0, 0.8);
+  --bg-main: rgba(0, 0, 0, 0.78);
+  --bg-surface: rgba(12, 12, 14, 0.84);
+  --bg-card: rgba(10, 10, 12, 0.82);
+  --glass-surface: rgba(0, 0, 0, 0.8);
+  --notch-surface: rgba(6, 6, 8, 0.88);
+  --glass-surface-strong: rgba(16, 16, 18, 0.9);
+  --glass-surface-subtle: rgba(0, 0, 0, 0.64);
+  --glass-blur: blur(20px) saturate(145%);
+  --glass-blur-subtle: blur(14px) saturate(130%);
+  --auth-glass: rgba(0, 0, 0, 0.84);
+  --auth-panel: rgba(10, 10, 12, 0.88);
+  --auth-input-bg: rgba(12, 12, 14, 0.8);
 }

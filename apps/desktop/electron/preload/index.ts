@@ -7,6 +7,8 @@ import {
   type AvatarConfig,
   type WindowBounds,
   type WorkspaceWindowState,
+  type MenubarDockPosition,
+  type MenubarDragInput,
 } from "@vrm/platform-contracts";
 
 const desktopAPI: DesktopAPI = {
@@ -133,6 +135,12 @@ const desktopAPI: DesktopAPI = {
         IPC_CHANNELS.WORKSPACE_SET_MENUBAR_COLLAPSED,
         collapsed,
       ),
+    setMenubarDock: (
+      dock: MenubarDockPosition,
+    ): Promise<WorkspaceWindowState> =>
+      ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_SET_MENUBAR_DOCK, dock),
+    dragMenubar: (input: MenubarDragInput): Promise<WorkspaceWindowState> =>
+      ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_DRAG_MENUBAR, input),
     showPanel: (tab?: string): Promise<WorkspaceWindowState> =>
       ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_SHOW_PANEL, tab),
     hidePanel: (): Promise<WorkspaceWindowState> =>
@@ -147,6 +155,10 @@ const desktopAPI: DesktopAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_MINIMIZE_WINDOW),
     toggleMaximizeWindow: (): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_TOGGLE_MAXIMIZE_WINDOW),
+    getWindowBounds: (): Promise<WindowBounds> =>
+      ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_GET_WINDOW_BOUNDS),
+    setWindowBounds: (bounds: Partial<WindowBounds>): Promise<WindowBounds> =>
+      ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_SET_WINDOW_BOUNDS, bounds),
     onStateChanged: (callback: (state: WorkspaceWindowState) => void) => {
       const handler = (_: any, state: WorkspaceWindowState) => callback(state);
       ipcRenderer.on(IPC_CHANNELS.WORKSPACE_STATE_CHANGED, handler);

@@ -137,12 +137,34 @@ export interface MenubarBounds {
 
 export type WorkspaceWindowMode = "combined" | "panel" | "menubar";
 
+export type GlassBackdropMode = "native-blur" | "frosted-fallback";
+
+export type MenubarDockPosition =
+  | "floating"
+  | "top"
+  | "bottom"
+  | "left"
+  | "right"
+  | "top-left"
+  | "top-right"
+  | "bottom-left"
+  | "bottom-right";
+
+export interface MenubarDragInput {
+  cursorX: number;
+  cursorY: number;
+  grabOffsetX: number;
+  grabOffsetY: number;
+}
+
 export interface WorkspaceWindowState {
   menubarVisible: boolean;
   panelVisible: boolean;
   menubarCollapsed: boolean;
+  menubarDock?: MenubarDockPosition;
   currentTab: string;
   theme: "light" | "dark" | "system";
+  glassBackdropMode?: GlassBackdropMode;
   isAuthenticated: boolean;
   isGuest: boolean;
   user: UserProfile | null;
@@ -383,6 +405,8 @@ export interface DesktopWorkspaceAPI {
   hideMenubar?: () => Promise<WorkspaceWindowState>;
   toggleMenubar?: (visible?: boolean) => Promise<WorkspaceWindowState>;
   setMenubarCollapsed?: (collapsed: boolean) => Promise<WorkspaceWindowState>;
+  setMenubarDock?: (dock: MenubarDockPosition) => Promise<WorkspaceWindowState>;
+  dragMenubar?: (input: MenubarDragInput) => Promise<WorkspaceWindowState>;
   showPanel?: (tab?: string) => Promise<WorkspaceWindowState>;
   hidePanel?: () => Promise<WorkspaceWindowState>;
   togglePanel?: (visible?: boolean) => Promise<WorkspaceWindowState>;
@@ -390,6 +414,8 @@ export interface DesktopWorkspaceAPI {
   resetLayout?: () => Promise<WorkspaceWindowState>;
   minimizeWindow?: () => Promise<void>;
   toggleMaximizeWindow?: () => Promise<void>;
+  getWindowBounds?: () => Promise<WindowBounds>;
+  setWindowBounds?: (bounds: Partial<WindowBounds>) => Promise<WindowBounds>;
   onStateChanged?: (
     callback: (state: WorkspaceWindowState) => void,
   ) => () => void;
@@ -453,6 +479,8 @@ export const IPC_CHANNELS = {
   WORKSPACE_HIDE_MENUBAR: "workspace:hide-menubar",
   WORKSPACE_TOGGLE_MENUBAR: "workspace:toggle-menubar",
   WORKSPACE_SET_MENUBAR_COLLAPSED: "workspace:set-menubar-collapsed",
+  WORKSPACE_SET_MENUBAR_DOCK: "workspace:set-menubar-dock",
+  WORKSPACE_DRAG_MENUBAR: "workspace:drag-menubar",
   WORKSPACE_SHOW_PANEL: "workspace:show-panel",
   WORKSPACE_HIDE_PANEL: "workspace:hide-panel",
   WORKSPACE_TOGGLE_PANEL: "workspace:toggle-panel",
@@ -460,6 +488,8 @@ export const IPC_CHANNELS = {
   WORKSPACE_RESET_LAYOUT: "workspace:reset-layout",
   WORKSPACE_MINIMIZE_WINDOW: "workspace:minimize-window",
   WORKSPACE_TOGGLE_MAXIMIZE_WINDOW: "workspace:toggle-maximize-window",
+  WORKSPACE_GET_WINDOW_BOUNDS: "workspace:get-window-bounds",
+  WORKSPACE_SET_WINDOW_BOUNDS: "workspace:set-window-bounds",
 } as const;
 
 export type IPCChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

@@ -4,6 +4,7 @@ import { DEFAULT_AVATAR_CONFIG, INITIAL_STAGE_STATUS } from "@vrm/shared";
 import { createWebFallbackAPI, useAppStore } from "@vrm/app-core";
 import { validateIpcSender } from "../electron/main/security.js";
 import { validateWindowBounds } from "../electron/main/bounds.js";
+import { getGlassBrowserWindowOptions } from "../electron/main/platform-glass.js";
 
 describe("Avatar Stage & Workspace Desktop Lifecycle Contracts", () => {
   beforeEach(() => {
@@ -56,6 +57,12 @@ describe("Avatar Stage & Workspace Desktop Lifecycle Contracts", () => {
     expect(IPC_CHANNELS.WORKSPACE_TOGGLE_PANEL).toBe("workspace:toggle-panel");
     expect(IPC_CHANNELS.WORKSPACE_NAVIGATE_TAB).toBe("workspace:navigate-tab");
     expect(IPC_CHANNELS.WORKSPACE_RESET_LAYOUT).toBe("workspace:reset-layout");
+    expect(IPC_CHANNELS.WORKSPACE_GET_WINDOW_BOUNDS).toBe(
+      "workspace:get-window-bounds",
+    );
+    expect(IPC_CHANNELS.WORKSPACE_SET_WINDOW_BOUNDS).toBe(
+      "workspace:set-window-bounds",
+    );
   });
 
   it("verifies stage initial status has stageVisible = false and retains default dimensions", () => {
@@ -436,5 +443,39 @@ describe("Avatar Stage & Workspace Desktop Lifecycle Contracts", () => {
     await expect(
       fallbackAPI.stage?.setIgnoreMouseEvents?.(true, true),
     ).resolves.toBeUndefined();
+  });
+
+  it("produces consistent borderless transparent glass window options across Windows, macOS, and Linux", () => {
+    const winOpts = getGlassBrowserWindowOptions("win32");
+    expect(winOpts.frame).toBe(false);
+    expect(winOpts.transparent).toBe(true);
+    expect(winOpts.backgroundColor).toBe("#00000000");
+    expect(winOpts.hasShadow).toBe(false);
+    expect(winOpts.roundedCorners).toBe(true);
+    expect(winOpts.vibrancy).toBeUndefined();
+
+    const macOpts = getGlassBrowserWindowOptions("darwin");
+    expect(macOpts.frame).toBe(false);
+    expect(macOpts.transparent).toBe(true);
+    expect(macOpts.vibrancy).toBe("under-window");
+    expect(macOpts.visualEffectState).toBe("active");
+
+    const linuxOpts = getGlassBrowserWindowOptions("linux");
+    expect(linuxOpts.frame).toBe(false);
+    expect(linuxOpts.transparent).toBe(true);
+    expect(linuxOpts.roundedCorners).toBe(true);
+    expect(linuxOpts.vibrancy).toBeUndefined();
+
+    // Overlay windows (Menubar & Stage) must opt out of taskbar & activation stealing
+    const overlayWin = getGlassBrowserWindowOptions("win32", { overlay: true });
+    expect(overlayWin.skipTaskbar).toBe(true);
+    expect(overlayWin.focusable).toBe(false);
+
+    const overlayLinux = getGlassBrowserWindowOptions("linux", {
+      overlay: true,
+    });
+    expect(overlayLinux.skipTaskbar).toBe(true);
+    expect(overlayLinux.focusable).toBe(false);
+    expect(overlayLinux.type).toBe("toolbar");
   });
 });

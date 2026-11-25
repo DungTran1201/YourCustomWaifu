@@ -1,5 +1,6 @@
 export { default as ShellLayout } from "./ShellLayout.vue";
 export { default as NavigationBar } from "./NavigationBar.vue";
+export { default as WindowResizeHandles } from "./WindowResizeHandles.vue";
 export { default as StatusBadge } from "./StatusBadge.vue";
 export { default as StateView } from "./StateView.vue";
 export { default as AppIcon } from "./AppIcon.vue";

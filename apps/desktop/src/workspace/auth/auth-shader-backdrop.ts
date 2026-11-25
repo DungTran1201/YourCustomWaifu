@@ -41,15 +41,15 @@ const FRAGMENT_SHADER = /* glsl */ `
     float dCursor = length(uv - cursorPos);
     float cursorSheen = exp(-dCursor * dCursor * 7.5);
 
-    vec3 lightColor = mix(vec3(1.0, 1.0, 1.0), vec3(0.86, 0.92, 1.0), cursorSheen * 0.45);
-    vec3 darkColor = mix(vec3(0.32, 0.36, 0.68), vec3(0.45, 0.34, 0.58), cursorSheen * 0.55);
+    vec3 lightColor = mix(vec3(1.0, 1.0, 1.0), vec3(0.96, 0.96, 0.98), cursorSheen * 0.45);
+    vec3 darkColor = mix(vec3(0.02, 0.02, 0.03), vec3(0.16, 0.16, 0.18), cursorSheen * 0.55);
     vec3 color = mix(lightColor, darkColor, uThemeMix);
 
-    float lightAlpha = coreGlow * 0.06 + cursorSheen * 0.04;
-    float darkAlpha = coreGlow * 0.06 + cursorSheen * 0.04;
+    float lightAlpha = coreGlow * 0.08 + cursorSheen * 0.05;
+    float darkAlpha = coreGlow * 0.1 + cursorSheen * 0.06;
     float alpha = mix(lightAlpha, darkAlpha, uThemeMix);
 
-    gl_FragColor = vec4(color, clamp(alpha, 0.0, 0.09));
+    gl_FragColor = vec4(color, clamp(alpha, 0.0, 0.12));
   }
 `;
 

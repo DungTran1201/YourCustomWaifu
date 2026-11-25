@@ -1,6 +1,16 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted } from "vue";
 import { useAppStore, type NavigationTab } from "@vrm/app-core";
+import {
+  NOTCH_CORNER_OUTER_SIZE,
+  NOTCH_CORNER_THICKNESS,
+  NOTCH_HORIZONTAL_HEIGHT,
+  NOTCH_HORIZONTAL_WIDTH,
+  NOTCH_VERTICAL_HEIGHT,
+  NOTCH_VERTICAL_WIDTH,
+  buildNotchContour,
+  contourToSvgPath,
+} from "@vrm/shared";
 import AppIcon from "./AppIcon.vue";
 
 const props = withDefaults(
@@ -15,31 +25,119 @@ const props = withDefaults(
 const store = useAppStore();
 
 const isNarrowViewport = ref(false);
+const viewportW = ref(
+  typeof window !== "undefined" && window.innerWidth > 0
+    ? window.innerWidth
+    : 0,
+);
+const viewportH = ref(
+  typeof window !== "undefined" && window.innerHeight > 0
+    ? window.innerHeight
+    : 0,
+);
 
 function checkWidth() {
   if (typeof window !== "undefined") {
     isNarrowViewport.value = window.innerWidth <= 860;
+    if (window.innerWidth > 0) viewportW.value = window.innerWidth;
+    if (window.innerHeight > 0) viewportH.value = window.innerHeight;
   }
 }
 
-onMounted(() => {
-  checkWidth();
-  window.addEventListener("resize", checkWidth, { passive: true });
-});
-
-onUnmounted(() => {
-  window.removeEventListener("resize", checkWidth);
-});
-
 const isDetachedWindow = computed(
   () => props.detached || store.state.windowMode === "menubar",
+);
+
+const activeDock = computed(() =>
+  isDetachedWindow.value ? store.state.menubarDock : "floating",
+);
+
+const isCornerFolded = computed(
+  () =>
+    activeDock.value === "top-left" ||
+    activeDock.value === "top-right" ||
+    activeDock.value === "bottom-left" ||
+    activeDock.value === "bottom-right",
+);
+
+const isHorizontalNotch = computed(
+  () => activeDock.value === "top" || activeDock.value === "bottom",
+);
+
+const isVerticalNotch = computed(
+  () => activeDock.value === "left" || activeDock.value === "right",
+);
+
+const isEdgeNotch = computed(
+  () => isHorizontalNotch.value || isVerticalNotch.value,
+);
+
+const notchClipId = "menubar-notch-silhouette-clip";
+
+const notchDimensions = computed(() => {
+  if (isCornerFolded.value) {
+    const w =
+      viewportW.value >= 120 && viewportW.value <= 420
+        ? viewportW.value
+        : NOTCH_CORNER_OUTER_SIZE;
+    const h =
+      viewportH.value >= 120 && viewportH.value <= 420
+        ? viewportH.value
+        : NOTCH_CORNER_OUTER_SIZE;
+    return { width: w, height: h };
+  }
+  if (isHorizontalNotch.value) {
+    const w =
+      viewportW.value >= 200 && viewportH.value <= 120
+        ? viewportW.value
+        : NOTCH_HORIZONTAL_WIDTH;
+    const h =
+      viewportH.value >= 32 && viewportH.value <= 120
+        ? viewportH.value
+        : NOTCH_HORIZONTAL_HEIGHT;
+    return { width: w, height: h };
+  }
+  if (isVerticalNotch.value) {
+    const w =
+      viewportW.value >= 32 && viewportW.value <= 120
+        ? viewportW.value
+        : NOTCH_VERTICAL_WIDTH;
+    const h =
+      viewportH.value >= 200 && viewportW.value <= 120
+        ? viewportH.value
+        : NOTCH_VERTICAL_HEIGHT;
+    return { width: w, height: h };
+  }
+  return {
+    width: NOTCH_HORIZONTAL_WIDTH,
+    height: NOTCH_HORIZONTAL_HEIGHT,
+  };
+});
+
+const notchSvgPath = computed(() => {
+  const dock = activeDock.value;
+  if (dock === "floating") return "";
+  const { width, height } = notchDimensions.value;
+  return contourToSvgPath(
+    buildNotchContour(dock, width, height, {
+      armThickness: NOTCH_CORNER_THICKNESS,
+    }),
+  );
+});
+
+const notchClipStyle = computed(() =>
+  notchSvgPath.value
+    ? {
+        clipPath: `url(#${notchClipId})`,
+        WebkitClipPath: `url(#${notchClipId})`,
+      }
+    : undefined,
 );
 
 const isEffectivelyCollapsed = computed(() => {
   if (store.state.sidebarCollapsed) {
     return true;
   }
-  // In an independent Menubar OS window, width is intentionally ~228px; never auto-collapse by viewport width
   if (isDetachedWindow.value) {
     return false;
   }
@@ -135,10 +233,339 @@ const tabGroups = computed<TabGroup[]>(() => {
     },
   ];
 });
+
+// Compact priority tabs shown inside compact Edge Notch & 90° Corner L-Notch
+const compactNotchTabs = computed<TabDef[]>(() => {
+  const flat = tabGroups.value.flatMap((g) => g.tabs);
+  const priorityOrder: NavigationTab[] = [
+    "chat",
+    "avatar",
+    "agents",
+    "memory",
+    "connections",
+    "settings",
+  ];
+  const prioritized = priorityOrder
+    .map((id) => flat.find((t) => t.id === id))
+    .filter((t): t is TabDef => Boolean(t));
+  if (prioritized.length >= 2) {
+    return prioritized.slice(0, 5);
+  }
+  return flat.slice(0, 5);
+});
+
+const cornerArmTabs = computed<TabDef[]>(() =>
+  compactNotchTabs.value.slice(0, 4),
+);
+
+// ---------------------------------------------------------------------------
+// Custom Pointer Perimeter Drag (works across edges & 90-degree corners)
+// ---------------------------------------------------------------------------
+let isDragging = false;
+let grabOffsetX = 0;
+let grabOffsetY = 0;
+let lastCursorX = 0;
+let lastCursorY = 0;
+let dragRafId: number | null = null;
+
+function flushMenubarDrag() {
+  dragRafId = null;
+  if (!isDragging) return;
+  store.dragMenubar({
+    cursorX: lastCursorX,
+    cursorY: lastCursorY,
+    grabOffsetX,
+    grabOffsetY,
+  });
+}
+
+function handleDragMove(e: PointerEvent) {
+  if (!isDragging) return;
+  lastCursorX = e.screenX;
+  lastCursorY = e.screenY;
+  if (dragRafId === null) {
+    dragRafId = requestAnimationFrame(flushMenubarDrag);
+  }
+}
+
+function stopMenubarDrag() {
+  if (!isDragging) return;
+  isDragging = false;
+  if (dragRafId !== null) {
+    cancelAnimationFrame(dragRafId);
+    dragRafId = null;
+  }
+  if (typeof window !== "undefined") {
+    window.removeEventListener("pointermove", handleDragMove);
+    window.removeEventListener("pointerup", stopMenubarDrag);
+    window.removeEventListener("pointercancel", stopMenubarDrag);
+  }
+}
+
+function startMenubarDrag(e: PointerEvent) {
+  if (e.button !== 0 || !isDetachedWindow.value) return;
+  const target = e.target as HTMLElement | null;
+  if (target?.closest("button")) return;
+
+  e.preventDefault();
+  e.stopPropagation();
+
+  isDragging = true;
+  grabOffsetX = e.clientX;
+  grabOffsetY = e.clientY;
+  lastCursorX = e.screenX;
+  lastCursorY = e.screenY;
+
+  window.addEventListener("pointermove", handleDragMove);
+  window.addEventListener("pointerup", stopMenubarDrag);
+  window.addEventListener("pointercancel", stopMenubarDrag);
+}
+
+onMounted(() => {
+  checkWidth();
+  window.addEventListener("resize", checkWidth, { passive: true });
+});
+
+onUnmounted(() => {
+  stopMenubarDrag();
+  window.removeEventListener("resize", checkWidth);
+});
 </script>
 
 <template>
+  <!-- Shared Parametric iPhone-Notch / 90° Corner L-Notch SVG Clip Mask -->
+  <svg
+    v-if="activeDock !== 'floating' && notchSvgPath"
+    width="0"
+    height="0"
+    class="notch-clip-defs"
+    aria-hidden="true"
+  >
+    <defs>
+      <clipPath :id="notchClipId" clipPathUnits="userSpaceOnUse">
+        <path :d="notchSvgPath" />
+      </clipPath>
+    </defs>
+  </svg>
+
+  <!-- 1. 90-Degree Folded L-Shaped Corner Notch (`top-left`, `top-right`, `bottom-left`, `bottom-right`) -->
   <aside
+    v-if="isCornerFolded"
+    :class="['corner-notch-shell', `dock-${activeDock}`]"
+    role="navigation"
+    aria-label="Corner Folded Menubar"
+  >
+    <div class="corner-l-assembly" :style="notchClipStyle">
+      <!-- Joint Corner Pivot Handle (Drag to slide out along either edge or detach to floating) -->
+      <div
+        class="corner-pivot-handle"
+        title="Drag to slide around screen border or pull inward to expand"
+        @pointerdown="startMenubarDrag"
+        @dblclick="store.setMenubarDock('floating')"
+      >
+        <AppIcon name="grip" size="13" class="grip-icon" />
+      </div>
+
+      <!-- Horizontal Arm: Primary Compact Tabs -->
+      <div
+        class="corner-arm corner-arm-horizontal"
+        @pointerdown="startMenubarDrag"
+      >
+        <button
+          v-for="tab in cornerArmTabs"
+          :key="tab.id"
+          :id="`nav-tab-${tab.id}`"
+          :class="[
+            'notch-icon-btn',
+            { active: store.state.currentTab === tab.id },
+          ]"
+          :title="tab.label"
+          :aria-label="tab.label"
+          :aria-current="store.state.currentTab === tab.id ? 'page' : undefined"
+          @click="store.setTab(tab.id)"
+        >
+          <AppIcon :name="tab.icon" size="15" />
+        </button>
+      </div>
+
+      <!-- Vertical Arm: Compact Utility Controls -->
+      <div
+        class="corner-arm corner-arm-vertical"
+        @pointerdown="startMenubarDrag"
+      >
+        <button
+          id="nav-stage-toggle-btn"
+          type="button"
+          :class="[
+            'notch-icon-btn',
+            store.state.stageStatus.stageVisible
+              ? 'stage-dot-active'
+              : undefined,
+          ]"
+          :title="
+            store.state.stageStatus.stageVisible
+              ? 'Hide Avatar Stage (Ctrl+Shift+A)'
+              : 'Show Avatar Stage (Ctrl+Shift+A)'
+          "
+          @click="store.toggleStage()"
+        >
+          <span class="notch-stage-dot"></span>
+        </button>
+
+        <button
+          id="panel-visibility-btn"
+          type="button"
+          :class="['notch-icon-btn', { active: store.state.panelVisible }]"
+          :title="
+            store.state.panelVisible
+              ? 'Hide Panel (Ctrl+\\)'
+              : 'Show Panel (Ctrl+\\)'
+          "
+          @click="store.togglePanel()"
+        >
+          <AppIcon name="panel" size="14" />
+        </button>
+
+        <button
+          id="theme-toggle-btn"
+          type="button"
+          class="notch-icon-btn"
+          :title="
+            store.resolvedTheme.value === 'dark'
+              ? 'Switch to White Background'
+              : 'Switch to Black Background'
+          "
+          @click="store.toggleTheme()"
+        >
+          <AppIcon
+            :name="store.resolvedTheme.value === 'dark' ? 'sun' : 'moon'"
+            size="14"
+          />
+        </button>
+
+        <button
+          id="notch-undock-btn"
+          type="button"
+          class="notch-icon-btn"
+          title="Expand to Floating Menubar"
+          aria-label="Expand to Floating Menubar"
+          @click="store.setMenubarDock('floating')"
+        >
+          <AppIcon name="maximize" size="12" />
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- 2. Compact Screen-Edge Notch (`top`, `bottom`, `left`, `right`) -->
+  <aside
+    v-else-if="isEdgeNotch"
+    :class="[
+      'edge-notch-bar',
+      `dock-${activeDock}`,
+      {
+        'notch-horizontal': isHorizontalNotch,
+        'notch-vertical': isVerticalNotch,
+      },
+    ]"
+    :style="notchClipStyle"
+    role="navigation"
+    aria-label="Edge Notch Menubar"
+    @pointerdown="startMenubarDrag"
+    @dblclick="store.setMenubarDock('floating')"
+  >
+    <div
+      class="notch-drag-grip"
+      title="Drag along screen edge or pull inward to expand"
+    >
+      <AppIcon name="grip" size="13" class="grip-icon" />
+    </div>
+
+    <div class="notch-tabs-strip">
+      <button
+        v-for="tab in compactNotchTabs"
+        :key="tab.id"
+        :id="`nav-tab-${tab.id}`"
+        :class="[
+          'notch-icon-btn',
+          { active: store.state.currentTab === tab.id },
+        ]"
+        :title="tab.label"
+        :aria-label="tab.label"
+        :aria-current="store.state.currentTab === tab.id ? 'page' : undefined"
+        @click="store.setTab(tab.id)"
+      >
+        <AppIcon :name="tab.icon" size="15" />
+      </button>
+    </div>
+
+    <span class="notch-divider-dot" aria-hidden="true"></span>
+
+    <div class="notch-utility-strip">
+      <button
+        id="nav-stage-toggle-btn"
+        type="button"
+        :class="[
+          'notch-icon-btn',
+          store.state.stageStatus.stageVisible ? 'stage-dot-active' : undefined,
+        ]"
+        :title="
+          store.state.stageStatus.stageVisible
+            ? 'Hide Avatar Stage (Ctrl+Shift+A)'
+            : 'Show Avatar Stage (Ctrl+Shift+A)'
+        "
+        @click="store.toggleStage()"
+      >
+        <span class="notch-stage-dot"></span>
+      </button>
+
+      <button
+        id="panel-visibility-btn"
+        type="button"
+        :class="['notch-icon-btn', { active: store.state.panelVisible }]"
+        :title="
+          store.state.panelVisible
+            ? 'Hide Panel (Ctrl+\\)'
+            : 'Show Panel (Ctrl+\\)'
+        "
+        @click="store.togglePanel()"
+      >
+        <AppIcon name="panel" size="14" />
+      </button>
+
+      <button
+        id="theme-toggle-btn"
+        type="button"
+        class="notch-icon-btn"
+        :title="
+          store.resolvedTheme.value === 'dark'
+            ? 'Switch to White Background'
+            : 'Switch to Black Background'
+        "
+        @click="store.toggleTheme()"
+      >
+        <AppIcon
+          :name="store.resolvedTheme.value === 'dark' ? 'sun' : 'moon'"
+          size="14"
+        />
+      </button>
+
+      <button
+        id="notch-undock-btn"
+        type="button"
+        class="notch-icon-btn"
+        title="Expand to Floating Menubar"
+        aria-label="Expand to Floating Menubar"
+        @click="store.setMenubarDock('floating')"
+      >
+        <AppIcon name="maximize" size="12" />
+      </button>
+    </div>
+  </aside>
+
+  <!-- 3. Standard Floating Menubar Sidebar (`floating`) -->
+  <aside
+    v-else
     :class="[
       'workspace-sidebar',
       {
@@ -149,9 +576,13 @@ const tabGroups = computed<TabGroup[]>(() => {
     role="navigation"
     aria-label="Sidebar Navigation"
   >
-    <!-- Slim Draggable Handle & Compact Window Controls (No bulky header bar) -->
-    <div class="sidebar-drag-bar">
-      <div class="sidebar-drag-grip" title="Drag to move Menubar">
+    <!-- Interactive Drag Handle (Drag to any screen edge to morph into Dynamic Notch!) -->
+    <div
+      class="sidebar-drag-bar"
+      title="Drag to move (snap to any screen edge for compact Notch)"
+      @pointerdown="startMenubarDrag"
+    >
+      <div class="sidebar-drag-grip">
         <AppIcon name="grip" size="13" class="grip-icon" />
       </div>
 
@@ -287,13 +718,13 @@ const tabGroups = computed<TabGroup[]>(() => {
           class="utility-icon-btn"
           :title="
             store.resolvedTheme.value === 'dark'
-              ? 'Switch to Light Glass'
-              : 'Switch to Dark Glass'
+              ? 'Switch to White Background'
+              : 'Switch to Black Background'
           "
           :aria-label="
             store.resolvedTheme.value === 'dark'
-              ? 'Switch to Light Glass Mode'
-              : 'Switch to Dark Glass Mode'
+              ? 'Switch to White Background Mode'
+              : 'Switch to Black Background Mode'
           "
           @click="store.toggleTheme()"
         >
@@ -374,15 +805,275 @@ const tabGroups = computed<TabGroup[]>(() => {
 </template>
 
 <style scoped>
+/* =========================================================================
+   1. Edge Notch Mode (`top`, `bottom`, `left`, `right`)
+      Clipped by exact SVG `<clipPath>` iPhone-notch contour (concave ears
+      flaring flush into screen edge + smooth deep convex inner corners).
+   ========================================================================= */
+.notch-clip-defs {
+  position: fixed;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.edge-notch-bar {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--notch-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: none;
+  user-select: none;
+  cursor: grab;
+  overflow: hidden;
+  transition: background-color var(--transition-fast);
+}
+
+.edge-notch-bar:active {
+  cursor: grabbing;
+}
+
+.edge-notch-bar.dock-top {
+  flex-direction: row;
+  padding: 2px 24px 5px;
+}
+
+.edge-notch-bar.dock-bottom {
+  flex-direction: row;
+  padding: 5px 24px 2px;
+}
+
+.edge-notch-bar.dock-left {
+  flex-direction: column;
+  padding: 24px 5px 24px 2px;
+}
+
+.edge-notch-bar.dock-right {
+  flex-direction: column;
+  padding: 24px 2px 24px 5px;
+}
+
+.notch-drag-grip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  opacity: 0.65;
+  padding: 2px;
+  flex-shrink: 0;
+}
+
+.notch-divider-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  opacity: 0.4;
+  flex-shrink: 0;
+}
+
+.notch-tabs-strip,
+.notch-utility-strip {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.notch-vertical .notch-tabs-strip,
+.notch-vertical .notch-utility-strip {
+  flex-direction: column;
+}
+
+.notch-icon-btn {
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast),
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.notch-icon-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  transform: scale(1.06);
+}
+
+.notch-icon-btn.active {
+  background: var(--bg-selected);
+  color: var(--text-primary);
+  box-shadow: var(--glass-shadow-sm);
+}
+
+.notch-stage-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition:
+    background-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.notch-icon-btn.stage-dot-active .notch-stage-dot {
+  background: var(--accent-success);
+  box-shadow: 0 0 8px var(--accent-success);
+}
+
+/* =========================================================================
+   2. 90-Degree L-Shaped Corner Notch (`top-left`, `top-right`, `bottom-*`)
+      Single unified L-assembly clipped via SVG `<clipPath>` (no corner overlap).
+   ========================================================================= */
+.corner-notch-shell {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background: transparent;
+  pointer-events: none;
+  user-select: none;
+}
+
+.corner-l-assembly {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: var(--notch-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: none;
+  pointer-events: auto;
+  cursor: grab;
+  transition: background-color var(--transition-fast);
+}
+
+.corner-l-assembly:active {
+  cursor: grabbing;
+}
+
+.corner-pivot-handle,
+.corner-arm {
+  position: absolute;
+  background: transparent;
+  border: none;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  cursor: grab;
+}
+
+.corner-pivot-handle:active,
+.corner-arm:active {
+  cursor: grabbing;
+}
+
+.corner-pivot-handle {
+  width: 48px;
+  height: 48px;
+  justify-content: center;
+  color: var(--text-muted);
+  z-index: 3;
+}
+
+.corner-arm-horizontal {
+  height: 48px;
+  width: calc(100% - 66px);
+  flex-direction: row;
+  justify-content: space-evenly;
+  padding: 0 4px;
+  gap: 2px;
+  z-index: 2;
+}
+
+.corner-arm-vertical {
+  width: 48px;
+  height: calc(100% - 66px);
+  flex-direction: column;
+  justify-content: space-evenly;
+  padding: 4px 0;
+  gap: 2px;
+  z-index: 2;
+}
+
+/* Position L-shape arms cleanly around each of the 4 screen corners */
+.dock-top-left .corner-pivot-handle {
+  top: 0;
+  left: 0;
+}
+.dock-top-left .corner-arm-horizontal {
+  top: 0;
+  left: 48px;
+}
+.dock-top-left .corner-arm-vertical {
+  top: 48px;
+  left: 0;
+}
+
+.dock-top-right .corner-pivot-handle {
+  top: 0;
+  right: 0;
+}
+.dock-top-right .corner-arm-horizontal {
+  top: 0;
+  right: 48px;
+}
+.dock-top-right .corner-arm-vertical {
+  top: 48px;
+  right: 0;
+}
+
+.dock-bottom-left .corner-pivot-handle {
+  bottom: 0;
+  left: 0;
+}
+.dock-bottom-left .corner-arm-horizontal {
+  bottom: 0;
+  left: 48px;
+}
+.dock-bottom-left .corner-arm-vertical {
+  bottom: 48px;
+  left: 0;
+}
+
+.dock-bottom-right .corner-pivot-handle {
+  bottom: 0;
+  right: 0;
+}
+.dock-bottom-right .corner-arm-horizontal {
+  bottom: 0;
+  right: 48px;
+}
+.dock-bottom-right .corner-arm-vertical {
+  bottom: 48px;
+  right: 0;
+}
+
+/* =========================================================================
+   3. Floating Menubar Sidebar (`floating`)
+   ========================================================================= */
 .workspace-sidebar {
   width: 224px;
   background: var(--glass-surface);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   border: none;
-  border-radius: var(--radius-shell-major, 24px) var(--radius-shell-minor, 12px)
-    var(--radius-shell-minor, 12px) var(--radius-shell-major, 24px);
-  box-shadow: var(--glass-specular), var(--glass-shadow);
+  border-radius: var(--radius-window, 24px);
+  box-shadow: var(--glass-shadow);
   display: flex;
   flex-direction: column;
   user-select: none;
@@ -398,15 +1089,16 @@ const tabGroups = computed<TabGroup[]>(() => {
 .workspace-sidebar.detached {
   width: 100%;
   height: 100%;
-  border-radius: 0;
-  box-shadow: var(--glass-specular);
+  border: none;
+  border-radius: var(--radius-window, 24px);
+  box-shadow: none;
 }
 
 .workspace-sidebar.collapsed:not(.detached) {
   width: 68px;
 }
 
-/* Slim Draggable Top Handle */
+/* Interactive Drag Handle (JS Pointer Drag so edges/corners snap smoothly) */
 .sidebar-drag-bar {
   display: flex;
   align-items: center;
@@ -414,7 +1106,12 @@ const tabGroups = computed<TabGroup[]>(() => {
   padding: 8px 8px 4px;
   min-height: 34px;
   flex-shrink: 0;
-  -webkit-app-region: drag;
+  cursor: grab;
+  -webkit-app-region: no-drag;
+}
+
+.sidebar-drag-bar:active {
+  cursor: grabbing;
 }
 
 .workspace-sidebar.collapsed .sidebar-drag-bar {
@@ -495,9 +1192,9 @@ const tabGroups = computed<TabGroup[]>(() => {
 }
 
 .group-divider {
-  height: 1px;
-  background: var(--border-subtle);
-  margin: 4px 10px;
+  height: 6px;
+  background: transparent;
+  margin: 2px 10px;
 }
 
 .sidebar-nav-btn {
@@ -508,7 +1205,7 @@ const tabGroups = computed<TabGroup[]>(() => {
   height: 36px;
   padding: 0 11px;
   border: none;
-  border-radius: 12px;
+  border-radius: 14px;
   color: var(--text-secondary);
   font-size: 0.825rem;
   font-weight: 500;
@@ -568,8 +1265,8 @@ const tabGroups = computed<TabGroup[]>(() => {
 /* Bottom Pinned Account & Quick Utility Footer */
 .sidebar-footer {
   flex-shrink: 0;
-  padding: 8px;
-  border-top: 1px solid var(--border-subtle);
+  padding: 10px 8px 8px;
+  border: none;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -674,7 +1371,6 @@ const tabGroups = computed<TabGroup[]>(() => {
   padding: 4px;
   border-radius: 14px;
   background: var(--glass-surface-subtle);
-  box-shadow: var(--glass-specular);
 }
 
 .account-dock-collapsed {
@@ -798,15 +1494,15 @@ const tabGroups = computed<TabGroup[]>(() => {
   padding: 6px 8px;
   border: none;
   border-radius: 10px;
-  background: var(--bg-hover);
-  color: var(--text-primary);
-  font-size: 0.75rem;
+  font-size: 0.76rem;
   font-weight: 600;
+  color: var(--alert-warning-text);
+  background: transparent;
   cursor: pointer;
   transition: background-color var(--transition-fast);
 }
 
 .guest-exit-btn:hover {
-  background: var(--bg-selected);
+  background: var(--alert-warning-bg);
 }
 </style>

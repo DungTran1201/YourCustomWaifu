@@ -344,7 +344,7 @@ async function runToolTest(tool: ToolItem) {
   flex-wrap: wrap;
   padding: 12px 18px;
   background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-md);
   margin-bottom: 24px;
   color: var(--text-secondary);
@@ -359,7 +359,7 @@ async function runToolTest(tool: ToolItem) {
 
 .tool-card {
   background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-md);
   padding: 20px;
   display: flex;
@@ -405,7 +405,6 @@ async function runToolTest(tool: ToolItem) {
   flex-wrap: wrap;
   gap: 16px;
   padding-top: 12px;
-  border-top: 1px solid var(--border-subtle);
   font-size: 0.8rem;
 }
 
@@ -424,7 +423,7 @@ async function runToolTest(tool: ToolItem) {
   padding: 2px 6px;
   border-radius: var(--radius-sm);
   background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  border: none;
   font-family: var(--font-family-mono);
 }
 
@@ -455,7 +454,7 @@ async function runToolTest(tool: ToolItem) {
   gap: 6px;
   background: var(--bg-surface);
   color: var(--text-primary);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-sm);
   padding: 5px 12px;
   font-size: 0.78rem;
@@ -466,7 +465,6 @@ async function runToolTest(tool: ToolItem) {
 
 .test-toggle-btn:hover {
   background: var(--bg-hover);
-  border-color: var(--accent-cyan);
   color: var(--accent-cyan);
 }
 
@@ -493,7 +491,7 @@ async function runToolTest(tool: ToolItem) {
   background-color: var(--bg-hover);
   transition: 0.3s;
   border-radius: 20px;
-  border: 1px solid var(--border-subtle);
+  border: none;
 }
 
 .slider:before {
@@ -520,7 +518,7 @@ input:checked + .slider:before {
 /* Test Panel Styles */
 .test-panel {
   background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-sm);
   padding: 16px;
   margin-top: 8px;
@@ -549,7 +547,7 @@ input:checked + .slider:before {
   background: rgba(245, 158, 11, 0.1);
   padding: 2px 8px;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(245, 158, 11, 0.25);
+  border: none;
 }
 
 .params-form {
@@ -584,12 +582,12 @@ input:checked + .slider:before {
   background: var(--bg-card);
   padding: 1px 4px;
   border-radius: 3px;
-  border: 1px solid var(--border-subtle);
+  border: none;
 }
 
 .param-input {
   background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   padding: 8px 10px;
@@ -599,7 +597,6 @@ input:checked + .slider:before {
 }
 
 .param-input:focus {
-  border-color: var(--accent-cyan);
   outline: none;
 }
 
@@ -626,7 +623,6 @@ input:checked + .slider:before {
 
 .confirmation-gate-row {
   padding: 8px 0;
-  border-top: 1px dashed var(--border-subtle);
 }
 
 .test-panel-actions {
@@ -657,7 +653,7 @@ input:checked + .slider:before {
 
 .result-container {
   background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-sm);
   padding: 12px;
   display: flex;
@@ -681,13 +677,13 @@ input:checked + .slider:before {
 .badge-success {
   background: rgba(16, 185, 129, 0.15);
   color: #10b981;
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  border: none;
 }
 
 .badge-error {
   background: rgba(239, 68, 68, 0.15);
   color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  border: none;
 }
 
 .latency-metric {

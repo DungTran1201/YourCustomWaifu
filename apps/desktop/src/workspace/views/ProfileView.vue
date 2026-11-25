@@ -239,7 +239,7 @@ async function handleSave() {
 
 .profile-form {
   background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-md);
   padding: 24px;
   display: flex;
@@ -275,7 +275,7 @@ async function handleSave() {
   width: 100%;
   padding: 10px 14px;
   background: var(--bg-secondary);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-size: 0.95rem;
@@ -283,7 +283,6 @@ async function handleSave() {
 
 .form-input:focus {
   outline: none;
-  border-color: var(--border-focus);
   box-shadow: 0 0 0 2px var(--accent-cyan-glow);
 }
 

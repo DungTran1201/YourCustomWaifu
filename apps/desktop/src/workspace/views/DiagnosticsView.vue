@@ -242,7 +242,7 @@ onMounted(() => {
   padding: 8px 16px;
   background: var(--bg-tertiary);
   color: var(--text-primary);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-sm);
   font-size: 0.85rem;
   font-weight: 500;
@@ -263,7 +263,7 @@ onMounted(() => {
 
 .stat-card {
   background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-md);
   padding: 18px;
   display: flex;
@@ -319,7 +319,7 @@ onMounted(() => {
 
 .cap-card {
   background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-sm);
   padding: 14px 18px;
   display: flex;
@@ -332,7 +332,7 @@ onMounted(() => {
 
 .os-info-box {
   background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-sm);
   padding: 16px 20px;
   display: flex;
@@ -359,7 +359,7 @@ onMounted(() => {
 
 .ipc-card {
   background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-md);
   padding: 20px;
   display: flex;

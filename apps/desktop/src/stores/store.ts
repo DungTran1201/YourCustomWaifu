@@ -19,6 +19,8 @@ import type {
   WindowBounds,
   WorkspaceWindowMode,
   WorkspaceWindowState,
+  MenubarDockPosition,
+  MenubarDragInput,
 } from "@vrm/platform-contracts";
 import {
   DEFAULT_SETTINGS,
@@ -92,6 +94,7 @@ export interface AppState {
   sidebarCollapsed: boolean;
   menubarVisible: boolean;
   panelVisible: boolean;
+  menubarDock: MenubarDockPosition;
   // Guest Preview state
   isGuest: boolean;
   isGuestPreviewAvailable: boolean;
@@ -117,6 +120,7 @@ const state = reactive<AppState>({
   sidebarCollapsed: false,
   menubarVisible: true,
   panelVisible: true,
+  menubarDock: "floating",
   settings: { ...DEFAULT_SETTINGS },
   diagnostics: null,
   isLoading: false,
@@ -420,10 +424,23 @@ function resolveEffectiveTheme(theme: AppSettings["theme"]): "light" | "dark" {
   return "light";
 }
 
+function applyGlassBackdropModeToDocument(
+  mode: "native-blur" | "frosted-fallback",
+) {
+  if (typeof document !== "undefined") {
+    document.documentElement.setAttribute("data-glass-backdrop", mode);
+  }
+}
+
 function applyThemeToDocument(theme: AppSettings["theme"]) {
   const resolved = resolveEffectiveTheme(theme);
   if (typeof document !== "undefined") {
     document.documentElement.setAttribute("data-theme", resolved);
+    if (!document.documentElement.getAttribute("data-glass-backdrop")) {
+      applyGlassBackdropModeToDocument(
+        isElectronEnvironment() ? "native-blur" : "frosted-fallback",
+      );
+    }
   }
   if (
     typeof window !== "undefined" &&
@@ -460,6 +477,9 @@ export function useAppStore() {
       state.menubarVisible = remote.menubarVisible;
       state.panelVisible = remote.panelVisible;
       state.sidebarCollapsed = remote.menubarCollapsed;
+      if (remote.menubarDock) {
+        state.menubarDock = remote.menubarDock;
+      }
 
       const wasSessionActive = state.isAuthenticated || state.isGuest;
       const isRemoteSessionActive = remote.isAuthenticated || remote.isGuest;
@@ -480,6 +500,13 @@ export function useAppStore() {
       ) {
         state.settings.theme = remote.theme;
         applyThemeToDocument(remote.theme);
+      }
+
+      if (
+        remote.glassBackdropMode === "native-blur" ||
+        remote.glassBackdropMode === "frosted-fallback"
+      ) {
+        applyGlassBackdropModeToDocument(remote.glassBackdropMode);
       }
 
       const wasAuthenticated = state.isAuthenticated;
@@ -528,6 +555,15 @@ export function useAppStore() {
               state.menubarVisible = current.menubarVisible;
               state.panelVisible = current.panelVisible;
               state.sidebarCollapsed = current.menubarCollapsed;
+              if (current.menubarDock) {
+                state.menubarDock = current.menubarDock;
+              }
+              if (
+                current.glassBackdropMode === "native-blur" ||
+                current.glassBackdropMode === "frosted-fallback"
+              ) {
+                applyGlassBackdropModeToDocument(current.glassBackdropMode);
+              }
             } finally {
               isApplyingRemoteWorkspaceState = false;
             }
@@ -1741,6 +1777,33 @@ export function useAppStore() {
     }
   }
 
+  function setMenubarDock(dock: MenubarDockPosition) {
+    state.menubarDock = dock;
+    if (
+      !isApplyingRemoteWorkspaceState &&
+      typeof window !== "undefined" &&
+      typeof window.desktopAPI?.workspace?.setMenubarDock === "function"
+    ) {
+      window.desktopAPI.workspace.setMenubarDock(dock).catch(() => {});
+    }
+  }
+
+  function dragMenubar(input: MenubarDragInput) {
+    if (
+      typeof window !== "undefined" &&
+      typeof window.desktopAPI?.workspace?.dragMenubar === "function"
+    ) {
+      window.desktopAPI.workspace
+        .dragMenubar(input)
+        .then((next) => {
+          if (next?.menubarDock) {
+            state.menubarDock = next.menubarDock;
+          }
+        })
+        .catch(() => {});
+    }
+  }
+
   function resetWorkspaceLayout() {
     if (
       typeof window !== "undefined" &&
@@ -1751,6 +1814,7 @@ export function useAppStore() {
       state.menubarVisible = true;
       state.panelVisible = true;
       state.sidebarCollapsed = false;
+      state.menubarDock = "floating";
     }
   }
 
@@ -1782,6 +1846,8 @@ export function useAppStore() {
     toggleSidebar,
     toggleMenubar,
     togglePanel,
+    setMenubarDock,
+    dragMenubar,
     resetWorkspaceLayout,
     minimizeCurrentWindow,
     toggleMaximizeCurrentWindow,

@@ -108,7 +108,7 @@ const activities = computed(() => {
 
 .activity-card {
   background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-md);
   padding: 18px 20px;
   display: flex;

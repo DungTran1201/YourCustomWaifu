@@ -3,6 +3,7 @@ import { computed, onMounted, onBeforeUnmount } from "vue";
 import { useAppStore } from "@vrm/app-core";
 import NavigationBar from "./NavigationBar.vue";
 import AppIcon from "./AppIcon.vue";
+import WindowResizeHandles from "./WindowResizeHandles.vue";
 import SettingsView from "../workspace/views/SettingsView.vue";
 import DiagnosticsView from "../workspace/views/DiagnosticsView.vue";
 import AuthEnvironment from "../workspace/auth/AuthEnvironment.vue";
@@ -110,11 +111,25 @@ onBeforeUnmount(() => {
   >
     <!-- 1. Independent Menubar Window Mode (?window=menubar in Electron) -->
     <template v-if="isMenubarOnlyWindow">
+      <WindowResizeHandles
+        v-if="
+          store.platform.value === 'electron' &&
+          store.state.menubarDock === 'floating'
+        "
+        :min-width="68"
+        :max-width="320"
+        :min-height="420"
+      />
       <NavigationBar detached />
     </template>
 
-    <!-- 2. Borderless Full-Bleed Glass Authentication Mode -->
+    <!-- 2. Borderless Rounded Glass Authentication Mode -->
     <template v-else-if="isAuthenticationMode">
+      <WindowResizeHandles
+        v-if="store.platform.value === 'electron'"
+        :min-width="540"
+        :min-height="440"
+      />
       <div
         v-if="store.platform.value === 'electron'"
         class="window-floating-controls"
@@ -149,6 +164,11 @@ onBeforeUnmount(() => {
 
     <!-- 3. Headerless Independent Functional Panel Window Mode (?window=panel in Electron) -->
     <template v-else-if="isPanelOnlyWindow">
+      <WindowResizeHandles
+        v-if="store.platform.value === 'electron'"
+        :min-width="540"
+        :min-height="440"
+      />
       <!-- Slim Invisible Top Drag Edge so Panel moves freely without a visible header -->
       <div
         class="panel-drag-strip"
@@ -373,21 +393,22 @@ onBeforeUnmount(() => {
   -webkit-app-region: drag;
 }
 
-/* Discreet Floating Hover Controls (Zero Header Bar) */
+/* Discreet Floating Hover Controls (Above resize handles so Close/Minimize/Maximize always click cleanly) */
 .window-floating-controls {
   position: fixed;
-  top: 8px;
-  right: 10px;
-  z-index: 45;
+  top: 10px;
+  right: 14px;
+  z-index: 80;
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 4px;
+  padding: 3px 5px;
+  border: none;
   border-radius: 9999px;
   background: var(--glass-surface-subtle);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  opacity: 0.42;
+  backdrop-filter: var(--glass-blur-subtle);
+  -webkit-backdrop-filter: var(--glass-blur-subtle);
+  opacity: 0.78;
   transition:
     opacity var(--transition-fast),
     background-color var(--transition-fast);
@@ -397,13 +418,13 @@ onBeforeUnmount(() => {
 .window-floating-controls:hover,
 .window-floating-controls:focus-within {
   opacity: 1;
-  background: var(--glass-surface);
-  box-shadow: var(--glass-specular), var(--glass-shadow-sm);
+  background: var(--glass-surface-strong);
+  box-shadow: var(--glass-shadow-sm);
 }
 
 .win-ctrl-btn {
-  width: 24px;
-  height: 22px;
+  width: 28px;
+  height: 24px;
   border: none;
   border-radius: 9999px;
   display: inline-flex;
@@ -451,26 +472,26 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
-/* Synchronized Asymmetric Glass Panel Surface */
+/* Borderless Rounded Translucent Glass Panel Surface */
 .shell-main.glass-panel-surface {
   border: none;
-  border-radius: var(--radius-shell-major, 24px) var(--radius-shell-minor, 12px)
-    var(--radius-shell-minor, 12px) var(--radius-shell-major, 24px);
+  border-radius: var(--radius-window, 24px);
   background: var(--glass-surface);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
-  box-shadow: var(--glass-specular), var(--glass-shadow);
+  box-shadow: var(--glass-shadow);
   transition:
     background-color var(--transition-normal),
     box-shadow var(--transition-normal);
 }
 
-/* Independent Native Panel Window fills its own Acrylic OS window edge-to-edge */
+/* Independent Native Panel Window: Borderless Rounded Transparent Glass */
 .shell-main.detached-panel-surface {
   width: 100%;
   height: 100%;
-  border-radius: 0;
-  box-shadow: var(--glass-specular);
+  border: none;
+  border-radius: var(--radius-window, 24px);
+  box-shadow: none;
   padding-top: 6px;
 }
 
@@ -485,7 +506,7 @@ onBeforeUnmount(() => {
   margin: 0;
   padding: 0;
   border: none;
-  border-radius: 0;
+  border-radius: var(--radius-window, 24px);
   background: transparent;
 }
 

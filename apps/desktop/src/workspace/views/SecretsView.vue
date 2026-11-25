@@ -198,7 +198,7 @@ async function handleDelete(targetProvider: string) {
 
 .vault-notice {
   background: rgba(99, 102, 241, 0.08);
-  border: 1px solid rgba(99, 102, 241, 0.3);
+  border: none;
   border-radius: var(--radius-md);
   padding: 16px 20px;
 }
@@ -218,7 +218,7 @@ async function handleDelete(targetProvider: string) {
 
 .secrets-card {
   background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-md);
   padding: 24px;
 }
@@ -284,7 +284,7 @@ async function handleDelete(targetProvider: string) {
   width: 100%;
   padding: 10px 14px;
   background: var(--bg-secondary);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-size: 0.95rem;
@@ -293,7 +293,6 @@ async function handleDelete(targetProvider: string) {
 .form-input:focus,
 .form-select:focus {
   outline: none;
-  border-color: var(--border-focus);
 }
 
 .action-row {
@@ -341,7 +340,7 @@ async function handleDelete(targetProvider: string) {
   align-items: center;
   padding: 12px 16px;
   background: var(--bg-secondary);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-sm);
 }
 
@@ -358,7 +357,7 @@ async function handleDelete(targetProvider: string) {
   border-radius: 4px;
   background: rgba(99, 102, 241, 0.15);
   color: var(--accent-indigo);
-  border: 1px solid rgba(99, 102, 241, 0.3);
+  border: none;
 }
 
 .secret-meta {

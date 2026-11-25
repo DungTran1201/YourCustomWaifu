@@ -208,7 +208,7 @@ function handleCreateSkill() {
 
 .create-card {
   background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-md);
   padding: 24px;
   margin-bottom: 24px;
@@ -244,7 +244,7 @@ function handleCreateSkill() {
 .custom-input {
   padding: 9px 12px;
   background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-size: 0.875rem;
@@ -253,7 +253,7 @@ function handleCreateSkill() {
 .custom-textarea {
   padding: 10px 12px;
   background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-family: var(--font-family-sans);
@@ -274,14 +274,13 @@ function handleCreateSkill() {
   width: 100%;
   padding: 10px 16px;
   background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-md);
   color: var(--text-primary);
   font-size: 0.9rem;
 }
 
 .search-input:focus {
-  border-color: var(--border-focus);
 }
 
 .skills-grid {
@@ -292,7 +291,7 @@ function handleCreateSkill() {
 
 .skill-card {
   background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-md);
   padding: 20px;
   display: flex;
@@ -334,7 +333,7 @@ function handleCreateSkill() {
   background: var(--bg-surface);
   padding: 10px 14px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border-subtle);
+  border: none;
   font-size: 0.8rem;
   color: var(--text-muted);
   font-family: var(--font-family-mono);
@@ -378,7 +377,7 @@ function handleCreateSkill() {
   background-color: var(--bg-hover);
   transition: 0.3s;
   border-radius: 20px;
-  border: 1px solid var(--border-subtle);
+  border: none;
 }
 
 .slider:before {

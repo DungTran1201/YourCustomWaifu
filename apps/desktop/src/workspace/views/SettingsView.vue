@@ -4,8 +4,8 @@ import { useAppStore } from "@vrm/app-core";
 const store = useAppStore();
 
 const themes = [
-  { id: "light", label: "Light Glass (Default)" },
-  { id: "dark", label: "Dark Glass" },
+  { id: "light", label: "White (Default)" },
+  { id: "dark", label: "Black" },
   { id: "system", label: "Follow System" },
 ] as const;
 
@@ -236,18 +236,20 @@ const logLevels = ["debug", "info", "warn", "error"] as const;
 .settings-group {
   background: var(--bg-card);
   border: none;
-  border-radius: var(--radius-md);
-  box-shadow: var(--glass-specular), var(--glass-shadow-sm);
+  border-radius: var(--radius-lg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-shadow-sm);
   padding: 8px 24px;
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 }
 
 .setting-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 0;
-  border-bottom: 1px solid var(--border-subtle);
+  padding: 18px 0;
+  border: none;
   gap: 16px;
 }
 
@@ -303,9 +305,9 @@ const logLevels = ["debug", "info", "warn", "error"] as const;
 
 .custom-select {
   padding: 8px 16px;
-  background: var(--bg-primary);
+  background: var(--glass-input);
   color: var(--text-primary);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-sm);
   font-family: var(--font-family-mono);
   font-size: 0.85rem;

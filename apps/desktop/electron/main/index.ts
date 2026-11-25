@@ -26,6 +26,8 @@ import {
   type WindowBounds,
   type GazeData,
   type BlinkDiagnostic,
+  type MenubarDockPosition,
+  type MenubarDragInput,
 } from "@vrm/platform-contracts";
 import {
   APP_METADATA,
@@ -45,6 +47,22 @@ import {
 import { validateWindowBounds } from "./bounds.js";
 import { ensureSampleVrm, getSampleVrmPath } from "./sample-vrm.js";
 import { isGuestPreviewAllowed } from "./guest-preview.js";
+import {
+  getGlassBrowserWindowOptions,
+  applyPlatformGlass,
+  updatePlatformGlassRegion,
+  configureNonIntrusiveOverlayWindow,
+  getPlatformGlassMode,
+  onPlatformGlassModeChanged,
+  disposePlatformGlass,
+} from "./platform-glass.js";
+import {
+  getFloatingMenubarDimensions,
+  getNotchDimensionsForDock,
+  getCornerBounds,
+  resolveMenubarPerimeterDrag,
+  isCornerDock,
+} from "./menubar-notch.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -79,12 +97,19 @@ let workspaceState: WorkspaceWindowState = {
   menubarVisible: true,
   panelVisible: true,
   menubarCollapsed: false,
+  menubarDock: "floating",
   currentTab: "signin",
   theme: "light",
+  glassBackdropMode: getPlatformGlassMode(),
   isAuthenticated: false,
   isGuest: false,
   user: null,
 };
+
+onPlatformGlassModeChanged((mode) => {
+  workspaceState.glassBackdropMode = mode;
+  broadcastWorkspaceState();
+});
 
 const CONFIG_FILE_NAME = "waifu-stage-config.json";
 
@@ -117,6 +142,30 @@ async function loadPersistedConfig(): Promise<void> {
           workspaceState.menubarCollapsed =
             parsed.workspacePrefs.menubarCollapsed;
         }
+        if (
+          typeof parsed.workspacePrefs.menubarDock === "string" &&
+          [
+            "floating",
+            "top",
+            "bottom",
+            "left",
+            "right",
+            "top-left",
+            "top-right",
+            "bottom-left",
+            "bottom-right",
+          ].includes(parsed.workspacePrefs.menubarDock)
+        ) {
+          workspaceState.menubarDock = parsed.workspacePrefs
+            .menubarDock as MenubarDockPosition;
+        }
+        if (
+          parsed.workspacePrefs.theme === "light" ||
+          parsed.workspacePrefs.theme === "dark" ||
+          parsed.workspacePrefs.theme === "system"
+        ) {
+          workspaceState.theme = parsed.workspacePrefs.theme;
+        }
       }
       if (
         parsed.avatarOverrides &&
@@ -147,6 +196,8 @@ async function savePersistedConfig(): Promise<void> {
       workspacePrefs: {
         menubarVisible: workspaceState.menubarVisible,
         menubarCollapsed: workspaceState.menubarCollapsed,
+        menubarDock: workspaceState.menubarDock || "floating",
+        theme: workspaceState.theme,
       },
       avatarOverrides,
     };
@@ -176,16 +227,29 @@ function broadcastWorkspaceState(): void {
   updateTrayMenu();
 }
 
+function resolveWorkspaceGlassTheme(
+  theme: "light" | "dark" | "system" = workspaceState.theme,
+): "light" | "dark" {
+  if (theme === "dark") return "dark";
+  if (theme === "system") {
+    return nativeTheme.shouldUseDarkColors ? "dark" : "light";
+  }
+  return "light";
+}
+
 function applyThemeToWorkspaceWindows(
   theme: "light" | "dark" | "system",
 ): void {
   nativeTheme.themeSource = theme;
+  const resolved = resolveWorkspaceGlassTheme(theme);
   for (const win of [mainWindow, menubarWindow]) {
     if (win && !win.isDestroyed()) {
       win.setBackgroundColor("#00000000");
-      if (process.platform === "win32") {
-        win.setBackgroundMaterial("acrylic");
-      }
+      const dock =
+        win === menubarWindow
+          ? workspaceState.menubarDock || "floating"
+          : "floating";
+      applyPlatformGlass(win, resolved, 24, dock);
     }
   }
 }
@@ -340,18 +404,7 @@ function createWorkspaceWindow(): BrowserWindow {
     minHeight: 440,
     show: false,
     title: APP_METADATA.name,
-    backgroundColor: "#00000000",
-    ...(process.platform === "win32"
-      ? { backgroundMaterial: "acrylic" as const }
-      : {}),
-    ...(process.platform === "darwin"
-      ? {
-          vibrancy: "under-window" as const,
-          visualEffectState: "active" as const,
-        }
-      : {}),
-    titleBarStyle: "hidden",
-    autoHideMenuBar: true,
+    ...getGlassBrowserWindowOptions(),
     webPreferences: {
       preload: join(__dirname, "../preload/index.cjs"),
       contextIsolation: true,
@@ -362,14 +415,6 @@ function createWorkspaceWindow(): BrowserWindow {
       navigateOnDragDrop: false,
     },
   });
-
-  if (process.platform === "win32") {
-    mainWindow.webContents.on("did-finish-load", () => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.setBackgroundMaterial("acrylic");
-      }
-    });
-  }
 
   mainWindow.removeMenu();
 
@@ -386,15 +431,19 @@ function createWorkspaceWindow(): BrowserWindow {
 
   mainWindow.once("ready-to-show", () => {
     if (!mainWindow || mainWindow.isDestroyed()) return;
-    if (process.platform === "win32") {
-      mainWindow.setBackgroundMaterial("acrylic");
-    }
     workspaceState.panelVisible = true;
+    applyPlatformGlass(mainWindow, resolveWorkspaceGlassTheme(), 24);
     mainWindow.show();
     if (workspaceBounds.isMaximized) {
       mainWindow.maximize();
     }
     updateTrayMenu();
+  });
+
+  mainWindow.on("show", () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      applyPlatformGlass(mainWindow, resolveWorkspaceGlassTheme(), 24);
+    }
   });
 
   mainWindow.on("close", (event) => {
@@ -412,11 +461,14 @@ function createWorkspaceWindow(): BrowserWindow {
 
   // Track normal bounds without overwriting during maximization
   mainWindow.on("resize", () => {
-    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isMaximized()) {
-      const size = mainWindow.getSize();
-      if (typeof size[0] === "number") workspaceBounds.width = size[0];
-      if (typeof size[1] === "number") workspaceBounds.height = size[1];
-      savePersistedConfig();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      updatePlatformGlassRegion(mainWindow, 24);
+      if (!mainWindow.isMaximized()) {
+        const size = mainWindow.getSize();
+        if (typeof size[0] === "number") workspaceBounds.width = size[0];
+        if (typeof size[1] === "number") workspaceBounds.height = size[1];
+        savePersistedConfig();
+      }
     }
   });
 
@@ -433,11 +485,13 @@ function createWorkspaceWindow(): BrowserWindow {
 
   mainWindow.on("maximize", () => {
     workspaceBounds.isMaximized = true;
+    updatePlatformGlassRegion(mainWindow, 24);
     savePersistedConfig();
   });
 
   mainWindow.on("unmaximize", () => {
     workspaceBounds.isMaximized = false;
+    updatePlatformGlassRegion(mainWindow, 24);
     savePersistedConfig();
   });
 
@@ -447,10 +501,9 @@ function createWorkspaceWindow(): BrowserWindow {
 function createMenubarWindow(): BrowserWindow {
   if (menubarWindow && !menubarWindow.isDestroyed()) {
     if (menubarWindow.isMinimized()) menubarWindow.restore();
-    menubarWindow.show();
-    if (process.platform === "win32") {
-      menubarWindow.setBackgroundMaterial("acrylic");
-    }
+    menubarWindow.setAlwaysOnTop(true, "floating");
+    menubarWindow.showInactive();
+    menubarWindow.moveTop();
     workspaceState.menubarVisible = true;
     broadcastWorkspaceState();
     return menubarWindow;
@@ -472,12 +525,21 @@ function createMenubarWindow(): BrowserWindow {
   let targetX = menubarBounds.x;
   let targetY = menubarBounds.y;
 
-  // Dock gracefully to the left of Panel window if no saved coordinates
+  // Dock gracefully to the left of Panel window if no saved coordinates,
+  // staying on the same display as Panel even when Panel is maximized or near the left screen edge.
   if (typeof targetX !== "number" || typeof targetY !== "number") {
     if (mainWindow && !mainWindow.isDestroyed()) {
       const panelBounds = mainWindow.getBounds();
-      targetX = panelBounds.x - targetWidth - 14;
-      targetY = panelBounds.y;
+      const panelDisplay = screen.getDisplayMatching(panelBounds);
+      const wa = panelDisplay.workArea;
+      const dockedLeft = panelBounds.x - targetWidth - 14;
+      if (mainWindow.isMaximized() || dockedLeft < wa.x) {
+        targetX = wa.x + 16;
+        targetY = wa.y + 16;
+      } else {
+        targetX = dockedLeft;
+        targetY = Math.max(wa.y, panelBounds.y);
+      }
     } else {
       const primary = displays[0]?.workArea || {
         x: 0,
@@ -493,15 +555,33 @@ function createMenubarWindow(): BrowserWindow {
     }
   }
 
+  const initialDock: MenubarDockPosition =
+    workspaceState.menubarDock || "floating";
+  const refWorkArea =
+    mainWindow && !mainWindow.isDestroyed()
+      ? screen.getDisplayMatching(mainWindow.getBounds()).workArea
+      : displays[0]?.workArea || { x: 0, y: 0, width: 1920, height: 1080 };
+  const floatingDims = getFloatingMenubarDimensions(
+    workspaceState.menubarCollapsed,
+    menubarBounds.width,
+    menubarBounds.height,
+    refWorkArea,
+  );
+  const notchDims = getNotchDimensionsForDock(
+    initialDock,
+    refWorkArea,
+    floatingDims,
+  );
+
   const bounds = validateWindowBounds(
     {
       x: targetX,
       y: targetY,
-      width: targetWidth,
-      height: targetHeight,
+      width: notchDims.width,
+      height: notchDims.height,
     },
     displays,
-    { minWidth: 68, minHeight: 420 },
+    { minWidth: 44, minHeight: 44 },
   );
 
   menubarWindow = new BrowserWindow({
@@ -509,24 +589,12 @@ function createMenubarWindow(): BrowserWindow {
     y: bounds.y,
     width: bounds.width,
     height: bounds.height,
-    minWidth: 68,
-    minHeight: 420,
-    maxWidth: 320,
+    minWidth: 44,
+    minHeight: 44,
+    maxWidth: 900,
     show: false,
     title: `${APP_METADATA.shortName} — Menubar`,
-    backgroundColor: "#00000000",
-    ...(process.platform === "win32"
-      ? { backgroundMaterial: "acrylic" as const }
-      : {}),
-    ...(process.platform === "darwin"
-      ? {
-          vibrancy: "under-window" as const,
-          visualEffectState: "active" as const,
-        }
-      : {}),
-    titleBarStyle: "hidden",
-    autoHideMenuBar: true,
-    resizable: true,
+    ...getGlassBrowserWindowOptions(process.platform, { overlay: true }),
     webPreferences: {
       preload: join(__dirname, "../preload/index.cjs"),
       contextIsolation: true,
@@ -537,14 +605,6 @@ function createMenubarWindow(): BrowserWindow {
       navigateOnDragDrop: false,
     },
   });
-
-  if (process.platform === "win32") {
-    menubarWindow.webContents.on("did-finish-load", () => {
-      if (menubarWindow && !menubarWindow.isDestroyed()) {
-        menubarWindow.setBackgroundMaterial("acrylic");
-      }
-    });
-  }
 
   menubarWindow.removeMenu();
   enforceWindowSecurity(menubarWindow);
@@ -560,9 +620,15 @@ function createMenubarWindow(): BrowserWindow {
 
   menubarWindow.once("ready-to-show", () => {
     if (!menubarWindow || menubarWindow.isDestroyed()) return;
-    if (process.platform === "win32") {
-      menubarWindow.setBackgroundMaterial("acrylic");
-    }
+    const activeDock = workspaceState.menubarDock || "floating";
+    configureNonIntrusiveOverlayWindow(menubarWindow);
+    applyPlatformGlass(
+      menubarWindow,
+      resolveWorkspaceGlassTheme(),
+      24,
+      activeDock,
+    );
+    menubarWindow.setAlwaysOnTop(true, "floating");
     menubarWindow.webContents.send(IPC_CHANNELS.WORKSPACE_STATE_CHANGED, {
       ...workspaceState,
     });
@@ -570,7 +636,22 @@ function createMenubarWindow(): BrowserWindow {
       ...stageStatus,
     });
     if (workspaceState.menubarVisible && isWorkspaceSessionActive()) {
-      menubarWindow.show();
+      menubarWindow.showInactive();
+      menubarWindow.moveTop();
+    }
+  });
+
+  menubarWindow.on("show", () => {
+    if (menubarWindow && !menubarWindow.isDestroyed()) {
+      const activeDock = workspaceState.menubarDock || "floating";
+      configureNonIntrusiveOverlayWindow(menubarWindow);
+      applyPlatformGlass(
+        menubarWindow,
+        resolveWorkspaceGlassTheme(),
+        24,
+        activeDock,
+      );
+      menubarWindow.setAlwaysOnTop(true, "floating");
     }
   });
 
@@ -590,24 +671,30 @@ function createMenubarWindow(): BrowserWindow {
 
   menubarWindow.on("resize", () => {
     if (menubarWindow && !menubarWindow.isDestroyed()) {
-      const size = menubarWindow.getSize();
-      if (typeof size[0] === "number" && !workspaceState.menubarCollapsed) {
-        menubarBounds.width = Math.max(MENUBAR_EXPANDED_WIDTH, size[0]);
+      const activeDock = workspaceState.menubarDock || "floating";
+      updatePlatformGlassRegion(menubarWindow, 24, activeDock);
+      if (activeDock === "floating") {
+        const size = menubarWindow.getSize();
+        if (typeof size[0] === "number" && !workspaceState.menubarCollapsed) {
+          menubarBounds.width = Math.max(MENUBAR_EXPANDED_WIDTH, size[0]);
+        }
+        if (typeof size[1] === "number") {
+          menubarBounds.height = size[1];
+        }
+        savePersistedConfig();
       }
-      if (typeof size[1] === "number") {
-        menubarBounds.height = size[1];
-      }
-      savePersistedConfig();
     }
   });
 
   menubarWindow.on("move", () => {
     if (menubarWindow && !menubarWindow.isDestroyed()) {
-      const pos = menubarWindow.getPosition();
-      if (typeof pos[0] === "number" && typeof pos[1] === "number") {
-        menubarBounds.x = pos[0];
-        menubarBounds.y = pos[1];
-        savePersistedConfig();
+      if ((workspaceState.menubarDock || "floating") === "floating") {
+        const pos = menubarWindow.getPosition();
+        if (typeof pos[0] === "number" && typeof pos[1] === "number") {
+          menubarBounds.x = pos[0];
+          menubarBounds.y = pos[1];
+          savePersistedConfig();
+        }
       }
     }
   });
@@ -617,7 +704,7 @@ function createMenubarWindow(): BrowserWindow {
 
 function createStageWindow(): BrowserWindow {
   if (stageWindow && !stageWindow.isDestroyed()) {
-    stageWindow.show();
+    stageWindow.showInactive();
     stageStatus.stageVisible = true;
     broadcastStageStatus();
     startCursorTracking();
@@ -645,6 +732,7 @@ function createStageWindow(): BrowserWindow {
     height: bounds.height,
     minWidth: 240,
     minHeight: 320,
+    show: false,
     title: "Avatar Stage",
     frame: false,
     transparent: true,
@@ -652,7 +740,8 @@ function createStageWindow(): BrowserWindow {
     hasShadow: false,
     alwaysOnTop: avatarConfig.alwaysOnTop !== false,
     resizable: true,
-    skipTaskbar: false,
+    skipTaskbar: true,
+    focusable: false,
     webPreferences: {
       preload: join(__dirname, "../preload/index.cjs"),
       contextIsolation: true,
@@ -662,6 +751,17 @@ function createStageWindow(): BrowserWindow {
       allowRunningInsecureContent: false,
       navigateOnDragDrop: false,
     },
+  });
+
+  configureNonIntrusiveOverlayWindow(stageWindow);
+  if (avatarConfig.alwaysOnTop !== false) {
+    stageWindow.setAlwaysOnTop(true, "screen-saver");
+  }
+  stageWindow.once("ready-to-show", () => {
+    if (stageWindow && !stageWindow.isDestroyed()) {
+      configureNonIntrusiveOverlayWindow(stageWindow);
+      stageWindow.showInactive();
+    }
   });
 
   enforceWindowSecurity(stageWindow);
@@ -783,23 +883,163 @@ function toggleMenubar(visible?: boolean): WorkspaceWindowState {
 
 function setMenubarCollapsed(collapsed: boolean): WorkspaceWindowState {
   workspaceState.menubarCollapsed = collapsed;
+  if ((workspaceState.menubarDock || "floating") !== "floating") {
+    workspaceState.menubarDock = "floating";
+  }
   if (menubarWindow && !menubarWindow.isDestroyed()) {
     const bounds = menubarWindow.getBounds();
-    const nextWidth = collapsed
-      ? MENUBAR_COLLAPSED_WIDTH
-      : Math.max(
-          MENUBAR_EXPANDED_WIDTH,
-          menubarBounds.width || DEFAULT_MENUBAR_BOUNDS.width,
-        );
+    const display = screen.getDisplayMatching(bounds);
+    const floatingDims = getFloatingMenubarDimensions(
+      collapsed,
+      menubarBounds.width,
+      menubarBounds.height,
+      display.workArea,
+    );
     menubarWindow.setBounds({
       x: bounds.x,
       y: bounds.y,
-      width: nextWidth,
-      height: bounds.height,
+      width: floatingDims.width,
+      height: floatingDims.height,
     });
+    applyPlatformGlass(
+      menubarWindow,
+      resolveWorkspaceGlassTheme(),
+      24,
+      "floating",
+    );
   }
   savePersistedConfig();
   broadcastWorkspaceState();
+  return { ...workspaceState };
+}
+
+function setMenubarDock(dock: MenubarDockPosition): WorkspaceWindowState {
+  const prevDock = workspaceState.menubarDock || "floating";
+  workspaceState.menubarDock = dock;
+
+  if (menubarWindow && !menubarWindow.isDestroyed()) {
+    const cur = menubarWindow.getBounds();
+    const display = screen.getDisplayMatching(cur);
+    const wa = display.workArea;
+    const floatingDims = getFloatingMenubarDimensions(
+      workspaceState.menubarCollapsed,
+      menubarBounds.width,
+      menubarBounds.height,
+      wa,
+    );
+
+    let nextBounds: WindowBounds;
+    if (dock === "floating") {
+      const targetX =
+        typeof menubarBounds.x === "number"
+          ? Math.max(
+              wa.x + 16,
+              Math.min(
+                wa.x + wa.width - floatingDims.width - 16,
+                menubarBounds.x,
+              ),
+            )
+          : wa.x + 28;
+      const targetY =
+        typeof menubarBounds.y === "number"
+          ? Math.max(
+              wa.y + 16,
+              Math.min(
+                wa.y + wa.height - floatingDims.height - 16,
+                menubarBounds.y,
+              ),
+            )
+          : Math.max(
+              wa.y + 16,
+              Math.round(wa.y + (wa.height - floatingDims.height) / 2),
+            );
+      nextBounds = {
+        x: targetX,
+        y: targetY,
+        width: floatingDims.width,
+        height: floatingDims.height,
+      };
+    } else if (isCornerDock(dock)) {
+      nextBounds = getCornerBounds(dock, wa);
+    } else {
+      const dims = getNotchDimensionsForDock(dock, wa, floatingDims);
+      nextBounds = {
+        x:
+          dock === "left"
+            ? wa.x
+            : dock === "right"
+              ? wa.x + wa.width - dims.width
+              : Math.round(wa.x + (wa.width - dims.width) / 2),
+        y:
+          dock === "top"
+            ? wa.y
+            : dock === "bottom"
+              ? wa.y + wa.height - dims.height
+              : Math.round(wa.y + (wa.height - dims.height) / 2),
+        width: dims.width,
+        height: dims.height,
+      };
+    }
+
+    menubarWindow.setBounds(nextBounds);
+    applyPlatformGlass(menubarWindow, resolveWorkspaceGlassTheme(), 24, dock);
+  }
+
+  savePersistedConfig();
+  if (prevDock !== dock) {
+    broadcastWorkspaceState();
+  }
+  return { ...workspaceState };
+}
+
+function dragMenubar(input: MenubarDragInput): WorkspaceWindowState {
+  if (!menubarWindow || menubarWindow.isDestroyed()) {
+    return { ...workspaceState };
+  }
+
+  const prevDock = workspaceState.menubarDock || "floating";
+  const display = screen.getDisplayNearestPoint({
+    x: Math.round(input.cursorX),
+    y: Math.round(input.cursorY),
+  });
+  const wa = display.workArea;
+  const floatingDims = getFloatingMenubarDimensions(
+    workspaceState.menubarCollapsed,
+    menubarBounds.width,
+    menubarBounds.height,
+    wa,
+  );
+
+  const result = resolveMenubarPerimeterDrag({
+    cursorX: input.cursorX,
+    cursorY: input.cursorY,
+    grabOffsetX: input.grabOffsetX,
+    grabOffsetY: input.grabOffsetY,
+    currentDock: prevDock,
+    workArea: wa,
+    floatingWidth: floatingDims.width,
+    floatingHeight: floatingDims.height,
+  });
+
+  workspaceState.menubarDock = result.dock;
+  menubarWindow.setBounds(result.bounds);
+
+  if (result.dock === "floating") {
+    menubarBounds.x = result.bounds.x;
+    menubarBounds.y = result.bounds.y;
+  }
+
+  if (prevDock !== result.dock) {
+    applyPlatformGlass(
+      menubarWindow,
+      resolveWorkspaceGlassTheme(),
+      24,
+      result.dock,
+    );
+    savePersistedConfig();
+    broadcastWorkspaceState();
+  }
+
   return { ...workspaceState };
 }
 
@@ -868,6 +1108,7 @@ function resetWorkspaceLayout(): WorkspaceWindowState {
   }
 
   if (isWorkspaceSessionActive()) {
+    workspaceState.menubarDock = "floating";
     const mb = createMenubarWindow();
     if (!mb.isDestroyed()) {
       mb.setBounds({
@@ -876,7 +1117,9 @@ function resetWorkspaceLayout(): WorkspaceWindowState {
         width: menubarW,
         height,
       });
-      mb.show();
+      applyPlatformGlass(mb, resolveWorkspaceGlassTheme(), 24, "floating");
+      mb.showInactive();
+      mb.moveTop();
       workspaceState.menubarVisible = true;
     }
   }
@@ -910,6 +1153,7 @@ function syncWorkspaceState(
   ) {
     workspaceState.theme = partial.theme;
     applyThemeToWorkspaceWindows(partial.theme);
+    savePersistedConfig();
   }
   if (typeof partial.menubarCollapsed === "boolean") {
     setMenubarCollapsed(partial.menubarCollapsed);
@@ -928,7 +1172,9 @@ function syncWorkspaceState(
       createMenubarWindow();
     } else if (workspaceState.menubarVisible) {
       if (menubarWindow && !menubarWindow.isDestroyed()) {
-        if (!menubarWindow.isVisible()) menubarWindow.show();
+        menubarWindow.setAlwaysOnTop(true, "floating");
+        if (!menubarWindow.isVisible()) menubarWindow.showInactive();
+        menubarWindow.moveTop();
       } else {
         createMenubarWindow();
       }
@@ -936,11 +1182,16 @@ function syncWorkspaceState(
       menubarWindow.hide();
     }
   } else {
-    // Unauthenticated Auth Mode: keep independent Menubar window hidden and show Auth panel
+    // Unauthenticated Auth Mode: keep independent Menubar window hidden and show Auth panel only when transitioning back from an active session
     if (menubarWindow && !menubarWindow.isDestroyed()) {
       menubarWindow.hide();
     }
-    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+    if (
+      wasActive &&
+      mainWindow &&
+      !mainWindow.isDestroyed() &&
+      !mainWindow.isVisible()
+    ) {
       mainWindow.show();
       workspaceState.panelVisible = true;
     }
@@ -1006,7 +1257,11 @@ function setAlwaysOnTop(enabled: boolean): StageStatus {
   avatarConfig.alwaysOnTop = enabled;
   stageStatus.alwaysOnTop = enabled;
   if (stageWindow && !stageWindow.isDestroyed()) {
-    stageWindow.setAlwaysOnTop(enabled);
+    if (enabled) {
+      stageWindow.setAlwaysOnTop(true, "screen-saver");
+    } else {
+      stageWindow.setAlwaysOnTop(false);
+    }
   }
   savePersistedConfig();
   broadcastStageStatus();
@@ -1026,6 +1281,7 @@ function setAnimationPaused(paused: boolean): StageStatus {
 function quitApplication(): void {
   isQuitting = true;
   stopCursorTracking();
+  disposePlatformGlass();
   globalShortcut.unregisterAll();
   if (menubarWindow && !menubarWindow.isDestroyed()) {
     menubarWindow.destroy();
@@ -1271,8 +1527,11 @@ function registerIpcHandlers(): void {
     const data = await res.json();
     try {
       const { safeStorage } = await import("electron");
-      if (safeStorage.isEncryptionAvailable() && data.refreshToken) {
-        const encrypted = safeStorage.encryptString(data.refreshToken);
+      const canEncrypt = await safeStorage.isAsyncEncryptionAvailable();
+      if (canEncrypt && data.refreshToken) {
+        const encrypted = await safeStorage.encryptStringAsync(
+          data.refreshToken,
+        );
         const credPath = join(app.getPath("userData"), "session.enc");
         await fs.writeFile(credPath, encrypted);
       }
@@ -1350,8 +1609,11 @@ function registerIpcHandlers(): void {
     const data = await res.json();
     try {
       const { safeStorage } = await import("electron");
-      if (safeStorage.isEncryptionAvailable() && data.refreshToken) {
-        const encrypted = safeStorage.encryptString(data.refreshToken);
+      const canEncrypt = await safeStorage.isAsyncEncryptionAvailable();
+      if (canEncrypt && data.refreshToken) {
+        const encrypted = await safeStorage.encryptStringAsync(
+          data.refreshToken,
+        );
         const credPath = join(app.getPath("userData"), "session.enc");
         await fs.writeFile(credPath, encrypted);
       }
@@ -1390,8 +1652,10 @@ function registerIpcHandlers(): void {
       const encrypted = await fs.readFile(credPath).catch(() => null);
       if (!encrypted) return null;
       const { safeStorage } = await import("electron");
-      if (!safeStorage.isEncryptionAvailable()) return null;
-      const refreshToken = safeStorage.decryptString(encrypted);
+      const canEncrypt = await safeStorage.isAsyncEncryptionAvailable();
+      if (!canEncrypt) return null;
+      const decrypted = await safeStorage.decryptStringAsync(encrypted);
+      const refreshToken = decrypted.result;
       const apiBaseUrl =
         process.env["VITE_API_BASE_URL"] || "http://127.0.0.1:3000";
       const res = await fetch(`${apiBaseUrl}/api/v1/auth/desktop-refresh`, {
@@ -1402,7 +1666,7 @@ function registerIpcHandlers(): void {
       if (!res.ok) return null;
       const data = await res.json();
       if (data.refreshToken) {
-        const newEnc = safeStorage.encryptString(data.refreshToken);
+        const newEnc = await safeStorage.encryptStringAsync(data.refreshToken);
         await fs.writeFile(credPath, newEnc);
       }
       const meRes = await fetch(`${apiBaseUrl}/api/v1/users/me`, {
@@ -1956,6 +2220,57 @@ function registerIpcHandlers(): void {
   );
 
   ipcMain.handle(
+    IPC_CHANNELS.WORKSPACE_SET_MENUBAR_DOCK,
+    (event, dock: unknown): WorkspaceWindowState => {
+      if (!validateIpcSender(event.sender, allowedWindows())) {
+        throw new Error("Unauthorized IPC sender");
+      }
+      const validDocks = new Set([
+        "floating",
+        "top",
+        "bottom",
+        "left",
+        "right",
+        "top-left",
+        "top-right",
+        "bottom-left",
+        "bottom-right",
+      ]);
+      if (typeof dock !== "string" || !validDocks.has(dock)) {
+        throw new Error("Invalid menubar dock position");
+      }
+      return setMenubarDock(dock as MenubarDockPosition);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.WORKSPACE_DRAG_MENUBAR,
+    (event, input: unknown): WorkspaceWindowState => {
+      if (!validateIpcSender(event.sender, allowedWindows())) {
+        throw new Error("Unauthorized IPC sender");
+      }
+      if (!input || typeof input !== "object") {
+        throw new Error("Invalid menubar drag payload");
+      }
+      const payload = input as Record<string, unknown>;
+      if (
+        !Number.isFinite(Number(payload.cursorX)) ||
+        !Number.isFinite(Number(payload.cursorY)) ||
+        !Number.isFinite(Number(payload.grabOffsetX)) ||
+        !Number.isFinite(Number(payload.grabOffsetY))
+      ) {
+        throw new Error("Invalid drag coordinates");
+      }
+      return dragMenubar({
+        cursorX: Number(payload.cursorX),
+        cursorY: Number(payload.cursorY),
+        grabOffsetX: Number(payload.grabOffsetX),
+        grabOffsetY: Number(payload.grabOffsetY),
+      });
+    },
+  );
+
+  ipcMain.handle(
     IPC_CHANNELS.WORKSPACE_SHOW_PANEL,
     (event, tab?: unknown): WorkspaceWindowState => {
       if (!validateIpcSender(event.sender, allowedWindows())) {
@@ -2032,6 +2347,70 @@ function registerIpcHandlers(): void {
           senderWin.maximize();
         }
       }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.WORKSPACE_GET_WINDOW_BOUNDS,
+    (event): WindowBounds => {
+      if (!validateIpcSender(event.sender, allowedWindows())) {
+        throw new Error("Unauthorized IPC sender");
+      }
+      const senderWin = BrowserWindow.fromWebContents(event.sender);
+      if (senderWin && !senderWin.isDestroyed()) {
+        const b = senderWin.getBounds();
+        return { x: b.x, y: b.y, width: b.width, height: b.height };
+      }
+      return {
+        x: workspaceBounds.x ?? 100,
+        y: workspaceBounds.y ?? 100,
+        width: workspaceBounds.width,
+        height: workspaceBounds.height,
+      };
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.WORKSPACE_SET_WINDOW_BOUNDS,
+    (event, partial: Partial<WindowBounds>): WindowBounds => {
+      if (!validateIpcSender(event.sender, allowedWindows())) {
+        throw new Error("Unauthorized IPC sender");
+      }
+      const senderWin = BrowserWindow.fromWebContents(event.sender);
+      if (!senderWin || senderWin.isDestroyed()) {
+        throw new Error("Workspace window not found");
+      }
+      const isMenubar = menubarWindow !== null && senderWin === menubarWindow;
+      const cur = senderWin.getBounds();
+      const minW = isMenubar ? 68 : 540;
+      const maxW = isMenubar ? 320 : 3840;
+      const minH = isMenubar ? 420 : 440;
+      const maxH = 2160;
+      const nextBounds: WindowBounds = {
+        x: typeof partial.x === "number" ? Math.round(partial.x) : cur.x,
+        y: typeof partial.y === "number" ? Math.round(partial.y) : cur.y,
+        width: Math.max(
+          minW,
+          Math.min(
+            maxW,
+            typeof partial.width === "number"
+              ? Math.round(partial.width)
+              : cur.width,
+          ),
+        ),
+        height: Math.max(
+          minH,
+          Math.min(
+            maxH,
+            typeof partial.height === "number"
+              ? Math.round(partial.height)
+              : cur.height,
+          ),
+        ),
+      };
+      senderWin.setBounds(nextBounds);
+      updatePlatformGlassRegion(senderWin, 24);
+      return nextBounds;
     },
   );
 }
@@ -2170,6 +2549,16 @@ if (!gotSingleInstanceLock) {
     // Create main workspace
     createWorkspaceWindow();
 
+    // Refresh rounded glass regions automatically if monitor DPI/scaling changes
+    screen.on("display-metrics-changed", () => {
+      updatePlatformGlassRegion(mainWindow, 24);
+      updatePlatformGlassRegion(
+        menubarWindow,
+        24,
+        workspaceState.menubarDock || "floating",
+      );
+    });
+
     // Respect saved startup preference for Avatar Stage
     if (avatarConfig.showStageOnStartup) {
       createStageWindow();
@@ -2186,6 +2575,7 @@ if (!gotSingleInstanceLock) {
 
   app.on("will-quit", () => {
     stopCursorTracking();
+    disposePlatformGlass();
     globalShortcut.unregisterAll();
     if (embeddedAuthServer) {
       try {

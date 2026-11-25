@@ -604,19 +604,19 @@ function handleOrientationChange(mode: "auto" | "0deg" | "180deg") {
 .model-status-pill.loaded {
   background: rgba(16, 185, 129, 0.15);
   color: #10b981;
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  border: none;
 }
 
 .model-status-pill.loading {
   background: rgba(59, 130, 246, 0.15);
   color: #3b82f6;
-  border: 1px solid rgba(59, 130, 246, 0.3);
+  border: none;
 }
 
 .model-status-pill.error {
   background: rgba(239, 68, 68, 0.15);
   color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  border: none;
 }
 
 .model-status-pill.fallback {
@@ -630,7 +630,7 @@ function handleOrientationChange(mode: "auto" | "0deg" | "180deg") {
   font-weight: 500;
   padding: 2px 7px;
   background: var(--bg-elevated);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: 10px;
   color: var(--text-secondary);
 }
@@ -665,7 +665,7 @@ function handleOrientationChange(mode: "auto" | "0deg" | "180deg") {
   gap: 6px;
   padding: 9px 18px;
   background: var(--bg-elevated);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-size: 0.85rem;
@@ -737,7 +737,6 @@ function handleOrientationChange(mode: "auto" | "0deg" | "180deg") {
   align-items: center;
   justify-content: space-between;
   padding: 18px 0;
-  border-bottom: 1px solid var(--border-subtle);
 }
 
 .setting-row:last-child {
@@ -773,7 +772,7 @@ function handleOrientationChange(mode: "auto" | "0deg" | "180deg") {
 .pill-btn {
   padding: 8px 16px;
   background: var(--bg-primary);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
   font-size: 0.85rem;
@@ -816,7 +815,7 @@ function handleOrientationChange(mode: "auto" | "0deg" | "180deg") {
   background-color: var(--bg-hover);
   transition: 0.3s;
   border-radius: 24px;
-  border: 1px solid var(--border-subtle);
+  border: none;
 }
 
 .slider:before {
@@ -843,7 +842,7 @@ input:checked + .slider:before {
 .info-card {
   padding: 20px;
   background: var(--bg-elevated);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-md);
   color: var(--text-secondary);
   font-size: 0.9rem;
@@ -865,7 +864,7 @@ input:checked + .slider:before {
   margin-left: 8px;
   padding: 1px 6px;
   background: rgba(255, 255, 255, 0.08);
-  border: 1px solid var(--border-default);
+  border: none;
   color: var(--text-primary);
   font-size: 0.75rem;
   border-radius: var(--radius-sm);

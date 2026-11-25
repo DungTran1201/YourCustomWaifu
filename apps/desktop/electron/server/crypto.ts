@@ -61,17 +61,37 @@ export async function initMasterKey(userDataPath?: string): Promise<Buffer> {
     try {
       const electron = await import("electron");
       const safeStorage = electron?.safeStorage;
-      if (
+      const isAvailable =
         safeStorage &&
-        typeof safeStorage.isEncryptionAvailable === "function" &&
-        safeStorage.isEncryptionAvailable()
-      ) {
+        (typeof safeStorage.isAsyncEncryptionAvailable === "function"
+          ? await safeStorage.isAsyncEncryptionAvailable()
+          : typeof safeStorage.isEncryptionAvailable === "function" &&
+            safeStorage.isEncryptionAvailable());
+
+      if (safeStorage && isAvailable) {
         const keyFilePath = path.join(userDataPath, "kms-master.enc");
         try {
           const existingEncrypted = await fs.readFile(keyFilePath);
-          const decryptedHex = safeStorage.decryptString(existingEncrypted);
+          let decryptedHex = "";
+          let shouldReEncrypt = false;
+          if (typeof safeStorage.decryptStringAsync === "function") {
+            const decrypted =
+              await safeStorage.decryptStringAsync(existingEncrypted);
+            decryptedHex = decrypted.result;
+            shouldReEncrypt = decrypted.shouldReEncrypt;
+          } else {
+            decryptedHex = safeStorage.decryptString(existingEncrypted);
+          }
           if (decryptedHex && decryptedHex.length === 64) {
             activeMasterKey = Buffer.from(decryptedHex, "hex");
+            if (
+              shouldReEncrypt &&
+              typeof safeStorage.encryptStringAsync === "function"
+            ) {
+              const reEncrypted =
+                await safeStorage.encryptStringAsync(decryptedHex);
+              await fs.writeFile(keyFilePath, reEncrypted);
+            }
             return activeMasterKey;
           }
         } catch {
@@ -81,7 +101,10 @@ export async function initMasterKey(userDataPath?: string): Promise<Buffer> {
         // Generate a new cryptographically secure 256-bit random master key
         const newKeyBytes = crypto.randomBytes(32);
         const newKeyHex = newKeyBytes.toString("hex");
-        const encryptedKey = safeStorage.encryptString(newKeyHex);
+        const encryptedKey =
+          typeof safeStorage.encryptStringAsync === "function"
+            ? await safeStorage.encryptStringAsync(newKeyHex)
+            : safeStorage.encryptString(newKeyHex);
         await fs.writeFile(keyFilePath, encryptedKey);
         activeMasterKey = newKeyBytes;
         return activeMasterKey;

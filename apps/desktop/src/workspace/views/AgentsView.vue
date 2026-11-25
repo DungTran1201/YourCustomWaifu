@@ -318,7 +318,7 @@ function saveAgent() {
 .btn-secondary {
   padding: 8px 18px;
   background: var(--bg-elevated);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-size: 0.85rem;
@@ -328,7 +328,7 @@ function saveAgent() {
 .success-notice {
   padding: 12px 18px;
   background: rgba(16, 185, 129, 0.15);
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  border: none;
   color: #10b981;
   border-radius: var(--radius-md);
   margin-bottom: 24px;
@@ -337,7 +337,7 @@ function saveAgent() {
 
 .card {
   background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-md);
   padding: 24px;
   margin-bottom: 24px;
@@ -382,14 +382,13 @@ function saveAgent() {
 .custom-input {
   padding: 9px 14px;
   background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-size: 0.9rem;
 }
 
 .custom-input:focus {
-  border-color: var(--border-focus);
 }
 
 .custom-input:disabled {
@@ -400,7 +399,7 @@ function saveAgent() {
   width: 100%;
   padding: 12px 14px;
   background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-family: var(--font-family-sans);
@@ -410,7 +409,6 @@ function saveAgent() {
 }
 
 .custom-textarea:focus {
-  border-color: var(--border-focus);
 }
 
 .custom-textarea:disabled {
@@ -422,7 +420,6 @@ function saveAgent() {
   align-items: center;
   justify-content: space-between;
   padding: 14px 0;
-  border-bottom: 1px solid var(--border-subtle);
 }
 
 .toggle-row:last-child {
@@ -469,7 +466,7 @@ function saveAgent() {
 
 .btn-preview-toggle {
   background: transparent;
-  border: 1px solid var(--border-subtle);
+  border: none;
   color: var(--accent);
   padding: 4px 10px;
   border-radius: 4px;
@@ -480,14 +477,13 @@ function saveAgent() {
 
 .btn-preview-toggle:hover {
   background: var(--surface-hover);
-  border-color: var(--accent);
 }
 
 .prompt-preview-box {
   margin-top: 12px;
   padding: 12px;
   background: var(--bg-alt, rgba(0, 0, 0, 0.2));
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: 6px;
 }
 

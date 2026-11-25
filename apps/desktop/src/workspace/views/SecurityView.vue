@@ -353,13 +353,12 @@ async function handleDeleteAccount() {
 
 .security-card {
   background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-md);
   padding: 24px;
 }
 
 .danger-card {
-  border-color: rgba(239, 68, 68, 0.3);
   background: rgba(239, 68, 68, 0.03);
 }
 
@@ -425,7 +424,7 @@ async function handleDeleteAccount() {
   width: 100%;
   padding: 10px 14px;
   background: var(--bg-secondary);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-size: 0.95rem;
@@ -433,7 +432,6 @@ async function handleDeleteAccount() {
 
 .form-input:focus {
   outline: none;
-  border-color: var(--border-focus);
 }
 
 .input-hint {
@@ -479,12 +477,11 @@ async function handleDeleteAccount() {
   align-items: center;
   padding: 12px 16px;
   background: var(--bg-secondary);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-sm);
 }
 
 .session-item.current {
-  border-color: var(--border-default);
   background: var(--bg-surface);
 }
 
@@ -517,7 +514,7 @@ async function handleDeleteAccount() {
   border-radius: 9999px;
   background: rgba(255, 255, 255, 0.08);
   color: var(--text-primary);
-  border: 1px solid var(--border-default);
+  border: none;
 }
 
 .device-meta {

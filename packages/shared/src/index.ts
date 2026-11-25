@@ -1,4 +1,5 @@
 export * from "./constants.js";
+export * from "./notch-geometry.js";
 
 export function formatDate(isoString: string): string {
   try {
