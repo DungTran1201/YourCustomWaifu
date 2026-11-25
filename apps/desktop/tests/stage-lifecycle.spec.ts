@@ -38,6 +38,24 @@ describe("Avatar Stage & Workspace Desktop Lifecycle Contracts", () => {
     expect(IPC_CHANNELS.WORKSPACE_SHOW).toBe("workspace:show");
     expect(IPC_CHANNELS.WORKSPACE_HIDE).toBe("workspace:hide");
     expect(IPC_CHANNELS.WORKSPACE_TOGGLE).toBe("workspace:toggle");
+    expect(IPC_CHANNELS.WORKSPACE_GET_STATE).toBe("workspace:get-state");
+    expect(IPC_CHANNELS.WORKSPACE_SYNC_STATE).toBe("workspace:sync-state");
+    expect(IPC_CHANNELS.WORKSPACE_STATE_CHANGED).toBe(
+      "workspace:state-changed",
+    );
+    expect(IPC_CHANNELS.WORKSPACE_SHOW_MENUBAR).toBe("workspace:show-menubar");
+    expect(IPC_CHANNELS.WORKSPACE_HIDE_MENUBAR).toBe("workspace:hide-menubar");
+    expect(IPC_CHANNELS.WORKSPACE_TOGGLE_MENUBAR).toBe(
+      "workspace:toggle-menubar",
+    );
+    expect(IPC_CHANNELS.WORKSPACE_SET_MENUBAR_COLLAPSED).toBe(
+      "workspace:set-menubar-collapsed",
+    );
+    expect(IPC_CHANNELS.WORKSPACE_SHOW_PANEL).toBe("workspace:show-panel");
+    expect(IPC_CHANNELS.WORKSPACE_HIDE_PANEL).toBe("workspace:hide-panel");
+    expect(IPC_CHANNELS.WORKSPACE_TOGGLE_PANEL).toBe("workspace:toggle-panel");
+    expect(IPC_CHANNELS.WORKSPACE_NAVIGATE_TAB).toBe("workspace:navigate-tab");
+    expect(IPC_CHANNELS.WORKSPACE_RESET_LAYOUT).toBe("workspace:reset-layout");
   });
 
   it("verifies stage initial status has stageVisible = false and retains default dimensions", () => {
@@ -114,33 +132,43 @@ describe("Avatar Stage & Workspace Desktop Lifecycle Contracts", () => {
     ).rejects.toThrow();
   });
 
-  it("validates IPC sender across both Workspace and Avatar Stage windows", () => {
+  it("validates IPC sender across Panel, Menubar, and Avatar Stage windows", () => {
     const mockSender = { id: 101 } as any;
     const mockMainWindow = {
       isDestroyed: () => false,
       webContents: { id: 101 },
+    } as any;
+    const mockMenubarWindow = {
+      isDestroyed: () => false,
+      webContents: { id: 155 },
     } as any;
     const mockStageWindow = {
       isDestroyed: () => false,
       webContents: { id: 202 },
     } as any;
 
-    // Sender is main window
-    expect(
-      validateIpcSender(mockSender, [mockMainWindow, mockStageWindow]),
-    ).toBe(true);
+    const windows = [mockMainWindow, mockMenubarWindow, mockStageWindow];
 
-    // Sender is stage window
-    const mockStageSender = { id: 202 } as any;
-    expect(
-      validateIpcSender(mockStageSender, [mockMainWindow, mockStageWindow]),
-    ).toBe(true);
+    expect(validateIpcSender(mockSender, windows)).toBe(true);
+    expect(validateIpcSender({ id: 155 } as any, windows)).toBe(true);
+    expect(validateIpcSender({ id: 202 } as any, windows)).toBe(true);
+    expect(validateIpcSender({ id: 999 } as any, windows)).toBe(false);
+  });
 
-    // Sender is foreign window
-    const mockForeignSender = { id: 999 } as any;
-    expect(
-      validateIpcSender(mockForeignSender, [mockMainWindow, mockStageWindow]),
-    ).toBe(false);
+  it("supports compact independent Menubar bounds validation without inflating width", () => {
+    const mockDisplays = [
+      {
+        bounds: { x: 0, y: 0, width: 1920, height: 1080 },
+        workArea: { x: 0, y: 0, width: 1920, height: 1040 },
+      },
+    ];
+    const compact = validateWindowBounds(
+      { x: 120, y: 120, width: 76, height: 700 },
+      mockDisplays,
+      { minWidth: 68, minHeight: 420 },
+    );
+    expect(compact.width).toBe(76);
+    expect(compact.x).toBe(120);
   });
 
   it("validates stage window coordinates and safely falls back when offscreen", () => {

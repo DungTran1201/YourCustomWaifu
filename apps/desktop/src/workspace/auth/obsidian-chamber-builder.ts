@@ -16,6 +16,7 @@ export interface ObsidianChamberInstance {
   roseStripMat: THREE.MeshBasicMaterial;
   glassBaffles: THREE.Mesh[];
   setCompanionPosition: (x: number, z: number) => void;
+  setTheme: (theme: "light" | "dark") => void;
   updateAmbient: (elapsed: number, entranceProgress: number) => void;
   dispose: () => void;
 }
@@ -66,10 +67,13 @@ export function buildObsidianGlassChamber(
   const H = dims.height;
 
   // -------------------------------------------------------------------------
-  // 1. Deep Exterior Void Shell (gives visible depth behind semi-transparent back glass)
+  // 1. Exterior Atmospheric Layer (transparent so GLSL shader backdrop shines through)
   // -------------------------------------------------------------------------
   const voidBackdropMat = new THREE.MeshBasicMaterial({
-    color: 0x040509,
+    color: 0xeaf0fb,
+    transparent: true,
+    opacity: 0.14,
+    depthWrite: false,
   });
   const voidBackdrop = new THREE.Mesh(
     new THREE.PlaneGeometry(dims.width * 1.8, H * 1.6),
@@ -297,8 +301,8 @@ export function buildObsidianGlassChamber(
     root.add(rightRib);
   }
 
-  const backMullionGeo = new THREE.BoxGeometry(0.04, H, 0.04);
-  for (const xPos of [-1.15, 0.0, 1.15]) {
+  const backMullionGeo = new THREE.BoxGeometry(0.036, H, 0.036);
+  for (const xPos of [-1.65, 1.65]) {
     const backRib = new THREE.Mesh(backMullionGeo, mullionMat);
     backRib.position.set(xPos, H / 2, -halfD + 0.02);
     backRib.receiveShadow = true;
@@ -418,10 +422,68 @@ export function buildObsidianGlassChamber(
     rightBaffle.position.x = x + 0.06;
   }
 
+  let currentTheme: "light" | "dark" = "dark";
+
+  function setTheme(theme: "light" | "dark") {
+    currentTheme = theme;
+    const isLight = theme === "light";
+
+    voidBackdropMat.color.setHex(isLight ? 0xeef3fc : 0x040509);
+    voidBackdropMat.opacity = isLight ? 0.1 : 0.35;
+
+    distantBeamMat.color.setHex(isLight ? 0x7c8cf8 : 0x9185d9);
+    distantBeamMat.opacity = isLight ? 0.16 : 0.14;
+
+    floorBaseMat.color.setHex(isLight ? 0xe7edf8 : 0x07080e);
+    floorBaseMat.roughness = isLight ? 0.42 : 0.78;
+    floorBaseMat.metalness = isLight ? 0.08 : 0.22;
+
+    floorGlassMat.color.setHex(isLight ? 0xffffff : 0x0d101b);
+    floorGlassMat.opacity = isLight ? 0.42 : 0.44;
+
+    gridMat.color.setHex(isLight ? 0xc7d2e8 : 0x23263a);
+    gridMat.opacity = isLight ? 0.16 : 0.22;
+
+    ceilingMat.color.setHex(isLight ? 0xf3f6fc : 0x080a12);
+    ceilingMat.metalness = isLight ? 0.1 : 0.45;
+
+    backWallMat.color.setHex(isLight ? 0xf8faff : 0x0b0d16);
+    backWallMat.opacity = isLight ? 0.12 : 0.24;
+
+    sideWallMat.color.setHex(isLight ? 0xf6f9ff : 0x0a0c15);
+    sideWallMat.opacity = isLight ? 0.12 : 0.24;
+
+    boxEdgesMat.color.setHex(isLight ? 0xffffff : 0x323654);
+    boxEdgesMat.opacity = isLight ? 0.2 : 0.34;
+
+    mullionMat.color.setHex(isLight ? 0xdde5f3 : 0x121522);
+    mullionMat.metalness = isLight ? 0.18 : 0.68;
+
+    baffleGlassMat.color.setHex(isLight ? 0xffffff : 0x121524);
+    baffleGlassMat.opacity = isLight ? 0.14 : 0.2;
+
+    baffleEdgeVioletMat.color.setHex(isLight ? 0x8b95eb : 0x9185d9);
+    baffleEdgeVioletMat.opacity = isLight ? 0.14 : 0.2;
+    baffleEdgeRoseMat.color.setHex(isLight ? 0xc293b3 : 0xb9789b);
+    baffleEdgeRoseMat.opacity = isLight ? 0.12 : 0.16;
+
+    if (contactShadow) {
+      (contactShadow.material as THREE.MeshBasicMaterial).opacity = isLight
+        ? 0.28
+        : 0.88;
+    }
+    plinthRingMat.color.setHex(isLight ? 0x64748b : 0x9185d9);
+    plinthRingMat.opacity = isLight ? 0.16 : 0.22;
+    violetStripMat.color.setHex(isLight ? 0x93a8f8 : 0x9185d9);
+    roseStripMat.color.setHex(isLight ? 0xd9a7c7 : 0xb9789b);
+  }
+
   function updateAmbient(elapsed: number, entranceProgress: number) {
     const e = THREE.MathUtils.clamp(entranceProgress, 0, 1);
-    violetStripMat.opacity = (0.36 + Math.sin(elapsed * 0.9) * 0.06) * e;
-    roseStripMat.opacity = (0.28 + Math.cos(elapsed * 0.75) * 0.05) * e;
+    const baseViolet = currentTheme === "light" ? 0.24 : 0.36;
+    const baseRose = currentTheme === "light" ? 0.18 : 0.28;
+    violetStripMat.opacity = (baseViolet + Math.sin(elapsed * 0.9) * 0.05) * e;
+    roseStripMat.opacity = (baseRose + Math.cos(elapsed * 0.75) * 0.04) * e;
     plinthRing.rotation.z = elapsed * 0.035;
   }
 
@@ -457,6 +519,7 @@ export function buildObsidianGlassChamber(
     roseStripMat,
     glassBaffles: [leftBaffle, rightBaffle],
     setCompanionPosition,
+    setTheme,
     updateAmbient,
     dispose,
   };

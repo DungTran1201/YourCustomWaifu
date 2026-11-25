@@ -9,7 +9,7 @@
     "theme": {
       "type": "string",
       "enum": ["dark", "light", "system"],
-      "default": "dark"
+      "default": "light"
     },
     "telemetryEnabled": {
       "type": "boolean",

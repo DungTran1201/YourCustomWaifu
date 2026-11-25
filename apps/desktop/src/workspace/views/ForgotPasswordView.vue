@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, inject } from "vue";
 import { useAppStore } from "@vrm/app-core";
-import AppIcon from "../../components/AppIcon.vue";
 import { AUTH_ENVIRONMENT_KEY } from "../auth/auth-environment-context.js";
 
 const store = useAppStore();
@@ -41,22 +40,12 @@ async function handleSubmit() {
   >
     <div class="noir-auth-card">
       <div class="noir-auth-header">
-        <div class="noir-eyebrow">
-          <AppIcon name="key" size="13" />
-          <span>Account Recovery</span>
-        </div>
         <h1 class="noir-auth-title">Reset Password</h1>
-        <p class="noir-auth-subtitle">
-          Request a 15-minute single-use recovery token for your account
-        </p>
       </div>
 
       <div v-if="submitted" class="alert alert-success" role="status">
-        <div class="alert-title">Recovery Request Dispatched</div>
+        <div class="alert-title">Reset Requested</div>
         <div>{{ responseMessage }}</div>
-        <div class="alert-hint">
-          Once you have your reset token, enter it on the password update form.
-        </div>
       </div>
 
       <div v-if="formError" class="alert alert-error" role="alert">
@@ -70,7 +59,7 @@ async function handleSubmit() {
         @submit.prevent="handleSubmit"
       >
         <div class="form-group">
-          <label for="reset-email" class="form-label">Email Address</label>
+          <label for="reset-email" class="form-label">Email</label>
           <div class="input-wrapper">
             <input
               id="reset-email"
@@ -79,7 +68,7 @@ async function handleSubmit() {
               autocomplete="email"
               required
               class="form-input"
-              placeholder="alex@example.com"
+              placeholder="name@example.com"
               :disabled="isSubmitting"
               @focus="authEnv?.notifyInputFocus()"
               @blur="authEnv?.notifyInputBlur()"
@@ -95,7 +84,7 @@ async function handleSubmit() {
           :disabled="isSubmitting"
         >
           <span v-if="isSubmitting" class="spinner"></span>
-          <span>{{ isSubmitting ? "Dispatching..." : "Send Reset Link" }}</span>
+          <span>{{ isSubmitting ? "Sending..." : "Send Reset Link" }}</span>
         </button>
       </form>
 

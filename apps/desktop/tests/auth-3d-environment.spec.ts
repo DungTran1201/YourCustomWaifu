@@ -15,6 +15,7 @@ import {
   parseVrmFromBuffer,
 } from "../src/vrm/index.js";
 import { buildObsidianGlassChamber } from "../src/workspace/auth/obsidian-chamber-builder.js";
+import { buildAuthShaderBackdrop } from "../src/workspace/auth/auth-shader-backdrop.js";
 
 function createMockVrm(): {
   vrm: VRM;
@@ -242,9 +243,31 @@ describe("3D VRM Authentication Environment, Companion Animation & 8-Char Passwo
       // Dynamic responsive companion positioning updates anchor & alcove
       chamber.setCompanionPosition(0.68, -0.3);
       expect(chamber.companionAnchor.x).toBeCloseTo(0.68, 3);
+      chamber.setTheme("light");
       chamber.updateAmbient(1.5, 1.0);
+      chamber.setTheme("dark");
+      chamber.updateAmbient(2.0, 1.0);
 
       expect(() => chamber.dispose()).not.toThrow();
+    });
+
+    it("creates GLSL shader backdrop supporting smooth Light/Dark glass theme transitions and pointer parallax", () => {
+      const backdrop = buildAuthShaderBackdrop("light");
+      expect(backdrop.mesh.name).toBe("AuthShaderBackdrop");
+
+      const mat = backdrop.mesh.material as THREE.ShaderMaterial;
+      expect(mat.uniforms.uThemeMix!.value).toBe(0);
+
+      backdrop.setTheme("dark");
+      backdrop.setPointer(0.5, -0.25);
+      backdrop.update(1.2, 0.5, false);
+      expect(mat.uniforms.uThemeMix!.value).toBeGreaterThan(0.5);
+
+      backdrop.setTheme("light");
+      backdrop.update(2.0, 0.5, true);
+      expect(mat.uniforms.uThemeMix!.value).toBe(0);
+
+      expect(() => backdrop.dispose()).not.toThrow();
     });
 
     it("drives LookAt, Head Movement, Thinking transitions, Pause/Resume, and Reduced Motion", () => {
@@ -346,20 +369,46 @@ describe("3D VRM Authentication Environment, Companion Animation & 8-Char Passwo
       expect(store.state.stageStatus.stageVisible).toBe(false);
     });
 
+    it("toggles between Light Glass and Dark Glass themes directly inside Authentication Environment", async () => {
+      const store = useAppStore();
+      store.updateSettings({ theme: "light" });
+
+      const wrapper = mount(App);
+      await flushPromises();
+
+      const themeBtn = wrapper.find("#auth-theme-toggle-btn");
+      expect(themeBtn.exists()).toBe(true);
+      expect(document.documentElement.getAttribute("data-theme")).toBe("light");
+      expect(wrapper.find(".auth-3d-stage").classes()).toContain("theme-light");
+
+      await themeBtn.trigger("click");
+      await wrapper.vm.$nextTick();
+
+      expect(store.resolvedTheme.value).toBe("dark");
+      expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
+      expect(wrapper.find(".auth-3d-stage").classes()).toContain("theme-dark");
+
+      await themeBtn.trigger("click");
+      await wrapper.vm.$nextTick();
+
+      expect(store.resolvedTheme.value).toBe("light");
+      expect(document.documentElement.getAttribute("data-theme")).toBe("light");
+    });
+
     it("switches smoothly between Floating Sign In, Register, Forgot Password, and Reset Password", async () => {
       const wrapper = mount(App);
       const store = useAppStore();
 
       expect(wrapper.find("#signin-email").exists()).toBe(true);
 
-      // Switch to Register via foreground link
-      await wrapper.find("#goto-signup-btn").trigger("click");
+      // Switch to Register via mode tab
+      await wrapper.find("#auth-tab-signup").trigger("click");
       await flushPromises();
       expect(store.state.currentTab).toBe("signup");
       expect(wrapper.find("#signup-email").exists()).toBe(true);
 
-      // Switch back to Sign In
-      await wrapper.find("#goto-signin-btn").trigger("click");
+      // Switch back to Sign In via mode tab
+      await wrapper.find("#auth-tab-signin").trigger("click");
       await flushPromises();
       expect(store.state.currentTab).toBe("signin");
 

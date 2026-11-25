@@ -21,13 +21,6 @@ const isPasswordLongEnough = computed(
     password.value.length <= PASSWORD_POLICY.maxLength,
 );
 
-const passwordProgressPct = computed(() =>
-  Math.min(
-    100,
-    Math.round((password.value.length / PASSWORD_POLICY.minLength) * 100),
-  ),
-);
-
 function handleInput() {
   if (formError.value) {
     formError.value = null;
@@ -103,23 +96,7 @@ async function handleSubmit() {
       </div>
 
       <div class="noir-auth-header">
-        <div class="noir-eyebrow">
-          <AppIcon name="signup" size="13" />
-          <span>YourCustomWaifu</span>
-        </div>
         <h1 class="noir-auth-title">Create Account</h1>
-        <p class="noir-auth-subtitle">
-          Instant activation for your private desktop companion
-        </p>
-      </div>
-
-      <!-- Policy Advisory: No Email Verification -->
-      <div class="noir-advisory" role="note">
-        <div class="noir-advisory-title">No Email Verification Required</div>
-        <div class="noir-advisory-text">
-          Accounts activate immediately upon creation with no confirmation links
-          or OTP gates. Double-check your email spelling for recovery.
-        </div>
       </div>
 
       <div
@@ -132,9 +109,7 @@ async function handleSubmit() {
 
       <form class="auth-form" novalidate @submit.prevent="handleSubmit">
         <div class="form-group">
-          <label for="signup-email" class="form-label"
-            >Email Address (Login Identifier)</label
-          >
+          <label for="signup-email" class="form-label">Email</label>
           <div class="input-wrapper">
             <input
               id="signup-email"
@@ -143,7 +118,7 @@ async function handleSubmit() {
               autocomplete="email"
               required
               class="form-input"
-              placeholder="alex@example.com"
+              placeholder="name@example.com"
               :disabled="isSubmitting"
               @focus="authEnv?.notifyInputFocus()"
               @blur="authEnv?.notifyInputBlur()"
@@ -153,9 +128,7 @@ async function handleSubmit() {
         </div>
 
         <div class="form-group">
-          <label for="signup-name" class="form-label"
-            >Display Name (Optional)</label
-          >
+          <label for="signup-name" class="form-label">Display Name</label>
           <div class="input-wrapper">
             <input
               id="signup-name"
@@ -163,7 +136,7 @@ async function handleSubmit() {
               type="text"
               autocomplete="name"
               class="form-input"
-              placeholder="Alex Chen"
+              placeholder="Optional"
               :disabled="isSubmitting"
               @focus="authEnv?.notifyInputFocus()"
               @blur="authEnv?.notifyInputBlur()"
@@ -200,18 +173,8 @@ async function handleSubmit() {
               <AppIcon :name="showPassword ? 'close' : 'eye'" size="15" />
             </button>
           </div>
-          <div class="pwd-meter-row">
-            <div class="pwd-meter-track" aria-hidden="true">
-              <div
-                class="pwd-meter-fill"
-                :class="{ valid: isPasswordLongEnough }"
-                :style="{ width: `${passwordProgressPct}%` }"
-              ></div>
-            </div>
-            <div class="input-hint" :class="{ valid: isPasswordLongEnough }">
-              {{ password.length }} / {{ PASSWORD_POLICY.minLength }} characters
-              minimum
-            </div>
+          <div class="input-hint" :class="{ valid: isPasswordLongEnough }">
+            Min {{ PASSWORD_POLICY.minLength }} characters
           </div>
         </div>
 
@@ -222,23 +185,9 @@ async function handleSubmit() {
           :disabled="isSubmitting || !isPasswordLongEnough"
         >
           <span v-if="isSubmitting" class="spinner"></span>
-          <span>{{
-            isSubmitting ? "Creating account..." : "Create Account & Sign In"
-          }}</span>
+          <span>{{ isSubmitting ? "Creating..." : "Create Account" }}</span>
         </button>
       </form>
-
-      <div class="auth-footer">
-        <span class="text-muted">Already have an account?</span>
-        <button
-          id="goto-signin-btn"
-          type="button"
-          class="link-btn font-semibold"
-          @click="store.setTab('signin')"
-        >
-          Sign in
-        </button>
-      </div>
     </div>
   </div>
 </template>

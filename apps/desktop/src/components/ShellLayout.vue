@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted } from "vue";
+import { computed, onMounted, onBeforeUnmount } from "vue";
 import { useAppStore } from "@vrm/app-core";
-import { APP_METADATA } from "@vrm/shared";
 import NavigationBar from "./NavigationBar.vue";
-import StatusBadge from "./StatusBadge.vue";
 import AppIcon from "./AppIcon.vue";
 import SettingsView from "../workspace/views/SettingsView.vue";
 import DiagnosticsView from "../workspace/views/DiagnosticsView.vue";
@@ -23,8 +21,6 @@ import ActivityView from "../workspace/views/ActivityView.vue";
 
 const store = useAppStore();
 
-const platformLabel = computed(() => "Desktop App");
-
 const AUTH_MODE_TABS = new Set([
   "signin",
   "signup",
@@ -32,8 +28,15 @@ const AUTH_MODE_TABS = new Set([
   "reset-password",
 ]);
 
+const isMenubarOnlyWindow = computed(
+  () => store.state.windowMode === "menubar",
+);
+
+const isPanelOnlyWindow = computed(() => store.state.windowMode === "panel");
+
 const isAuthenticationMode = computed(
   () =>
+    !isMenubarOnlyWindow.value &&
     !store.state.isGuest &&
     !store.state.isAuthenticated &&
     (AUTH_MODE_TABS.has(store.state.currentTab) ||
@@ -41,255 +44,220 @@ const isAuthenticationMode = computed(
         store.state.currentTab !== "diagnostics")),
 );
 
-const activeTabTitle = computed(() => {
-  if (isAuthenticationMode.value) {
-    return "";
+function handleWorkspaceShortcuts(e: KeyboardEvent) {
+  if (e.defaultPrevented || isAuthenticationMode.value || e.repeat) return;
+  const hasMod = e.ctrlKey || e.metaKey;
+  if (!hasMod || e.altKey) return;
+
+  const key = e.key.toLowerCase();
+
+  // Ctrl+Shift+B: Expand / Collapse Menubar
+  if (e.shiftKey && key === "b") {
+    e.preventDefault();
+    if (!store.state.menubarVisible) {
+      store.toggleMenubar(true);
+      store.toggleSidebar(false);
+    } else {
+      store.toggleSidebar();
+    }
+    return;
   }
-  switch (store.state.currentTab) {
-    case "chat":
-      return "Companion Chat";
-    case "avatar":
-      return "Avatar Stage Settings";
-    case "agents":
-      return "AI Agents";
-    case "skills":
-      return "Skills Configuration";
-    case "rules":
-      return "Operating Rules";
-    case "tools":
-      return "Tool Integrations";
-    case "connections":
-      return "Provider Connections";
-    case "memory":
-      return "Companion Memory";
-    case "activity":
-      return "System Activity";
-    case "profile":
-      return "Account Profile";
-    case "security":
-      return "Security & Sessions";
-    case "secrets":
-      return "AI Keys & Credentials";
-    case "settings":
-      return "Application Settings";
-    case "diagnostics":
-      return "System Diagnostics";
-    case "signin":
-    case "signup":
-    case "forgot-password":
-    case "reset-password":
-      return "";
-    default:
-      return "Workspace";
+
+  // Ctrl+B: Show / Hide Menubar Window
+  if (!e.shiftKey && key === "b") {
+    e.preventDefault();
+    store.toggleMenubar();
+    return;
+  }
+
+  // Ctrl+\: Show / Hide Main Panel Window
+  if (!e.shiftKey && (e.key === "\\" || e.code === "Backslash")) {
+    e.preventDefault();
+    store.togglePanel();
+  }
+}
+
+onMounted(() => {
+  store.initTheme();
+  void store.initWorkspaceSync();
+  if (!isMenubarOnlyWindow.value) {
+    void store.initAuth();
+  }
+  store.initStageSync();
+  if (typeof window !== "undefined") {
+    window.addEventListener("keydown", handleWorkspaceShortcuts);
   }
 });
 
-onMounted(() => {
-  store.initAuth();
-  store.initStageSync();
+onBeforeUnmount(() => {
+  if (typeof window !== "undefined") {
+    window.removeEventListener("keydown", handleWorkspaceShortcuts);
+  }
 });
 </script>
 
 <template>
-  <div :class="['shell-layout', { 'auth-shell-active': isAuthenticationMode }]">
-    <!-- Borderless Full-Bleed Authentication Mode: Zero Sidebar, Zero Topbar, Zero Page Border -->
-    <template v-if="isAuthenticationMode">
+  <div
+    :class="[
+      'shell-layout',
+      `theme-${store.resolvedTheme.value}`,
+      {
+        'auth-shell-active': isAuthenticationMode,
+        'window-mode-menubar': isMenubarOnlyWindow,
+        'window-mode-panel': isPanelOnlyWindow && !isAuthenticationMode,
+      },
+    ]"
+  >
+    <!-- 1. Independent Menubar Window Mode (?window=menubar in Electron) -->
+    <template v-if="isMenubarOnlyWindow">
+      <NavigationBar detached />
+    </template>
+
+    <!-- 2. Borderless Full-Bleed Glass Authentication Mode -->
+    <template v-else-if="isAuthenticationMode">
+      <div
+        v-if="store.platform.value === 'electron'"
+        class="window-floating-controls"
+        aria-label="Window Controls"
+      >
+        <button
+          id="window-minimize-btn"
+          type="button"
+          class="win-ctrl-btn"
+          title="Minimize"
+          aria-label="Minimize window"
+          @click="store.minimizeCurrentWindow()"
+        >
+          <AppIcon name="minus" size="12" />
+        </button>
+        <button
+          id="window-close-btn"
+          type="button"
+          class="win-ctrl-btn win-ctrl-close"
+          title="Hide Window"
+          aria-label="Hide window"
+          @click="store.togglePanel(false)"
+        >
+          <AppIcon name="close" size="12" />
+        </button>
+      </div>
+
       <main class="shell-main auth-scene-active" role="main">
         <AuthEnvironment />
       </main>
     </template>
 
-    <!-- Standard Authenticated / Guest / System Workspace Shell -->
-    <template v-else>
-      <!-- Restrained Native Desktop Topbar -->
-      <header
+    <!-- 3. Headerless Independent Functional Panel Window Mode (?window=panel in Electron) -->
+    <template v-else-if="isPanelOnlyWindow">
+      <!-- Slim Invisible Top Drag Edge so Panel moves freely without a visible header -->
+      <div
+        class="panel-drag-strip"
+        title="Drag to move Panel"
+        aria-hidden="true"
+      ></div>
+
+      <!-- Subtle Hover-Reveal Window Controls (Zero Header Chrome) -->
+      <div class="window-floating-controls" aria-label="Panel Window Controls">
+        <button
+          id="window-minimize-btn"
+          type="button"
+          class="win-ctrl-btn"
+          title="Minimize Panel"
+          aria-label="Minimize Panel"
+          @click="store.minimizeCurrentWindow()"
+        >
+          <AppIcon name="minus" size="12" />
+        </button>
+        <button
+          id="window-maximize-btn"
+          type="button"
+          class="win-ctrl-btn"
+          title="Maximize or Restore Panel"
+          aria-label="Maximize or Restore Panel"
+          @click="store.toggleMaximizeCurrentWindow()"
+        >
+          <AppIcon name="maximize" size="11" />
+        </button>
+        <button
+          id="window-close-btn"
+          type="button"
+          class="win-ctrl-btn win-ctrl-close"
+          title="Hide Panel (Ctrl+\)"
+          aria-label="Hide Panel"
+          @click="store.togglePanel(false)"
+        >
+          <AppIcon name="close" size="12" />
+        </button>
+      </div>
+
+      <main
         :class="[
-          'shell-topbar',
-          { 'has-native-overlay': store.platform.value === 'electron' },
+          'shell-main',
+          'glass-panel-surface',
+          'detached-panel-surface',
+          {
+            'chat-view-active': store.state.currentTab === 'chat',
+          },
         ]"
-        role="banner"
+        role="main"
       >
-        <div class="topbar-left">
-          <!-- Sidebar Collapse / Expand Toggle Button -->
-          <button
-            id="sidebar-toggle-btn"
-            class="sidebar-toggle-btn"
-            :title="
-              store.state.sidebarCollapsed
-                ? 'Expand Sidebar'
-                : 'Collapse Sidebar'
-            "
-            :aria-label="
-              store.state.sidebarCollapsed
-                ? 'Expand Sidebar'
-                : 'Collapse Sidebar'
-            "
-            @click="store.toggleSidebar()"
-          >
-            <AppIcon
-              :name="
-                store.state.sidebarCollapsed ? 'chevron-right' : 'chevron-left'
-              "
-              size="14"
-            />
-          </button>
-
-          <div class="brand">
-            <div class="logo-mark">
-              <AppIcon name="stage" size="14" />
-            </div>
-            <div class="brand-text">
-              <span class="app-name">{{ APP_METADATA.shortName }}</span>
-              <span class="app-version">v{{ APP_METADATA.version }}</span>
-            </div>
-          </div>
-
-          <StatusBadge
-            v-if="!store.hasBridgeError.value"
-            status="ready"
-            :label="platformLabel"
+        <template v-if="store.state.isGuest">
+          <AvatarSettingsView v-if="store.state.currentTab === 'avatar'" />
+          <SettingsView v-else-if="store.state.currentTab === 'settings'" />
+          <DiagnosticsView
+            v-else-if="store.state.currentTab === 'diagnostics'"
           />
-          <span
-            v-else
-            id="bridge-error-badge"
-            class="bridge-error-badge"
-            title="Electron IPC Bridge missing. Check preload script."
-          >
-            BRIDGE ERROR
-          </span>
-          <span
-            v-if="store.state.isGuest"
-            id="guest-preview-badge"
-            class="guest-preview-badge"
-            title="Running in local development preview mode"
-          >
-            GUEST PREVIEW
-          </span>
-        </div>
+          <AvatarSettingsView v-else />
+        </template>
 
-        <div class="topbar-center">
-          <span class="current-view-title">{{ activeTabTitle }}</span>
-        </div>
+        <template v-else-if="!store.state.isAuthenticated">
+          <SettingsView v-if="store.state.currentTab === 'settings'" />
+          <DiagnosticsView
+            v-else-if="store.state.currentTab === 'diagnostics'"
+          />
+          <AuthEnvironment v-else />
+        </template>
 
-        <div class="topbar-right">
-          <!-- Stage Quick-Toggle Button -->
-          <button
-            id="nav-stage-toggle-btn"
-            :class="[
-              'stage-pill-btn',
-              store.state.stageStatus.stageVisible
-                ? 'stage-active'
-                : 'stage-inactive',
-            ]"
-            :title="
-              store.state.stageStatus.stageVisible
-                ? 'Avatar Stage is visible (Click to hide)'
-                : 'Avatar Stage is hidden (Click to launch)'
-            "
-            @click="store.toggleStage()"
-          >
-            <span class="stage-dot"></span>
-            <span class="stage-label">{{
-              store.state.stageStatus.stageVisible
-                ? "Stage Active"
-                : "Show Stage"
-            }}</span>
-          </button>
+        <template v-else>
+          <ChatView v-if="store.state.currentTab === 'chat'" />
+          <AvatarSettingsView v-else-if="store.state.currentTab === 'avatar'" />
+          <AgentsView v-else-if="store.state.currentTab === 'agents'" />
+          <SkillsView v-else-if="store.state.currentTab === 'skills'" />
+          <RulesView v-else-if="store.state.currentTab === 'rules'" />
+          <ToolsView v-else-if="store.state.currentTab === 'tools'" />
+          <ConnectionsView
+            v-else-if="store.state.currentTab === 'connections'"
+          />
+          <MemoryView v-else-if="store.state.currentTab === 'memory'" />
+          <ActivityView v-else-if="store.state.currentTab === 'activity'" />
+          <ProfileView v-else-if="store.state.currentTab === 'profile'" />
+          <SecurityView v-else-if="store.state.currentTab === 'security'" />
+          <SecretsView v-else-if="store.state.currentTab === 'secrets'" />
+          <SettingsView v-else-if="store.state.currentTab === 'settings'" />
+          <DiagnosticsView
+            v-else-if="store.state.currentTab === 'diagnostics'"
+          />
+          <ChatView v-else />
+        </template>
+      </main>
+    </template>
 
-          <!-- Guest Actions -->
-          <template v-if="store.state.isGuest">
-            <button
-              id="exit-guest-preview-btn"
-              class="nav-auth-btn guest-exit-btn"
-              title="Exit Guest Preview"
-              @click="store.exitGuestPreview()"
-            >
-              Exit Guest Preview
-            </button>
-          </template>
-
-          <!-- Auth Actions -->
-          <template v-else-if="store.state.isAuthenticated">
-            <button
-              id="nav-user-pill"
-              class="user-pill-btn"
-              title="Account Profile"
-              @click="store.setTab('profile')"
-            >
-              <AppIcon name="user" size="13" class="user-pill-icon" />
-              <span class="user-pill-name">{{
-                store.state.user?.displayName ||
-                store.state.user?.email?.split("@")[0]
-              }}</span>
-            </button>
-            <button
-              id="nav-signout-btn"
-              class="nav-auth-btn"
-              title="Sign Out"
-              @click="store.logout()"
-            >
-              Sign Out
-            </button>
-          </template>
-          <template v-else>
-            <button
-              id="nav-signin-btn"
-              class="nav-auth-btn"
-              @click="store.setTab('signin')"
-            >
-              Sign In
-            </button>
-            <button
-              id="nav-signup-btn"
-              class="nav-auth-primary-btn"
-              @click="store.setTab('signup')"
-            >
-              Register
-            </button>
-          </template>
-
-          <!-- Theme Toggle Button -->
-          <button
-            id="theme-toggle-btn"
-            class="icon-btn"
-            :title="
-              store.state.settings.theme === 'dark'
-                ? 'Switch to Light Mode'
-                : 'Switch to Dark Mode'
-            "
-            :aria-label="
-              store.state.settings.theme === 'dark'
-                ? 'Switch to Light Mode'
-                : 'Switch to Dark Mode'
-            "
-            @click="
-              store.updateSettings({
-                theme: store.state.settings.theme === 'dark' ? 'light' : 'dark',
-              })
-            "
-          >
-            <AppIcon
-              :name="store.state.settings.theme === 'dark' ? 'sun' : 'moon'"
-              size="14"
-            />
-          </button>
-        </div>
-      </header>
-
-      <!-- Shell Body: Collapsible Left Sidebar + Central Content Area -->
+    <!-- 4. Headerless Separated Shell Body (Fallback for Web / Unit Tests) -->
+    <template v-else>
       <div class="shell-body">
-        <NavigationBar />
+        <NavigationBar v-if="store.state.menubarVisible" />
 
         <main
+          v-if="store.state.panelVisible"
           :class="[
             'shell-main',
+            'glass-panel-surface',
             {
               'chat-view-active': store.state.currentTab === 'chat',
             },
           ]"
           role="main"
         >
-          <!-- Guest Preview routing: focus on Avatar Stage and settings -->
           <template v-if="store.state.isGuest">
             <AvatarSettingsView v-if="store.state.currentTab === 'avatar'" />
             <SettingsView v-else-if="store.state.currentTab === 'settings'" />
@@ -299,7 +267,6 @@ onMounted(() => {
             <AvatarSettingsView v-else />
           </template>
 
-          <!-- Unauthenticated routing: mount unified 3D VRM Authentication Environment unless viewing system tools -->
           <template v-else-if="!store.state.isAuthenticated">
             <SettingsView v-if="store.state.currentTab === 'settings'" />
             <DiagnosticsView
@@ -308,7 +275,6 @@ onMounted(() => {
             <AuthEnvironment v-else />
           </template>
 
-          <!-- Authenticated routing: display Chatspace by default -->
           <template v-else>
             <ChatView v-if="store.state.currentTab === 'chat'" />
             <AvatarSettingsView
@@ -333,6 +299,41 @@ onMounted(() => {
             <ChatView v-else />
           </template>
         </main>
+
+        <!-- Minimal Glass Restore Card when Panel is Hidden in Combined Fallback -->
+        <section
+          v-else
+          class="panel-hidden-stage"
+          aria-label="Workspace Panel Hidden"
+        >
+          <div class="panel-restore-card">
+            <AppIcon name="panel" size="22" class="restore-icon" />
+            <h3 class="restore-title">Workspace Panel Hidden</h3>
+            <p class="restore-desc">
+              Press <kbd>Ctrl+\</kbd> or toggle in Settings anytime to bring
+              back your workspace panel.
+            </p>
+            <div class="restore-actions">
+              <button
+                id="panel-restore-btn"
+                type="button"
+                class="restore-btn"
+                @click="store.togglePanel(true)"
+              >
+                Show Panel
+              </button>
+              <button
+                v-if="!store.state.menubarVisible"
+                id="menubar-restore-btn"
+                type="button"
+                class="restore-btn-secondary"
+                @click="store.toggleMenubar(true)"
+              >
+                Show Menubar
+              </button>
+            </div>
+          </div>
+        </section>
       </div>
     </template>
   </div>
@@ -340,289 +341,101 @@ onMounted(() => {
 
 <style scoped>
 .shell-layout {
+  position: relative;
   height: 100vh;
   width: 100%;
   display: flex;
   flex-direction: column;
-  background-color: var(--bg-primary);
+  background: var(--canvas-bg);
   color: var(--text-primary);
   overflow: hidden;
   min-width: 0;
   min-height: 0;
+  transition:
+    background 260ms ease,
+    color 200ms ease;
 }
 
-/* Topbar Header */
-.shell-topbar {
-  height: 46px;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-subtle);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 14px;
-  user-select: none;
-  flex-shrink: 0;
-  z-index: 20;
-  min-width: 0;
-  gap: 8px;
+.shell-layout.auth-shell-active,
+.shell-layout.window-mode-menubar,
+.shell-layout.window-mode-panel {
+  background: transparent;
+}
+
+/* Slim Invisible Top Drag Edge for Headerless Panel Window */
+.panel-drag-strip {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 98px;
+  height: 18px;
+  z-index: 40;
   -webkit-app-region: drag;
 }
 
-.shell-topbar.has-native-overlay {
-  padding-right: 146px;
-}
-
-.topbar-left,
-.topbar-right,
-.shell-topbar button {
+/* Discreet Floating Hover Controls (Zero Header Bar) */
+.window-floating-controls {
+  position: fixed;
+  top: 8px;
+  right: 10px;
+  z-index: 45;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 4px;
+  border-radius: 9999px;
+  background: var(--glass-surface-subtle);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  opacity: 0.42;
+  transition:
+    opacity var(--transition-fast),
+    background-color var(--transition-fast);
   -webkit-app-region: no-drag;
 }
 
-.topbar-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  flex-shrink: 1;
+.window-floating-controls:hover,
+.window-floating-controls:focus-within {
+  opacity: 1;
+  background: var(--glass-surface);
+  box-shadow: var(--glass-specular), var(--glass-shadow-sm);
 }
 
-.bridge-error-badge {
-  padding: 2px 7px;
-  background: rgba(239, 68, 68, 0.15);
-  color: var(--accent-danger);
-  border: 1px solid rgba(239, 68, 68, 0.35);
-  border-radius: var(--radius-sm);
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
-
-.guest-preview-badge {
-  padding: 2px 7px;
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text-secondary);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-}
-
-.guest-exit-btn {
-  border-color: var(--border-default);
-  color: var(--text-secondary);
-}
-
-.guest-exit-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-
-.sidebar-toggle-btn {
-  background: transparent;
-  border: 1px solid var(--border-subtle);
-  color: var(--text-secondary);
-  width: 26px;
-  height: 26px;
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.sidebar-toggle-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-  border-color: var(--border-default);
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.logo-mark {
+.win-ctrl-btn {
   width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-}
-
-.brand-text {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-}
-
-.app-name {
-  font-weight: 600;
-  font-size: 0.85rem;
-  color: var(--text-primary);
-  letter-spacing: -0.01em;
-}
-
-.app-version {
-  font-size: 0.68rem;
-  color: var(--text-muted);
-  font-family: var(--font-family-mono);
-}
-
-.topbar-center {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  overflow: hidden;
-  padding: 0 8px;
-}
-
-.current-view-title {
-  font-size: 0.78rem;
-  font-weight: 500;
-  color: var(--text-muted);
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.topbar-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-  min-width: 0;
-}
-
-.stage-pill-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 9px;
-  border-radius: var(--radius-sm);
-  font-size: 0.78rem;
-  font-weight: 500;
-  border: 1px solid var(--border-subtle);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.stage-pill-btn.stage-active {
-  background: rgba(16, 185, 129, 0.1);
-  color: var(--accent-success);
-  border-color: rgba(16, 185, 129, 0.3);
-}
-
-.stage-pill-btn.stage-inactive {
-  background: var(--bg-surface);
-  color: var(--text-secondary);
-}
-
-.stage-pill-btn:hover {
-  border-color: var(--border-default);
-}
-
-.stage-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.user-pill-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 9px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  height: 22px;
+  border: none;
   border-radius: 9999px;
-  color: var(--text-primary);
-  font-size: 0.78rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.user-pill-btn:hover {
-  border-color: var(--border-default);
-  background: var(--bg-hover);
-}
-
-.user-pill-name {
-  max-width: 100px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.nav-auth-btn {
-  padding: 4px 9px;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 0.78rem;
-  font-weight: 500;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-subtle);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.nav-auth-btn:hover {
-  color: var(--text-primary);
-  background: var(--bg-hover);
-  border-color: var(--border-default);
-}
-
-.nav-auth-primary-btn {
-  padding: 4px 11px;
-  background: var(--text-primary);
-  color: var(--bg-primary);
-  font-size: 0.78rem;
-  font-weight: 600;
-  border-radius: var(--radius-sm);
-  border: 1px solid transparent;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.nav-auth-primary-btn:hover {
-  opacity: 0.9;
-}
-
-.action-icon-btn {
-  width: 28px;
-  height: 28px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  border: 1px solid var(--border-subtle);
   color: var(--text-secondary);
+  background: transparent;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
-.action-icon-btn:hover {
+.win-ctrl-btn:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
-  border-color: var(--border-default);
 }
 
-/* Shell Body */
+.win-ctrl-btn.win-ctrl-close:hover {
+  background: var(--alert-error-bg);
+  color: var(--alert-error-text);
+}
+
+/* Separated Shell Body (Fallback Combined Mode) */
 .shell-body {
+  position: relative;
+  z-index: 1;
   flex: 1 1 auto;
   display: flex;
   overflow: hidden;
-  position: relative;
+  padding: 14px;
+  gap: 14px;
   min-height: 0;
   min-width: 0;
 }
@@ -633,13 +446,38 @@ onMounted(() => {
   flex-direction: column;
   overflow-y: auto;
   overflow-x: hidden;
-  background: var(--bg-primary);
   position: relative;
   min-height: 0;
   min-width: 0;
 }
 
-.shell-main.chat-view-active,
+/* Synchronized Asymmetric Glass Panel Surface */
+.shell-main.glass-panel-surface {
+  border: none;
+  border-radius: var(--radius-shell-major, 24px) var(--radius-shell-minor, 12px)
+    var(--radius-shell-minor, 12px) var(--radius-shell-major, 24px);
+  background: var(--glass-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-specular), var(--glass-shadow);
+  transition:
+    background-color var(--transition-normal),
+    box-shadow var(--transition-normal);
+}
+
+/* Independent Native Panel Window fills its own Acrylic OS window edge-to-edge */
+.shell-main.detached-panel-surface {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  box-shadow: var(--glass-specular);
+  padding-top: 6px;
+}
+
+.shell-main.chat-view-active {
+  overflow: hidden;
+}
+
 .shell-main.auth-scene-active {
   overflow: hidden;
   width: 100%;
@@ -647,41 +485,100 @@ onMounted(() => {
   margin: 0;
   padding: 0;
   border: none;
+  border-radius: 0;
+  background: transparent;
 }
 
-/* Obsidian Glass Chamber Full-Bleed Shell (Zero Topbar, Zero Sidebar, Zero Page Border) */
-.shell-layout.auth-shell-active {
-  width: 100vw;
-  height: 100vh;
-  background-color: var(--obsidian-void, #05060a);
-  color: var(--obsidian-text, #ececf4);
+/* Panel Hidden Restore Stage (Combined Fallback) */
+.panel-hidden-stage {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  padding: 24px;
+}
+
+.panel-restore-card {
+  max-width: 340px;
+  width: 100%;
+  padding: 26px 24px;
   border: none;
-  margin: 0;
-  padding: 0;
+  border-radius: 22px;
+  background: var(--glass-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-specular), var(--glass-shadow);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
 }
 
-/* Responsive Topbar reflow */
-@media (max-width: 900px) {
-  .topbar-center {
-    display: none;
-  }
-  .app-version {
-    display: none;
-  }
+.restore-icon {
+  color: var(--text-secondary);
 }
 
-@media (max-width: 820px) {
-  .shell-topbar {
-    padding: 0 10px;
-    gap: 6px;
-  }
-  .user-pill-name {
-    max-width: 70px;
-  }
-  .guest-preview-badge,
-  .bridge-error-badge {
-    padding: 2px 5px;
-    font-size: 0.62rem;
-  }
+.restore-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.restore-desc {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.restore-desc kbd {
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--glass-surface-strong);
+  color: var(--text-primary);
+  font-family: var(--font-family-mono);
+  font-size: 0.75rem;
+}
+
+.restore-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.restore-btn {
+  padding: 8px 18px;
+  border: none;
+  border-radius: 9999px;
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity var(--transition-fast);
+}
+
+.restore-btn:hover {
+  opacity: 0.9;
+}
+
+.restore-btn-secondary {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 9999px;
+  background: var(--glass-surface-strong);
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.restore-btn-secondary:hover {
+  background: var(--bg-hover);
 }
 </style>

@@ -238,15 +238,15 @@ async function handleDelete(targetProvider: string) {
 }
 
 .alert-error {
-  background: rgba(239, 68, 68, 0.15);
-  border: 1px solid var(--accent-danger);
-  color: #fca5a5;
+  background: var(--alert-error-bg);
+  border: none;
+  color: var(--alert-error-text);
 }
 
 .alert-success {
-  background: rgba(16, 185, 129, 0.15);
-  border: 1px solid var(--accent-success);
-  color: #86efac;
+  background: var(--alert-success-bg);
+  border: none;
+  color: var(--alert-success-text);
 }
 
 .secret-form {
@@ -382,9 +382,9 @@ async function handleDelete(targetProvider: string) {
 }
 
 .btn-delete {
-  background: none;
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  color: #fca5a5;
+  background: var(--alert-error-bg);
+  border: none;
+  color: var(--alert-error-text);
   padding: 4px 10px;
   font-size: 0.75rem;
   border-radius: var(--radius-sm);

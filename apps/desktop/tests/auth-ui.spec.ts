@@ -46,13 +46,13 @@ describe("Workspace Desktop Authentication UI & Navigation Flow", () => {
 
     await wrapper.find("#auth-tab-signin").trigger("click");
     expect(store.state.currentTab).toBe("signin");
-    expect(wrapper.text()).toContain("Welcome Back");
+    expect(wrapper.text()).toContain("Sign In");
     expect(wrapper.find("#signin-email").exists()).toBe(true);
     expect(wrapper.find("#signin-password").exists()).toBe(true);
     expect(wrapper.find("#signin-submit-btn").exists()).toBe(true);
   });
 
-  it("navigates to Sign Up view and displays 8-char requirement and unverified notice while keeping single 3D environment", async () => {
+  it("navigates to Sign Up view and keeps Auth streamlined without VRM or clutter", async () => {
     const wrapper = mount(App);
     const store = useAppStore();
 
@@ -64,18 +64,19 @@ describe("Workspace Desktop Authentication UI & Navigation Flow", () => {
     await wrapper.find("#auth-tab-signup").trigger("click");
     expect(store.state.currentTab).toBe("signup");
     expect(wrapper.text()).toContain("Create Account");
-    expect(wrapper.text()).toContain("No Email Verification Required");
-    expect(wrapper.text()).toContain("8 characters minimum");
+    expect(wrapper.text()).not.toContain("No Email Verification Required");
+    expect(wrapper.text()).toContain("Min 8 characters");
     expect(wrapper.find("#signup-email").exists()).toBe(true);
     expect(wrapper.find("#signup-password").exists()).toBe(true);
     expect(wrapper.find("#signup-submit-btn").exists()).toBe(true);
+    expect(wrapper.find(".chamber-status-pill").exists()).toBe(false);
     expect(wrapper.find(".shell-topbar").exists()).toBe(false);
     expect(wrapper.find(".workspace-sidebar").exists()).toBe(false);
-    // Single 3D stage persists across Sign In <-> Register switch
+    // Single translucent backdrop persists across Sign In <-> Register switch
     expect(wrapper.findAll(".auth-3d-stage")).toHaveLength(1);
   });
 
-  it("hides .shell-topbar, NavigationBar, and 'Sign In' topbar title across Sign In, Register, Forgot Password, and Reset Password, and restores ShellLayout for Guest Preview & Authenticated Workspace", async () => {
+  it("keeps headerless workspace layout without .shell-topbar across Auth, Guest Preview, and Authenticated Workspace while rendering Menubar with bottom Account dock", async () => {
     const wrapper = mount(App);
     const store = useAppStore();
 
@@ -90,33 +91,35 @@ describe("Workspace Desktop Authentication UI & Navigation Flow", () => {
 
       expect(wrapper.find(".shell-topbar").exists()).toBe(false);
       expect(wrapper.find(".workspace-sidebar").exists()).toBe(false);
-      expect(wrapper.find(".current-view-title").exists()).toBe(false);
       expect(wrapper.find('[data-testid="auth-3d-environment"]').exists()).toBe(
         true,
       );
     }
 
-    // Guest Preview restores ShellLayout (Topbar + Sidebar)
+    // Guest Preview restores headerless Workspace (Menubar + Panel, zero Topbar)
     store.state.isGuest = true;
     store.setTab("avatar");
     await wrapper.vm.$nextTick();
-    expect(wrapper.find(".shell-topbar").exists()).toBe(true);
+    expect(wrapper.find(".shell-topbar").exists()).toBe(false);
     expect(wrapper.find(".workspace-sidebar").exists()).toBe(true);
+    expect(wrapper.find(".workspace-sidebar .sidebar-footer").exists()).toBe(
+      true,
+    );
     expect(wrapper.find('[data-testid="auth-3d-environment"]').exists()).toBe(
       false,
     );
 
-    // Reset guest & verify Authenticated Workspace restores ShellLayout
+    // Reset guest & verify Authenticated Workspace renders headerless Menubar + Panel
     store.state.isGuest = false;
     store.state.isAuthenticated = true;
     store.setTab("chat");
     await wrapper.vm.$nextTick();
-    expect(wrapper.find(".shell-topbar").exists()).toBe(true);
+    expect(wrapper.find(".shell-topbar").exists()).toBe(false);
     expect(wrapper.find(".workspace-sidebar").exists()).toBe(true);
-    expect(wrapper.find(".current-view-title").text()).toBe("Companion Chat");
+    expect(wrapper.find(".shell-main.chat-view-active").exists()).toBe(true);
   });
 
-  it("dynamically shows companion tabs and user pill when authenticated", async () => {
+  it("dynamically shows companion tabs and places user account dock at the bottom of Menubar when authenticated", async () => {
     const wrapper = mount(App);
     const store = useAppStore();
 
@@ -136,7 +139,7 @@ describe("Workspace Desktop Authentication UI & Navigation Flow", () => {
 
     await wrapper.vm.$nextTick();
 
-    expect(wrapper.find(".shell-topbar").exists()).toBe(true);
+    expect(wrapper.find(".shell-topbar").exists()).toBe(false);
     expect(wrapper.find(".workspace-sidebar").exists()).toBe(true);
     expect(wrapper.find("#nav-tab-chat").exists()).toBe(true);
     expect(wrapper.find("#nav-tab-avatar").exists()).toBe(true);
@@ -146,9 +149,17 @@ describe("Workspace Desktop Authentication UI & Navigation Flow", () => {
     expect(wrapper.find("#nav-tab-tools").exists()).toBe(true);
     expect(wrapper.find("#nav-tab-connections").exists()).toBe(true);
     expect(wrapper.find("#nav-tab-memory").exists()).toBe(true);
-    expect(wrapper.find("#nav-user-pill").exists()).toBe(true);
-    expect(wrapper.find("#nav-signout-btn").exists()).toBe(true);
-    // 3D Auth Environment must be completely unmounted when authenticated
+    // User account pill and sign out reside in the bottom footer of Menubar
+    expect(
+      wrapper
+        .find(".workspace-sidebar .sidebar-footer #nav-user-pill")
+        .exists(),
+    ).toBe(true);
+    expect(
+      wrapper
+        .find(".workspace-sidebar .sidebar-footer #nav-signout-btn")
+        .exists(),
+    ).toBe(true);
     expect(wrapper.find('[data-testid="auth-3d-environment"]').exists()).toBe(
       false,
     );

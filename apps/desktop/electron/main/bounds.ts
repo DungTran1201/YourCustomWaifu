@@ -25,9 +25,12 @@ export interface ValidatedBounds {
 export function validateWindowBounds(
   target: { x?: number; y?: number; width?: number; height?: number },
   displays: DisplayLike[],
+  options?: { minWidth?: number; minHeight?: number },
 ): ValidatedBounds {
-  const width = Math.max(240, target.width || 420);
-  const height = Math.max(320, target.height || 640);
+  const minW = options?.minWidth ?? 240;
+  const minH = options?.minHeight ?? 320;
+  const width = Math.max(minW, target.width || 420);
+  const height = Math.max(minH, target.height || 640);
 
   if (!displays || displays.length === 0) {
     return { x: 100, y: 100, width, height };

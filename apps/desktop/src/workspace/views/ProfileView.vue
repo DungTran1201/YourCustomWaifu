@@ -178,20 +178,21 @@ async function handleSave() {
 }
 
 .alert-error {
-  background: rgba(239, 68, 68, 0.15);
-  border: 1px solid var(--accent-danger);
-  color: #fca5a5;
+  background: var(--alert-error-bg);
+  border: none;
+  color: var(--alert-error-text);
 }
 
 .alert-success {
-  background: rgba(16, 185, 129, 0.15);
-  border: 1px solid var(--accent-success);
-  color: #86efac;
+  background: var(--alert-success-bg);
+  border: none;
+  color: var(--alert-success-text);
 }
 
 .email-status-card {
   background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
+  border: none;
+  box-shadow: var(--glass-specular), var(--glass-shadow-sm);
   border-radius: var(--radius-md);
   padding: 20px;
   margin-bottom: 28px;
@@ -212,9 +213,9 @@ async function handleSave() {
 }
 
 .status-unverified {
-  background: rgba(245, 158, 11, 0.15);
-  border: 1px solid var(--accent-warning);
-  color: #fcd34d;
+  background: var(--alert-warning-bg);
+  border: none;
+  color: var(--alert-warning-text);
 }
 
 .registered-date {

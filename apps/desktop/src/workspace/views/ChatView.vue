@@ -510,24 +510,30 @@ async function copyMessage(id: string, text: string) {
   flex-direction: column;
   height: 100%;
   flex: 1;
-  background-color: var(--bg-primary);
+  background-color: transparent;
   color: var(--text-primary);
   min-height: 0;
   position: relative;
 }
 
 .chat-header {
-  height: 48px;
+  height: 54px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--bg-primary);
+  padding: 6px 104px 0 18px;
+  border-bottom: none;
+  background: transparent;
   flex-shrink: 0;
   z-index: 10;
   min-width: 0;
   gap: 8px;
+  -webkit-app-region: drag;
+}
+
+.chat-header button,
+.chat-header .model-selector-container {
+  -webkit-app-region: no-drag;
 }
 
 .header-left {
@@ -687,15 +693,14 @@ async function copyMessage(id: string, text: string) {
   width: 310px;
   max-height: 420px;
   overflow-y: auto;
-  background: #12151c;
-  border: 1px solid var(--border-default);
+  background: var(--glass-surface-strong);
+  border: none;
   border-radius: var(--radius-md);
-  box-shadow:
-    0 16px 36px rgba(0, 0, 0, 0.65),
-    0 0 0 1px rgba(255, 255, 255, 0.05);
-  padding: 8px;
+  box-shadow: var(--glass-specular), var(--glass-shadow);
+  padding: 10px;
   z-index: 100;
-  backdrop-filter: blur(16px);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   animation: dropdownIn 0.15s ease-out;
 }
 
@@ -815,7 +820,7 @@ async function copyMessage(id: string, text: string) {
 }
 
 .model-option-btn:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--bg-hover);
   color: var(--text-primary);
 }
 
@@ -1050,22 +1055,22 @@ async function copyMessage(id: string, text: string) {
 
 .message-bubble {
   max-width: 82%;
-  padding: 10px 14px;
+  padding: 11px 15px;
   border-radius: var(--radius-md);
   font-size: 0.85rem;
   line-height: 1.55;
   position: relative;
+  border: none;
+  box-shadow: var(--glass-specular), var(--glass-shadow-sm);
 }
 
 .user-row .message-bubble {
   background: var(--bg-elevated);
-  border: 1px solid var(--border-default);
   color: var(--text-primary);
 }
 
 .assistant-row .message-bubble {
   background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
   color: var(--text-primary);
 }
 
@@ -1216,7 +1221,7 @@ async function copyMessage(id: string, text: string) {
 /* Composer */
 .chat-composer-container {
   padding: 10px 16px 14px 16px;
-  background: var(--bg-primary);
+  background: transparent;
   flex-shrink: 0;
 }
 
@@ -1228,18 +1233,24 @@ async function copyMessage(id: string, text: string) {
 }
 
 .composer-box {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-default);
+  background: var(--glass-surface-strong);
+  border: none;
   border-radius: var(--radius-md);
-  padding: 10px 12px;
+  box-shadow: var(--glass-specular), var(--glass-shadow-sm);
+  padding: 10px 14px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  transition: border-color var(--transition-fast);
+  transition:
+    box-shadow var(--transition-fast),
+    background-color var(--transition-fast);
 }
 
 .composer-box:focus-within {
-  border-color: rgba(255, 255, 255, 0.24);
+  background: var(--glass-input-focus);
+  box-shadow:
+    0 0 0 2px var(--focus-ring),
+    var(--glass-shadow-sm);
 }
 
 .composer-textarea {
@@ -1290,9 +1301,10 @@ async function copyMessage(id: string, text: string) {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 12px;
-  background: var(--text-primary);
-  color: var(--bg-primary);
+  padding: 6px 14px;
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+  border: none;
   border-radius: var(--radius-sm);
   font-size: 0.78rem;
   font-weight: 600;

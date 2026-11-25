@@ -19,11 +19,12 @@ defineProps<{
   gap: 6px;
   padding: 4px 10px;
   border-radius: 9999px;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  border: 1px solid transparent;
+  border: none;
+  box-shadow: var(--glass-specular);
 }
 
 .dot {
@@ -34,9 +35,8 @@ defineProps<{
 
 .status-active,
 .status-ready {
-  background: rgba(16, 185, 129, 0.12);
-  color: var(--accent-success);
-  border-color: rgba(16, 185, 129, 0.3);
+  background: var(--alert-success-bg);
+  color: var(--alert-success-text);
 }
 .status-active .dot,
 .status-ready .dot {
@@ -45,27 +45,24 @@ defineProps<{
 }
 
 .status-offline {
-  background: rgba(107, 114, 128, 0.15);
-  color: var(--text-muted);
-  border-color: rgba(107, 114, 128, 0.3);
+  background: var(--glass-surface-subtle);
+  color: var(--status-muted-text);
 }
 .status-offline .dot {
-  background: var(--text-muted);
+  background: var(--status-muted-text);
 }
 
 .status-warning {
-  background: rgba(245, 158, 11, 0.12);
-  color: var(--accent-warning);
-  border-color: rgba(245, 158, 11, 0.3);
+  background: var(--alert-warning-bg);
+  color: var(--alert-warning-text);
 }
 .status-warning .dot {
   background: var(--accent-warning);
 }
 
 .status-error {
-  background: rgba(239, 68, 68, 0.12);
-  color: var(--accent-danger);
-  border-color: rgba(239, 68, 68, 0.3);
+  background: var(--alert-error-bg);
+  color: var(--alert-error-text);
 }
 .status-error .dot {
   background: var(--accent-danger);

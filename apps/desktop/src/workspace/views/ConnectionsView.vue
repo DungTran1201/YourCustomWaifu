@@ -297,8 +297,8 @@ async function handleTest(provider: "gemini" | "openai" | "anthropic") {
 
 .btn-primary {
   padding: 8px 16px;
-  background: var(--text-primary);
-  color: #101114;
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
   border-radius: var(--radius-sm);
   font-size: 0.85rem;
   font-weight: 600;
@@ -306,7 +306,7 @@ async function handleTest(provider: "gemini" | "openai" | "anthropic") {
 }
 
 .btn-primary:hover {
-  background: #ffffff;
+  opacity: 0.9;
 }
 
 .btn-secondary {

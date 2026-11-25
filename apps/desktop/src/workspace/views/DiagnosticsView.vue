@@ -381,8 +381,8 @@ onMounted(() => {
 
 .action-btn {
   padding: 8px 18px;
-  background: var(--text-primary);
-  color: #101114;
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
   font-weight: 600;
   border-radius: var(--radius-sm);
   font-size: 0.85rem;
@@ -392,7 +392,7 @@ onMounted(() => {
 }
 
 .action-btn:hover {
-  background: #ffffff;
+  opacity: 0.9;
 }
 
 .ping-output {

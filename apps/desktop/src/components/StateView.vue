@@ -57,15 +57,18 @@ const emit = defineEmits<{
   justify-content: center;
   padding: 48px 24px;
   text-align: center;
-  background: var(--bg-card);
-  border: 1px dashed var(--border-subtle);
+  background: var(--glass-surface-strong);
+  border: none;
   border-radius: var(--radius-lg);
-  backdrop-filter: blur(8px);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-specular), var(--glass-shadow-sm);
 }
 
 .state-icon {
   font-size: 2.5rem;
   margin-bottom: 16px;
+  color: var(--text-secondary);
 }
 
 .spinner {
@@ -99,17 +102,19 @@ const emit = defineEmits<{
 }
 
 .state-action-btn {
-  padding: 8px 18px;
-  background: var(--accent-cyan);
-  color: #000;
+  padding: 9px 18px;
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+  border: none;
   font-weight: 600;
   font-size: 0.875rem;
   border-radius: var(--radius-sm);
+  box-shadow: var(--glass-shadow-sm);
   transition: all var(--transition-fast);
 }
 
 .state-action-btn:hover {
-  background: #22d3ee;
-  box-shadow: 0 0 12px var(--accent-cyan-glow);
+  opacity: 0.9;
+  transform: translateY(-1px);
 }
 </style>

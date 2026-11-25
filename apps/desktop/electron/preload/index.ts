@@ -6,6 +6,7 @@ import {
   type StageStatus,
   type AvatarConfig,
   type WindowBounds,
+  type WorkspaceWindowState,
 } from "@vrm/platform-contracts";
 
 const desktopAPI: DesktopAPI = {
@@ -113,6 +114,49 @@ const desktopAPI: DesktopAPI = {
     hide: (): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_HIDE),
     toggle: (): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_TOGGLE),
+    syncTheme: (theme: "light" | "dark"): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_SYNC_THEME, theme),
+    getState: (): Promise<WorkspaceWindowState> =>
+      ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_GET_STATE),
+    syncState: (
+      partial: Partial<WorkspaceWindowState>,
+    ): Promise<WorkspaceWindowState> =>
+      ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_SYNC_STATE, partial),
+    showMenubar: (): Promise<WorkspaceWindowState> =>
+      ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_SHOW_MENUBAR),
+    hideMenubar: (): Promise<WorkspaceWindowState> =>
+      ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_HIDE_MENUBAR),
+    toggleMenubar: (visible?: boolean): Promise<WorkspaceWindowState> =>
+      ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_TOGGLE_MENUBAR, visible),
+    setMenubarCollapsed: (collapsed: boolean): Promise<WorkspaceWindowState> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.WORKSPACE_SET_MENUBAR_COLLAPSED,
+        collapsed,
+      ),
+    showPanel: (tab?: string): Promise<WorkspaceWindowState> =>
+      ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_SHOW_PANEL, tab),
+    hidePanel: (): Promise<WorkspaceWindowState> =>
+      ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_HIDE_PANEL),
+    togglePanel: (visible?: boolean): Promise<WorkspaceWindowState> =>
+      ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_TOGGLE_PANEL, visible),
+    navigateTab: (tab: string): Promise<WorkspaceWindowState> =>
+      ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_NAVIGATE_TAB, tab),
+    resetLayout: (): Promise<WorkspaceWindowState> =>
+      ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_RESET_LAYOUT),
+    minimizeWindow: (): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_MINIMIZE_WINDOW),
+    toggleMaximizeWindow: (): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_TOGGLE_MAXIMIZE_WINDOW),
+    onStateChanged: (callback: (state: WorkspaceWindowState) => void) => {
+      const handler = (_: any, state: WorkspaceWindowState) => callback(state);
+      ipcRenderer.on(IPC_CHANNELS.WORKSPACE_STATE_CHANGED, handler);
+      return () => {
+        ipcRenderer.removeListener(
+          IPC_CHANNELS.WORKSPACE_STATE_CHANGED,
+          handler,
+        );
+      };
+    },
   },
 };
 

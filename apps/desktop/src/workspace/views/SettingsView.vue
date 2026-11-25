@@ -4,8 +4,8 @@ import { useAppStore } from "@vrm/app-core";
 const store = useAppStore();
 
 const themes = [
-  { id: "dark", label: "Dark Mode (Default)" },
-  { id: "light", label: "Light Mode" },
+  { id: "light", label: "Light Glass (Default)" },
+  { id: "dark", label: "Dark Glass" },
   { id: "system", label: "Follow System" },
 ] as const;
 
@@ -99,6 +99,101 @@ const logLevels = ["debug", "info", "warn", "error"] as const;
       </div>
     </div>
 
+    <div class="settings-group">
+      <div class="setting-row">
+        <div class="setting-info">
+          <label class="setting-label">Menubar Window</label>
+          <span class="setting-desc">
+            Show or hide the independent floating Menubar window
+            <span class="shortcut-badge">Ctrl+B</span>
+            <span class="shortcut-badge">Global: Ctrl+Alt+B</span>
+          </span>
+        </div>
+        <div class="setting-control">
+          <label class="switch">
+            <input
+              id="settings-menubar-toggle"
+              type="checkbox"
+              :checked="store.state.menubarVisible"
+              @change="
+                (e) =>
+                  store.toggleMenubar((e.target as HTMLInputElement).checked)
+              "
+            />
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <label class="setting-label">Compact Menubar</label>
+          <span class="setting-desc">
+            Collapse Menubar to icon rail width
+            <span class="shortcut-badge">Ctrl+Shift+B</span>
+          </span>
+        </div>
+        <div class="setting-control">
+          <label class="switch">
+            <input
+              id="settings-menubar-collapse-toggle"
+              type="checkbox"
+              :checked="store.state.sidebarCollapsed"
+              @change="
+                (e) =>
+                  store.toggleSidebar((e.target as HTMLInputElement).checked)
+              "
+            />
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <label class="setting-label">Functional Panel Window</label>
+          <span class="setting-desc">
+            Show or hide the independent Workspace Panel window
+            <span class="shortcut-badge">Ctrl+\</span>
+            <span class="shortcut-badge">Global: Ctrl+Alt+\</span>
+          </span>
+        </div>
+        <div class="setting-control">
+          <label class="switch">
+            <input
+              id="settings-panel-toggle"
+              type="checkbox"
+              :checked="store.state.panelVisible"
+              @change="
+                (e) => store.togglePanel((e.target as HTMLInputElement).checked)
+              "
+            />
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <label class="setting-label">Window Positioning</label>
+          <span class="setting-desc">
+            Drag the top edge of either window to move freely, or reset both
+            side-by-side
+          </span>
+        </div>
+        <div class="setting-control">
+          <button
+            id="settings-reset-layout-btn"
+            type="button"
+            class="layout-reset-btn"
+            @click="store.resetWorkspaceLayout()"
+          >
+            Arrange Side-by-Side
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div class="info-card">
       <h4>Runtime Environment Details</h4>
       <p>
@@ -140,8 +235,9 @@ const logLevels = ["debug", "info", "warn", "error"] as const;
 
 .settings-group {
   background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-md);
+  box-shadow: var(--glass-specular), var(--glass-shadow-sm);
   padding: 8px 24px;
   margin-bottom: 32px;
 }
@@ -181,10 +277,10 @@ const logLevels = ["debug", "info", "warn", "error"] as const;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  background: var(--bg-primary);
+  background: var(--glass-surface-subtle);
   padding: 4px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border-subtle);
+  border: none;
 }
 
 .pill-btn {
@@ -200,8 +296,8 @@ const logLevels = ["debug", "info", "warn", "error"] as const;
 }
 
 .pill-btn.active {
-  background: var(--text-primary);
-  color: #101114;
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
   font-weight: 600;
 }
 
@@ -238,7 +334,8 @@ const logLevels = ["debug", "info", "warn", "error"] as const;
   background-color: var(--bg-tertiary);
   transition: 0.3s;
   border-radius: 24px;
-  border: 1px solid var(--border-subtle);
+  border: none;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.12);
 }
 
 .slider:before {
@@ -264,8 +361,9 @@ input:checked + .slider:before {
 
 .info-card {
   padding: 20px;
-  background: rgba(99, 102, 241, 0.08);
-  border: 1px solid rgba(99, 102, 241, 0.2);
+  background: var(--glass-surface-subtle);
+  border: none;
+  box-shadow: var(--glass-specular), var(--glass-shadow-sm);
   border-radius: var(--radius-md);
   color: var(--text-secondary);
   font-size: 0.9rem;
@@ -274,6 +372,38 @@ input:checked + .slider:before {
 .info-card h4 {
   color: var(--text-primary);
   margin-bottom: 6px;
+}
+
+.shortcut-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: var(--glass-surface-subtle);
+  color: var(--text-primary);
+  font-family: var(--font-family-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+
+.layout-reset-btn {
+  padding: 7px 14px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--glass-surface-strong);
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  box-shadow: var(--glass-specular), var(--glass-shadow-sm);
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.layout-reset-btn:hover {
+  background: var(--bg-hover);
+  transform: translateY(-1px);
 }
 
 @media (max-width: 640px) {

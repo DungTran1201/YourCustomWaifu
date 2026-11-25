@@ -146,6 +146,7 @@ export function createWebFallbackAPI(): DesktopAPI {
       show: async () => {},
       hide: async () => {},
       toggle: async () => {},
+      onStateChanged: () => () => {},
     },
   };
 }

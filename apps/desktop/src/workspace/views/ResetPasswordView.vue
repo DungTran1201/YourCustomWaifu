@@ -56,14 +56,7 @@ async function handleSubmit() {
   >
     <div class="noir-auth-card">
       <div class="noir-auth-header">
-        <div class="noir-eyebrow">
-          <AppIcon name="security" size="13" />
-          <span>Credential Renewal</span>
-        </div>
         <h1 class="noir-auth-title">Set New Password</h1>
-        <p class="noir-auth-subtitle">
-          All existing active sessions will be terminated upon reset
-        </p>
       </div>
 
       <div v-if="formError" class="alert alert-error" role="alert">
@@ -120,8 +113,7 @@ async function handleSubmit() {
             </button>
           </div>
           <div class="input-hint" :class="{ valid: isPasswordLongEnough }">
-            {{ newPassword.length }} /
-            {{ PASSWORD_POLICY.minLength }} characters minimum
+            Min {{ PASSWORD_POLICY.minLength }} characters
           </div>
         </div>
 
@@ -132,9 +124,7 @@ async function handleSubmit() {
           :disabled="isSubmitting || !isPasswordLongEnough"
         >
           <span v-if="isSubmitting" class="spinner"></span>
-          <span>{{
-            isSubmitting ? "Updating..." : "Update Password & Sign In"
-          }}</span>
+          <span>{{ isSubmitting ? "Updating..." : "Update Password" }}</span>
         </button>
       </form>
 

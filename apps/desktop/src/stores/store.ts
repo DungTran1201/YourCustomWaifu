@@ -17,6 +17,8 @@ import type {
   MemoryItem,
   ChatMessage,
   WindowBounds,
+  WorkspaceWindowMode,
+  WorkspaceWindowState,
 } from "@vrm/platform-contracts";
 import {
   DEFAULT_SETTINGS,
@@ -86,15 +88,35 @@ export interface AppState {
   chatSending: boolean;
   chatError: string | null;
   // UI Layout state
+  windowMode: WorkspaceWindowMode;
   sidebarCollapsed: boolean;
+  menubarVisible: boolean;
+  panelVisible: boolean;
   // Guest Preview state
   isGuest: boolean;
   isGuestPreviewAvailable: boolean;
 }
 
+export function detectWorkspaceWindowMode(): WorkspaceWindowMode {
+  if (typeof window === "undefined") return "combined";
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.get("window");
+    if (mode === "menubar" || mode === "panel") {
+      return mode;
+    }
+  } catch {
+    // Ignore malformed query string
+  }
+  return "combined";
+}
+
 const state = reactive<AppState>({
   currentTab: "signin",
+  windowMode: detectWorkspaceWindowMode(),
   sidebarCollapsed: false,
+  menubarVisible: true,
+  panelVisible: true,
   settings: { ...DEFAULT_SETTINGS },
   diagnostics: null,
   isLoading: false,
@@ -359,21 +381,211 @@ async function apiRequest(
   return data;
 }
 
+const THEME_STORAGE_KEY = "ycw-interface-theme";
+let systemThemeListenerRegistered = false;
+let workspaceSyncCleanup: (() => void) | null = null;
+let isApplyingRemoteWorkspaceState = false;
+
+function pushWorkspaceStateToMain(partial: Partial<WorkspaceWindowState>) {
+  if (isApplyingRemoteWorkspaceState) return;
+  if (
+    typeof window !== "undefined" &&
+    typeof window.desktopAPI?.workspace?.syncState === "function"
+  ) {
+    const plainPayload = JSON.parse(
+      JSON.stringify(partial),
+    ) as Partial<WorkspaceWindowState>;
+    window.desktopAPI.workspace.syncState(plainPayload).catch((err) => {
+      console.warn("[Workspace Sync] syncState failed:", err);
+    });
+  }
+}
+
+function resolveEffectiveTheme(theme: AppSettings["theme"]): "light" | "dark" {
+  if (theme === "dark" || theme === "light") {
+    return theme;
+  }
+  if (
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function"
+  ) {
+    try {
+      return window.matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light";
+    } catch {
+      return "light";
+    }
+  }
+  return "light";
+}
+
+function applyThemeToDocument(theme: AppSettings["theme"]) {
+  const resolved = resolveEffectiveTheme(theme);
+  if (typeof document !== "undefined") {
+    document.documentElement.setAttribute("data-theme", resolved);
+  }
+  if (
+    typeof window !== "undefined" &&
+    typeof window.desktopAPI?.workspace?.syncTheme === "function"
+  ) {
+    window.desktopAPI.workspace.syncTheme(resolved).catch(() => {});
+  }
+}
+
 export function useAppStore() {
   const platform = computed<PlatformType>(() => detectPlatform());
   const hasBridgeError = computed<boolean>(() => hasPreloadBridgeError());
+  const resolvedTheme = computed<"light" | "dark">(() =>
+    resolveEffectiveTheme(state.settings.theme),
+  );
 
   function setTab(tab: NavigationTab) {
     state.currentTab = tab;
     state.authError = null;
     state.authNotice = null;
+    if (
+      !isApplyingRemoteWorkspaceState &&
+      typeof window !== "undefined" &&
+      typeof window.desktopAPI?.workspace?.navigateTab === "function" &&
+      (state.isAuthenticated || state.isGuest)
+    ) {
+      window.desktopAPI.workspace.navigateTab(tab).catch(() => {});
+    }
+  }
+
+  function applyRemoteWorkspaceState(remote: WorkspaceWindowState) {
+    isApplyingRemoteWorkspaceState = true;
+    try {
+      state.menubarVisible = remote.menubarVisible;
+      state.panelVisible = remote.panelVisible;
+      state.sidebarCollapsed = remote.menubarCollapsed;
+
+      const wasSessionActive = state.isAuthenticated || state.isGuest;
+      const isRemoteSessionActive = remote.isAuthenticated || remote.isGuest;
+
+      if (
+        remote.currentTab &&
+        (state.windowMode === "menubar" ||
+          isRemoteSessionActive ||
+          wasSessionActive !== isRemoteSessionActive)
+      ) {
+        state.currentTab = remote.currentTab as NavigationTab;
+      }
+
+      if (
+        remote.theme === "light" ||
+        remote.theme === "dark" ||
+        remote.theme === "system"
+      ) {
+        state.settings.theme = remote.theme;
+        applyThemeToDocument(remote.theme);
+      }
+
+      const wasAuthenticated = state.isAuthenticated;
+      if (
+        state.windowMode === "menubar" ||
+        wasSessionActive !== isRemoteSessionActive ||
+        isRemoteSessionActive
+      ) {
+        state.isAuthenticated = remote.isAuthenticated;
+        state.isGuest = remote.isGuest;
+        state.user = remote.user;
+      }
+      if (
+        !wasAuthenticated &&
+        remote.isAuthenticated &&
+        state.windowMode === "panel"
+      ) {
+        fetchCompanionData().catch(() => {});
+      }
+    } finally {
+      isApplyingRemoteWorkspaceState = false;
+    }
+  }
+
+  async function initWorkspaceSync() {
+    state.windowMode = detectWorkspaceWindowMode();
+    if (typeof window === "undefined") return;
+    const wsApi = window.desktopAPI?.workspace;
+    if (!wsApi) return;
+
+    if (!workspaceSyncCleanup && typeof wsApi.onStateChanged === "function") {
+      workspaceSyncCleanup = wsApi.onStateChanged((remote) => {
+        applyRemoteWorkspaceState(remote);
+      });
+    }
+
+    if (typeof wsApi.getState === "function") {
+      try {
+        const current = await wsApi.getState();
+        if (current) {
+          if (state.windowMode === "menubar") {
+            applyRemoteWorkspaceState(current);
+          } else {
+            isApplyingRemoteWorkspaceState = true;
+            try {
+              state.menubarVisible = current.menubarVisible;
+              state.panelVisible = current.panelVisible;
+              state.sidebarCollapsed = current.menubarCollapsed;
+            } finally {
+              isApplyingRemoteWorkspaceState = false;
+            }
+          }
+        }
+      } catch {
+        // Ignore if running under mock smoke harness
+      }
+    }
+  }
+
+  function initTheme() {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = window.localStorage?.getItem(THEME_STORAGE_KEY);
+        if (saved === "light" || saved === "dark" || saved === "system") {
+          state.settings.theme = saved;
+        }
+      } catch {
+        // Ignore restricted storage
+      }
+
+      if (
+        !systemThemeListenerRegistered &&
+        typeof window.matchMedia === "function"
+      ) {
+        systemThemeListenerRegistered = true;
+        try {
+          const mq = window.matchMedia("(prefers-color-scheme: dark)");
+          mq.addEventListener("change", () => {
+            if (state.settings.theme === "system") {
+              applyThemeToDocument("system");
+            }
+          });
+        } catch {
+          // Ignore environments without addEventListener on MediaQueryList
+        }
+      }
+    }
+    applyThemeToDocument(state.settings.theme);
   }
 
   function updateSettings(partial: Partial<AppSettings>) {
     Object.assign(state.settings, partial);
-    if (typeof document !== "undefined") {
-      document.documentElement.setAttribute("data-theme", state.settings.theme);
+    if (partial.theme && typeof window !== "undefined") {
+      try {
+        window.localStorage?.setItem(THEME_STORAGE_KEY, partial.theme);
+      } catch {
+        // Ignore restricted storage
+      }
+      pushWorkspaceStateToMain({ theme: partial.theme });
     }
+    applyThemeToDocument(state.settings.theme);
+  }
+
+  function toggleTheme() {
+    const next = resolvedTheme.value === "dark" ? "light" : "dark";
+    updateSettings({ theme: next });
   }
 
   async function loadDiagnostics() {
@@ -422,6 +634,13 @@ export function useAppStore() {
           }
           state.isAuthenticated = true;
           state.currentTab = "chat";
+          pushWorkspaceStateToMain({
+            isAuthenticated: true,
+            isGuest: false,
+            user: state.user,
+            currentTab: "chat",
+            theme: state.settings.theme,
+          });
           fetchCompanionData().catch(() => {});
           return;
         }
@@ -482,6 +701,13 @@ export function useAppStore() {
         if (res.csrfToken) state.csrfToken = res.csrfToken;
         state.isAuthenticated = true;
         setTab("chat");
+        pushWorkspaceStateToMain({
+          isAuthenticated: true,
+          isGuest: false,
+          user: state.user,
+          currentTab: "chat",
+          theme: state.settings.theme,
+        });
         fetchCompanionData().catch(() => {});
         return;
       }
@@ -524,6 +750,13 @@ export function useAppStore() {
         if (res.csrfToken) state.csrfToken = res.csrfToken;
         state.isAuthenticated = true;
         setTab("chat");
+        pushWorkspaceStateToMain({
+          isAuthenticated: true,
+          isGuest: false,
+          user: state.user,
+          currentTab: "chat",
+          theme: state.settings.theme,
+        });
         fetchCompanionData().catch(() => {});
         return;
       }
@@ -564,10 +797,17 @@ export function useAppStore() {
       state.sessionToken = null;
       state.csrfToken = null;
       state.isAuthenticated = false;
+      state.isGuest = false;
       state.sessions = [];
       state.secrets = [];
       state.authLoading = false;
       setTab("signin");
+      pushWorkspaceStateToMain({
+        isAuthenticated: false,
+        isGuest: false,
+        user: null,
+        currentTab: "signin",
+      });
     }
   }
 
@@ -585,10 +825,17 @@ export function useAppStore() {
       state.sessionToken = null;
       state.csrfToken = null;
       state.isAuthenticated = false;
+      state.isGuest = false;
       state.sessions = [];
       state.secrets = [];
       state.authLoading = false;
       setTab("signin");
+      pushWorkspaceStateToMain({
+        isAuthenticated: false,
+        isGuest: false,
+        user: null,
+        currentTab: "signin",
+      });
     }
   }
 
@@ -615,6 +862,7 @@ export function useAppStore() {
       });
       state.user = updated;
       state.authNotice = "Profile updated successfully";
+      pushWorkspaceStateToMain({ user: state.user });
     } catch (err: any) {
       state.authError = err.message;
       throw err;
@@ -988,6 +1236,13 @@ export function useAppStore() {
     state.isAuthenticated = false;
     state.user = null;
     setTab("avatar");
+    pushWorkspaceStateToMain({
+      isAuthenticated: false,
+      isGuest: true,
+      user: null,
+      currentTab: "avatar",
+      theme: state.settings.theme,
+    });
     await showStage();
     if (!state.avatarConfig.avatarPath) {
       await loadSampleVrm();
@@ -997,6 +1252,12 @@ export function useAppStore() {
   function exitGuestPreview() {
     state.isGuest = false;
     setTab("signin");
+    pushWorkspaceStateToMain({
+      isAuthenticated: false,
+      isGuest: false,
+      user: null,
+      currentTab: "signin",
+    });
   }
 
   // --- Companion Data Sync ---
@@ -1444,10 +1705,70 @@ export function useAppStore() {
   }
 
   function toggleSidebar(collapsed?: boolean) {
-    if (typeof collapsed === "boolean") {
-      state.sidebarCollapsed = collapsed;
+    const next =
+      typeof collapsed === "boolean" ? collapsed : !state.sidebarCollapsed;
+    state.sidebarCollapsed = next;
+    if (
+      !isApplyingRemoteWorkspaceState &&
+      typeof window !== "undefined" &&
+      typeof window.desktopAPI?.workspace?.setMenubarCollapsed === "function"
+    ) {
+      window.desktopAPI.workspace.setMenubarCollapsed(next).catch(() => {});
+    }
+  }
+
+  function toggleMenubar(visible?: boolean) {
+    const next = typeof visible === "boolean" ? visible : !state.menubarVisible;
+    state.menubarVisible = next;
+    if (
+      !isApplyingRemoteWorkspaceState &&
+      typeof window !== "undefined" &&
+      typeof window.desktopAPI?.workspace?.toggleMenubar === "function"
+    ) {
+      window.desktopAPI.workspace.toggleMenubar(next).catch(() => {});
+    }
+  }
+
+  function togglePanel(visible?: boolean) {
+    const next = typeof visible === "boolean" ? visible : !state.panelVisible;
+    state.panelVisible = next;
+    if (
+      !isApplyingRemoteWorkspaceState &&
+      typeof window !== "undefined" &&
+      typeof window.desktopAPI?.workspace?.togglePanel === "function"
+    ) {
+      window.desktopAPI.workspace.togglePanel(next).catch(() => {});
+    }
+  }
+
+  function resetWorkspaceLayout() {
+    if (
+      typeof window !== "undefined" &&
+      typeof window.desktopAPI?.workspace?.resetLayout === "function"
+    ) {
+      window.desktopAPI.workspace.resetLayout().catch(() => {});
     } else {
-      state.sidebarCollapsed = !state.sidebarCollapsed;
+      state.menubarVisible = true;
+      state.panelVisible = true;
+      state.sidebarCollapsed = false;
+    }
+  }
+
+  function minimizeCurrentWindow() {
+    if (
+      typeof window !== "undefined" &&
+      typeof window.desktopAPI?.workspace?.minimizeWindow === "function"
+    ) {
+      window.desktopAPI.workspace.minimizeWindow().catch(() => {});
+    }
+  }
+
+  function toggleMaximizeCurrentWindow() {
+    if (
+      typeof window !== "undefined" &&
+      typeof window.desktopAPI?.workspace?.toggleMaximizeWindow === "function"
+    ) {
+      window.desktopAPI.workspace.toggleMaximizeWindow().catch(() => {});
     }
   }
 
@@ -1455,9 +1776,18 @@ export function useAppStore() {
     state,
     platform,
     hasBridgeError,
+    resolvedTheme,
     setTab,
+    initWorkspaceSync,
     toggleSidebar,
+    toggleMenubar,
+    togglePanel,
+    resetWorkspaceLayout,
+    minimizeCurrentWindow,
+    toggleMaximizeCurrentWindow,
+    initTheme,
     updateSettings,
+    toggleTheme,
     loadDiagnostics,
     executePing,
     initAuth,

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mount } from "@vue/test-utils";
+import { mount, enableAutoUnmount } from "@vue/test-utils";
 import App from "../src/workspace/App.vue";
 import ShellLayout from "../src/components/ShellLayout.vue";
 import NavigationBar from "../src/components/NavigationBar.vue";
@@ -24,6 +24,7 @@ import ResetPasswordView from "../src/workspace/views/ResetPasswordView.vue";
 import { useAppStore } from "@vrm/app-core";
 
 describe("Workspace Desktop Responsive Layout & Viewport Adaptation", () => {
+  enableAutoUnmount(afterEach);
   const originalInnerWidth = window.innerWidth;
   const originalInnerHeight = window.innerHeight;
 
@@ -56,7 +57,11 @@ describe("Workspace Desktop Responsive Layout & Viewport Adaptation", () => {
       timezone: "UTC",
       createdAt: new Date().toISOString(),
     };
+    store.state.windowMode = "combined";
     store.state.sidebarCollapsed = false;
+    store.state.menubarVisible = true;
+    store.state.panelVisible = true;
+    store.updateSettings({ theme: "light" });
     store.setTab("chat");
     setViewport(1100, 740);
   });
@@ -65,13 +70,125 @@ describe("Workspace Desktop Responsive Layout & Viewport Adaptation", () => {
     setViewport(originalInnerWidth, originalInnerHeight);
   });
 
-  describe("ShellLayout Root & Sizing Hierarchy", () => {
-    it("renders shell layout with correct container classes and structure", () => {
+  describe("ShellLayout Root & Independent Headerless Multi-Window Modes", () => {
+    it("renders headerless shell layout with separated Menubar (bottom user dock) and Panel", () => {
       const wrapper = mount(ShellLayout);
       expect(wrapper.find(".shell-layout").exists()).toBe(true);
-      expect(wrapper.find(".shell-topbar").exists()).toBe(true);
+      expect(wrapper.find(".shell-topbar").exists()).toBe(false);
       expect(wrapper.find(".shell-body").exists()).toBe(true);
+      expect(wrapper.find(".shell-main.glass-panel-surface").exists()).toBe(
+        true,
+      );
+      expect(wrapper.find(".workspace-sidebar").exists()).toBe(true);
+      expect(
+        wrapper
+          .find(".workspace-sidebar .sidebar-footer #nav-user-pill")
+          .exists(),
+      ).toBe(true);
+      expect(
+        wrapper
+          .find(".workspace-sidebar .sidebar-footer #nav-signout-btn")
+          .exists(),
+      ).toBe(true);
+    });
+
+    it("renders standalone Menubar window cleanly without Panel when windowMode is 'menubar'", () => {
+      const store = useAppStore();
+      store.state.windowMode = "menubar";
+
+      const wrapper = mount(ShellLayout);
+      expect(wrapper.find(".shell-topbar").exists()).toBe(false);
+      expect(wrapper.find(".workspace-sidebar.detached").exists()).toBe(true);
+      expect(wrapper.find(".shell-main").exists()).toBe(false);
+      expect(wrapper.find("#nav-user-pill").exists()).toBe(true);
+    });
+
+    it("renders standalone headerless Panel window cleanly without Menubar when windowMode is 'panel'", () => {
+      const store = useAppStore();
+      store.state.windowMode = "panel";
+
+      const wrapper = mount(ShellLayout);
+      expect(wrapper.find(".shell-topbar").exists()).toBe(false);
+      expect(wrapper.find(".workspace-sidebar").exists()).toBe(false);
+      expect(wrapper.find(".shell-main.detached-panel-surface").exists()).toBe(
+        true,
+      );
+      expect(wrapper.find(".panel-drag-strip").exists()).toBe(true);
+    });
+
+    it("toggles independent Menubar and Panel visibility via Settings toggles, Menubar controls, and keyboard shortcuts", async () => {
+      const store = useAppStore();
+      store.setTab("settings");
+      const wrapper = mount(ShellLayout);
+      await wrapper.vm.$nextTick();
+
+      // 1. Toggle Menubar off via Settings switch (#settings-menubar-toggle)
+      const settingsMenubarToggle = wrapper.find("#settings-menubar-toggle");
+      expect(settingsMenubarToggle.exists()).toBe(true);
+      await settingsMenubarToggle.setValue(false);
+      expect(store.state.menubarVisible).toBe(false);
+      expect(wrapper.find(".workspace-sidebar").exists()).toBe(false);
+
+      // Restore Menubar via Ctrl+B
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "b", ctrlKey: true }),
+      );
+      await wrapper.vm.$nextTick();
+      expect(store.state.menubarVisible).toBe(true);
+      expect(wrapper.find(".workspace-sidebar").exists()).toBe(true);
+
+      // 2. Toggle Panel off via Menubar utility button (#panel-visibility-btn)
+      const panelBtn = wrapper.find("#panel-visibility-btn");
+      expect(panelBtn.exists()).toBe(true);
+      await panelBtn.trigger("click");
+      expect(store.state.panelVisible).toBe(false);
+      expect(wrapper.find(".shell-main").exists()).toBe(false);
+      expect(wrapper.find("#panel-restore-btn").exists()).toBe(true);
+
+      // Restore Panel via Ctrl+\
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "\\",
+          code: "Backslash",
+          ctrlKey: true,
+        }),
+      );
+      await wrapper.vm.$nextTick();
+      expect(store.state.panelVisible).toBe(true);
       expect(wrapper.find(".shell-main").exists()).toBe(true);
+
+      // 3. Collapse / Expand Menubar via Ctrl+Shift+B and Settings switch
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "B",
+          ctrlKey: true,
+          shiftKey: true,
+        }),
+      );
+      await wrapper.vm.$nextTick();
+      expect(store.state.sidebarCollapsed).toBe(true);
+      expect(wrapper.find(".workspace-sidebar").classes()).toContain(
+        "collapsed",
+      );
+
+      wrapper.unmount();
+    });
+
+    it("switches seamlessly between Light Glass and Dark Glass themes from Menubar dock", async () => {
+      const store = useAppStore();
+      const wrapper = mount(ShellLayout);
+
+      expect(store.resolvedTheme.value).toBe("light");
+      expect(document.documentElement.getAttribute("data-theme")).toBe("light");
+      expect(wrapper.find(".shell-layout").classes()).toContain("theme-light");
+
+      await wrapper.find("#theme-toggle-btn").trigger("click");
+      await wrapper.vm.$nextTick();
+      expect(store.resolvedTheme.value).toBe("dark");
+      expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
+      expect(wrapper.find(".shell-layout").classes()).toContain("theme-dark");
+
+      wrapper.unmount();
     });
 
     it("applies 'chat-view-active' on .shell-main only when currentTab is 'chat'", async () => {
@@ -94,27 +211,6 @@ describe("Workspace Desktop Responsive Layout & Viewport Adaptation", () => {
       await wrapper.vm.$nextTick();
       expect(wrapper.find(".shell-main").classes()).not.toContain(
         "chat-view-active",
-      );
-    });
-
-    it("displays the active tab title in the topbar center", async () => {
-      const store = useAppStore();
-      const wrapper = mount(ShellLayout);
-
-      store.setTab("chat");
-      await wrapper.vm.$nextTick();
-      expect(wrapper.find(".current-view-title").text()).toBe("Companion Chat");
-
-      store.setTab("avatar");
-      await wrapper.vm.$nextTick();
-      expect(wrapper.find(".current-view-title").text()).toBe(
-        "Avatar Stage Settings",
-      );
-
-      store.setTab("rules");
-      await wrapper.vm.$nextTick();
-      expect(wrapper.find(".current-view-title").text()).toBe(
-        "Operating Rules",
       );
     });
   });
@@ -191,7 +287,7 @@ describe("Workspace Desktop Responsive Layout & Viewport Adaptation", () => {
         await wrapper.vm.$nextTick();
 
         expect(wrapper.find(".shell-layout").exists()).toBe(true);
-        expect(wrapper.find(".shell-topbar").exists()).toBe(true);
+        expect(wrapper.find(".shell-topbar").exists()).toBe(false);
         expect(wrapper.find(".workspace-sidebar").exists()).toBe(true);
         expect(wrapper.find(".shell-main").exists()).toBe(true);
       });

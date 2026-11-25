@@ -253,6 +253,33 @@ const iconSize = computed(() =>
       <line x1="6" x2="18" y1="6" y2="18" />
     </template>
 
+    <!-- Minimize -->
+    <template v-else-if="name === 'minus' || name === 'minimize'">
+      <line x1="5" x2="19" y1="12" y2="12" />
+    </template>
+
+    <!-- Maximize / Square -->
+    <template v-else-if="name === 'maximize' || name === 'square'">
+      <rect width="14" height="14" x="5" y="5" rx="2" />
+    </template>
+
+    <!-- Sign Out / LogOut -->
+    <template v-else-if="name === 'logout' || name === 'signout'">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" x2="9" y1="12" y2="12" />
+    </template>
+
+    <!-- Drag Grip -->
+    <template v-else-if="name === 'grip' || name === 'move'">
+      <circle cx="9" cy="6" r="1" />
+      <circle cx="15" cy="6" r="1" />
+      <circle cx="9" cy="12" r="1" />
+      <circle cx="15" cy="12" r="1" />
+      <circle cx="9" cy="18" r="1" />
+      <circle cx="15" cy="18" r="1" />
+    </template>
+
     <!-- Eye (LookAt / Visible) -->
     <template v-else-if="name === 'eye'">
       <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
@@ -264,6 +291,18 @@ const iconSize = computed(() =>
       <rect width="20" height="14" x="2" y="3" rx="2" />
       <line x1="8" x2="16" y1="21" y2="21" />
       <line x1="12" x2="12" y1="17" y2="21" />
+    </template>
+
+    <!-- Layout Sidebar (Menubar toggle) -->
+    <template v-else-if="name === 'sidebar' || name === 'panel-left'">
+      <rect width="18" height="18" x="3" y="3" rx="3" />
+      <line x1="9" x2="9" y1="3" y2="21" />
+    </template>
+
+    <!-- Layout Panel (Right panel toggle) -->
+    <template v-else-if="name === 'panel' || name === 'panel-right'">
+      <rect width="18" height="18" x="3" y="3" rx="3" />
+      <line x1="15" x2="15" y1="3" y2="21" />
     </template>
 
     <!-- Globe / Web -->

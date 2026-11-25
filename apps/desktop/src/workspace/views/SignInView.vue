@@ -93,14 +93,7 @@ async function handleGuestPreview() {
       </div>
 
       <div class="noir-auth-header">
-        <div class="noir-eyebrow">
-          <AppIcon name="sparkles" size="13" />
-          <span>YourCustomWaifu</span>
-        </div>
-        <h1 class="noir-auth-title">Welcome Back</h1>
-        <p class="noir-auth-subtitle">
-          Sign in to awaken your personal companion workspace
-        </p>
+        <h1 class="noir-auth-title">Sign In</h1>
       </div>
 
       <div
@@ -121,7 +114,7 @@ async function handleGuestPreview() {
 
       <form class="auth-form" novalidate @submit.prevent="handleSubmit">
         <div class="form-group">
-          <label for="signin-email" class="form-label">Email Address</label>
+          <label for="signin-email" class="form-label">Email</label>
           <div class="input-wrapper">
             <input
               id="signin-email"
@@ -130,7 +123,7 @@ async function handleGuestPreview() {
               autocomplete="email"
               required
               class="form-input"
-              placeholder="alex@example.com"
+              placeholder="name@example.com"
               :disabled="isSubmitting"
               @focus="authEnv?.notifyInputFocus()"
               @blur="authEnv?.notifyInputBlur()"
@@ -195,7 +188,7 @@ async function handleGuestPreview() {
         class="guest-preview-container"
       >
         <div class="guest-divider">
-          <span>or development preview</span>
+          <span>or</span>
         </div>
         <button
           id="signin-guest-btn"
@@ -204,18 +197,6 @@ async function handleGuestPreview() {
           @click="handleGuestPreview"
         >
           Continue as Guest — Development Preview
-        </button>
-      </div>
-
-      <div class="auth-footer">
-        <span class="text-muted">Don't have an account?</span>
-        <button
-          id="goto-signup-btn"
-          type="button"
-          class="link-btn font-semibold"
-          @click="store.setTab('signup')"
-        >
-          Create account
         </button>
       </div>
     </div>

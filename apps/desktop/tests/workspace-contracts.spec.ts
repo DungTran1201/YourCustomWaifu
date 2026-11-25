@@ -7,7 +7,7 @@ describe("Workspace Contracts and Architecture Integrity", () => {
     expect(APP_METADATA.name).toBe("YourCustomWaifu — Desktop AI Companion");
     expect(APP_METADATA.shortName).toBe("YourCustomWaifu");
     expect(APP_METADATA.license).toBe("MIT");
-    expect(DEFAULT_SETTINGS.theme).toBe("dark");
+    expect(DEFAULT_SETTINGS.theme).toBe("light");
   });
 
   it("detects Web platform when window.desktopAPI is not injected", () => {

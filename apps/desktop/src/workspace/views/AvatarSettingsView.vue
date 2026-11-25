@@ -440,8 +440,9 @@ function handleOrientationChange(mode: "auto" | "0deg" | "180deg") {
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
-  background: rgba(245, 158, 11, 0.08);
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  background: var(--status-warning-bg);
+  border: none;
+  box-shadow: var(--glass-specular), var(--glass-shadow-sm);
   border-radius: var(--radius-md);
   padding: 16px 20px;
   margin-bottom: 28px;
@@ -459,7 +460,7 @@ function handleOrientationChange(mode: "auto" | "0deg" | "180deg") {
   font-weight: 700;
   letter-spacing: 0.05em;
   background: rgba(245, 158, 11, 0.2);
-  color: #f59e0b;
+  color: var(--status-warning-fg);
   padding: 3px 8px;
   border-radius: var(--radius-sm);
 }
@@ -478,19 +479,20 @@ function handleOrientationChange(mode: "auto" | "0deg" | "180deg") {
 
 .btn-guest-exit {
   padding: 8px 14px;
-  background: transparent;
-  border: 1px solid rgba(245, 158, 11, 0.4);
-  color: #f59e0b;
+  background: var(--glass-surface-subtle);
+  border: none;
+  box-shadow: var(--glass-specular);
+  color: var(--status-warning-fg);
   border-radius: var(--radius-sm);
   font-size: 0.82rem;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
   transition: all var(--transition-fast);
 }
 
 .btn-guest-exit:hover {
-  background: rgba(245, 158, 11, 0.15);
+  background: rgba(245, 158, 11, 0.18);
 }
 
 .section-header {
@@ -521,18 +523,18 @@ function handleOrientationChange(mode: "auto" | "0deg" | "180deg") {
   border-radius: var(--radius-md);
   font-size: 0.9rem;
   font-weight: 600;
-  border: 1px solid var(--border-subtle);
+  border: none;
+  box-shadow: var(--glass-specular), var(--glass-shadow-sm);
   transition: all var(--transition-fast);
 }
 
 .stage-toggle-hero-btn.active {
-  background: rgba(16, 185, 129, 0.15);
-  color: #10b981;
-  border-color: rgba(16, 185, 129, 0.4);
+  background: var(--status-success-bg);
+  color: var(--status-success-fg);
 }
 
 .stage-toggle-hero-btn.inactive {
-  background: var(--bg-elevated);
+  background: var(--glass-surface-strong);
   color: var(--text-primary);
 }
 
@@ -552,7 +554,8 @@ function handleOrientationChange(mode: "auto" | "0deg" | "180deg") {
   align-items: center;
   justify-content: space-between;
   background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
+  border: none;
+  box-shadow: var(--glass-specular), var(--glass-shadow-sm);
   border-radius: var(--radius-md);
   padding: 24px;
   margin-bottom: 28px;
@@ -617,9 +620,9 @@ function handleOrientationChange(mode: "auto" | "0deg" | "180deg") {
 }
 
 .model-status-pill.fallback {
-  background: rgba(156, 163, 175, 0.15);
-  color: #9ca3af;
-  border: 1px solid rgba(156, 163, 175, 0.3);
+  background: var(--glass-surface-subtle);
+  color: var(--status-muted-text);
+  border: none;
 }
 
 .vrm-version-pill {
@@ -700,10 +703,11 @@ function handleOrientationChange(mode: "auto" | "0deg" | "180deg") {
   align-items: center;
   gap: 12px;
   padding: 14px 20px;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: var(--status-error-bg);
+  border: none;
+  box-shadow: var(--glass-specular), var(--glass-shadow-sm);
   border-radius: var(--radius-md);
-  color: var(--text-primary);
+  color: var(--status-error-fg);
   margin-bottom: 24px;
   font-size: 0.85rem;
 }
@@ -714,7 +718,8 @@ function handleOrientationChange(mode: "auto" | "0deg" | "180deg") {
 
 .settings-group {
   background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
+  border: none;
+  box-shadow: var(--glass-specular), var(--glass-shadow-sm);
   border-radius: var(--radius-md);
   padding: 16px 24px;
   margin-bottom: 28px;
@@ -777,8 +782,8 @@ function handleOrientationChange(mode: "auto" | "0deg" | "180deg") {
 }
 
 .pill-btn.active {
-  background: var(--text-primary);
-  color: #101114;
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
   font-weight: 600;
 }
 

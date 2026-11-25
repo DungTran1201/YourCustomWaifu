@@ -7,6 +7,7 @@ import {
   globalShortcut,
   dialog,
   nativeImage,
+  nativeTheme,
   screen,
 } from "electron";
 import { fileURLToPath } from "node:url";
@@ -20,6 +21,8 @@ import {
   type AvatarOrientationMode,
   type StageStatus,
   type WorkspaceBounds,
+  type MenubarBounds,
+  type WorkspaceWindowState,
   type WindowBounds,
   type GazeData,
   type BlinkDiagnostic,
@@ -29,6 +32,9 @@ import {
   PASSWORD_POLICY,
   DEFAULT_AVATAR_CONFIG,
   DEFAULT_WORKSPACE_BOUNDS,
+  DEFAULT_MENUBAR_BOUNDS,
+  MENUBAR_EXPANDED_WIDTH,
+  MENUBAR_COLLAPSED_WIDTH,
   INITIAL_STAGE_STATUS,
 } from "@vrm/shared";
 import {
@@ -45,6 +51,7 @@ const __dirname = dirname(__filename);
 
 // Windows & Lifecycle References
 let mainWindow: BrowserWindow | null = null;
+let menubarWindow: BrowserWindow | null = null;
 let stageWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
@@ -66,7 +73,18 @@ function getAvatarStorageKey(avatarPath?: string | null): string {
 // Shared State & Persistence
 let avatarConfig: AvatarConfig = { ...DEFAULT_AVATAR_CONFIG };
 let workspaceBounds: WorkspaceBounds = { ...DEFAULT_WORKSPACE_BOUNDS };
+let menubarBounds: MenubarBounds = { ...DEFAULT_MENUBAR_BOUNDS };
 let stageStatus: StageStatus = { ...INITIAL_STAGE_STATUS };
+let workspaceState: WorkspaceWindowState = {
+  menubarVisible: true,
+  panelVisible: true,
+  menubarCollapsed: false,
+  currentTab: "signin",
+  theme: "light",
+  isAuthenticated: false,
+  isGuest: false,
+  user: null,
+};
 
 const CONFIG_FILE_NAME = "waifu-stage-config.json";
 
@@ -87,6 +105,19 @@ async function loadPersistedConfig(): Promise<void> {
         ...DEFAULT_WORKSPACE_BOUNDS,
         ...(parsed.workspaceBounds || {}),
       };
+      menubarBounds = {
+        ...DEFAULT_MENUBAR_BOUNDS,
+        ...(parsed.menubarBounds || {}),
+      };
+      if (parsed.workspacePrefs && typeof parsed.workspacePrefs === "object") {
+        if (typeof parsed.workspacePrefs.menubarVisible === "boolean") {
+          workspaceState.menubarVisible = parsed.workspacePrefs.menubarVisible;
+        }
+        if (typeof parsed.workspacePrefs.menubarCollapsed === "boolean") {
+          workspaceState.menubarCollapsed =
+            parsed.workspacePrefs.menubarCollapsed;
+        }
+      }
       if (
         parsed.avatarOverrides &&
         typeof parsed.avatarOverrides === "object"
@@ -97,10 +128,12 @@ async function loadPersistedConfig(): Promise<void> {
       // Backward-compatibility: flat avatarConfig
       avatarConfig = { ...DEFAULT_AVATAR_CONFIG, ...parsed };
       workspaceBounds = { ...DEFAULT_WORKSPACE_BOUNDS };
+      menubarBounds = { ...DEFAULT_MENUBAR_BOUNDS };
     }
   } catch {
     avatarConfig = { ...DEFAULT_AVATAR_CONFIG };
     workspaceBounds = { ...DEFAULT_WORKSPACE_BOUNDS };
+    menubarBounds = { ...DEFAULT_MENUBAR_BOUNDS };
     avatarOverrides = {};
   }
 }
@@ -110,6 +143,11 @@ async function savePersistedConfig(): Promise<void> {
     const payload = {
       avatarConfig,
       workspaceBounds,
+      menubarBounds,
+      workspacePrefs: {
+        menubarVisible: workspaceState.menubarVisible,
+        menubarCollapsed: workspaceState.menubarCollapsed,
+      },
       avatarOverrides,
     };
     await fs.writeFile(
@@ -122,8 +160,38 @@ async function savePersistedConfig(): Promise<void> {
   }
 }
 
+function isWorkspaceSessionActive(): boolean {
+  return workspaceState.isAuthenticated || workspaceState.isGuest;
+}
+
+function broadcastWorkspaceState(): void {
+  const allowed = [mainWindow, menubarWindow];
+  for (const win of allowed) {
+    if (win && !win.isDestroyed()) {
+      win.webContents.send(IPC_CHANNELS.WORKSPACE_STATE_CHANGED, {
+        ...workspaceState,
+      });
+    }
+  }
+  updateTrayMenu();
+}
+
+function applyThemeToWorkspaceWindows(
+  theme: "light" | "dark" | "system",
+): void {
+  nativeTheme.themeSource = theme;
+  for (const win of [mainWindow, menubarWindow]) {
+    if (win && !win.isDestroyed()) {
+      win.setBackgroundColor("#00000000");
+      if (process.platform === "win32") {
+        win.setBackgroundMaterial("acrylic");
+      }
+    }
+  }
+}
+
 function broadcastStageStatus(): void {
-  const allowed = [mainWindow, stageWindow];
+  const allowed = [mainWindow, menubarWindow, stageWindow];
   for (const win of allowed) {
     if (win && !win.isDestroyed()) {
       win.webContents.send(IPC_CHANNELS.STAGE_STATUS_CHANGED, {
@@ -135,7 +203,7 @@ function broadcastStageStatus(): void {
 }
 
 function broadcastStageConfig(): void {
-  const allowed = [mainWindow, stageWindow];
+  const allowed = [mainWindow, menubarWindow, stageWindow];
   for (const win of allowed) {
     if (win && !win.isDestroyed()) {
       win.webContents.send(IPC_CHANNELS.STAGE_CONFIG_CHANGED, {
@@ -213,6 +281,8 @@ function createWorkspaceWindow(): BrowserWindow {
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.show();
     mainWindow.focus();
+    workspaceState.panelVisible = true;
+    broadcastWorkspaceState();
     return mainWindow;
   }
 
@@ -221,13 +291,14 @@ function createWorkspaceWindow(): BrowserWindow {
     workArea: d.workArea,
   }));
 
-  const initialWidth = workspaceBounds.width || 1100;
-  const initialHeight = workspaceBounds.height || 740;
+  const initialWidth = workspaceBounds.width || DEFAULT_WORKSPACE_BOUNDS.width;
+  const initialHeight =
+    workspaceBounds.height || DEFAULT_WORKSPACE_BOUNDS.height;
 
   let validatedX = workspaceBounds.x;
   let validatedY = workspaceBounds.y;
 
-  // Center on primary display if no previous coordinates
+  // Center Panel slightly right of center so Menubar docks cleanly to its left on first launch
   if (typeof validatedX !== "number" || typeof validatedY !== "number") {
     const primary = displays[0]?.workArea || {
       x: 0,
@@ -235,8 +306,16 @@ function createWorkspaceWindow(): BrowserWindow {
       width: 1920,
       height: 1080,
     };
-    validatedX = Math.round(primary.x + (primary.width - initialWidth) / 2);
-    validatedY = Math.round(primary.y + (primary.height - initialHeight) / 2);
+    const combinedWidth = initialWidth + MENUBAR_EXPANDED_WIDTH + 14;
+    const startX = Math.max(
+      primary.x + 16,
+      Math.round(primary.x + (primary.width - combinedWidth) / 2),
+    );
+    validatedX = startX + MENUBAR_EXPANDED_WIDTH + 14;
+    validatedY = Math.max(
+      primary.y + 16,
+      Math.round(primary.y + (primary.height - initialHeight) / 2),
+    );
   }
 
   const bounds = validateWindowBounds(
@@ -247,23 +326,31 @@ function createWorkspaceWindow(): BrowserWindow {
       height: initialHeight,
     },
     displays,
+    { minWidth: 540, minHeight: 440 },
   );
+
+  nativeTheme.themeSource = workspaceState.theme;
 
   mainWindow = new BrowserWindow({
     x: bounds.x,
     y: bounds.y,
     width: bounds.width,
     height: bounds.height,
-    minWidth: 800,
-    minHeight: 560,
+    minWidth: 540,
+    minHeight: 440,
+    show: false,
     title: APP_METADATA.name,
-    backgroundColor: "#05060a",
+    backgroundColor: "#00000000",
+    ...(process.platform === "win32"
+      ? { backgroundMaterial: "acrylic" as const }
+      : {}),
+    ...(process.platform === "darwin"
+      ? {
+          vibrancy: "under-window" as const,
+          visualEffectState: "active" as const,
+        }
+      : {}),
     titleBarStyle: "hidden",
-    titleBarOverlay: {
-      color: "#05060a",
-      symbolColor: "#ececf4",
-      height: 36,
-    },
     autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, "../preload/index.cjs"),
@@ -276,26 +363,51 @@ function createWorkspaceWindow(): BrowserWindow {
     },
   });
 
+  if (process.platform === "win32") {
+    mainWindow.webContents.on("did-finish-load", () => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.setBackgroundMaterial("acrylic");
+      }
+    });
+  }
+
   mainWindow.removeMenu();
 
   enforceWindowSecurity(mainWindow);
 
   const devUrl = process.env["VITE_DEV_SERVER_URL"];
   if (devUrl) {
-    mainWindow.loadURL(devUrl);
+    mainWindow.loadURL(`${devUrl}/?window=panel`);
   } else {
-    mainWindow.loadFile(join(__dirname, "../../dist/index.html"));
+    mainWindow.loadFile(join(__dirname, "../../dist/index.html"), {
+      query: { window: "panel" },
+    });
   }
 
-  if (workspaceBounds.isMaximized) {
-    mainWindow.maximize();
-  }
+  mainWindow.once("ready-to-show", () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (process.platform === "win32") {
+      mainWindow.setBackgroundMaterial("acrylic");
+    }
+    workspaceState.panelVisible = true;
+    mainWindow.show();
+    if (workspaceBounds.isMaximized) {
+      mainWindow.maximize();
+    }
+    updateTrayMenu();
+  });
 
   mainWindow.on("close", (event) => {
     if (!isQuitting) {
       event.preventDefault();
       mainWindow?.hide();
+      workspaceState.panelVisible = false;
+      broadcastWorkspaceState();
     }
+  });
+
+  mainWindow.on("closed", () => {
+    mainWindow = null;
   });
 
   // Track normal bounds without overwriting during maximization
@@ -330,6 +442,177 @@ function createWorkspaceWindow(): BrowserWindow {
   });
 
   return mainWindow;
+}
+
+function createMenubarWindow(): BrowserWindow {
+  if (menubarWindow && !menubarWindow.isDestroyed()) {
+    if (menubarWindow.isMinimized()) menubarWindow.restore();
+    menubarWindow.show();
+    if (process.platform === "win32") {
+      menubarWindow.setBackgroundMaterial("acrylic");
+    }
+    workspaceState.menubarVisible = true;
+    broadcastWorkspaceState();
+    return menubarWindow;
+  }
+
+  const displays = screen.getAllDisplays().map((d) => ({
+    bounds: d.bounds,
+    workArea: d.workArea,
+  }));
+
+  const targetWidth = workspaceState.menubarCollapsed
+    ? MENUBAR_COLLAPSED_WIDTH
+    : Math.max(
+        MENUBAR_EXPANDED_WIDTH,
+        menubarBounds.width || DEFAULT_MENUBAR_BOUNDS.width,
+      );
+  const targetHeight = menubarBounds.height || workspaceBounds.height || 740;
+
+  let targetX = menubarBounds.x;
+  let targetY = menubarBounds.y;
+
+  // Dock gracefully to the left of Panel window if no saved coordinates
+  if (typeof targetX !== "number" || typeof targetY !== "number") {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      const panelBounds = mainWindow.getBounds();
+      targetX = panelBounds.x - targetWidth - 14;
+      targetY = panelBounds.y;
+    } else {
+      const primary = displays[0]?.workArea || {
+        x: 0,
+        y: 0,
+        width: 1920,
+        height: 1080,
+      };
+      targetX = primary.x + 28;
+      targetY = Math.max(
+        primary.y + 16,
+        Math.round(primary.y + (primary.height - targetHeight) / 2),
+      );
+    }
+  }
+
+  const bounds = validateWindowBounds(
+    {
+      x: targetX,
+      y: targetY,
+      width: targetWidth,
+      height: targetHeight,
+    },
+    displays,
+    { minWidth: 68, minHeight: 420 },
+  );
+
+  menubarWindow = new BrowserWindow({
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: bounds.height,
+    minWidth: 68,
+    minHeight: 420,
+    maxWidth: 320,
+    show: false,
+    title: `${APP_METADATA.shortName} — Menubar`,
+    backgroundColor: "#00000000",
+    ...(process.platform === "win32"
+      ? { backgroundMaterial: "acrylic" as const }
+      : {}),
+    ...(process.platform === "darwin"
+      ? {
+          vibrancy: "under-window" as const,
+          visualEffectState: "active" as const,
+        }
+      : {}),
+    titleBarStyle: "hidden",
+    autoHideMenuBar: true,
+    resizable: true,
+    webPreferences: {
+      preload: join(__dirname, "../preload/index.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+      navigateOnDragDrop: false,
+    },
+  });
+
+  if (process.platform === "win32") {
+    menubarWindow.webContents.on("did-finish-load", () => {
+      if (menubarWindow && !menubarWindow.isDestroyed()) {
+        menubarWindow.setBackgroundMaterial("acrylic");
+      }
+    });
+  }
+
+  menubarWindow.removeMenu();
+  enforceWindowSecurity(menubarWindow);
+
+  const devUrl = process.env["VITE_DEV_SERVER_URL"];
+  if (devUrl) {
+    menubarWindow.loadURL(`${devUrl}/?window=menubar`);
+  } else {
+    menubarWindow.loadFile(join(__dirname, "../../dist/index.html"), {
+      query: { window: "menubar" },
+    });
+  }
+
+  menubarWindow.once("ready-to-show", () => {
+    if (!menubarWindow || menubarWindow.isDestroyed()) return;
+    if (process.platform === "win32") {
+      menubarWindow.setBackgroundMaterial("acrylic");
+    }
+    menubarWindow.webContents.send(IPC_CHANNELS.WORKSPACE_STATE_CHANGED, {
+      ...workspaceState,
+    });
+    menubarWindow.webContents.send(IPC_CHANNELS.STAGE_STATUS_CHANGED, {
+      ...stageStatus,
+    });
+    if (workspaceState.menubarVisible && isWorkspaceSessionActive()) {
+      menubarWindow.show();
+    }
+  });
+
+  menubarWindow.on("close", (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      menubarWindow?.hide();
+      workspaceState.menubarVisible = false;
+      savePersistedConfig();
+      broadcastWorkspaceState();
+    }
+  });
+
+  menubarWindow.on("closed", () => {
+    menubarWindow = null;
+  });
+
+  menubarWindow.on("resize", () => {
+    if (menubarWindow && !menubarWindow.isDestroyed()) {
+      const size = menubarWindow.getSize();
+      if (typeof size[0] === "number" && !workspaceState.menubarCollapsed) {
+        menubarBounds.width = Math.max(MENUBAR_EXPANDED_WIDTH, size[0]);
+      }
+      if (typeof size[1] === "number") {
+        menubarBounds.height = size[1];
+      }
+      savePersistedConfig();
+    }
+  });
+
+  menubarWindow.on("move", () => {
+    if (menubarWindow && !menubarWindow.isDestroyed()) {
+      const pos = menubarWindow.getPosition();
+      if (typeof pos[0] === "number" && typeof pos[1] === "number") {
+        menubarBounds.x = pos[0];
+        menubarBounds.y = pos[1];
+        savePersistedConfig();
+      }
+    }
+  });
+
+  return menubarWindow;
 }
 
 function createStageWindow(): BrowserWindow {
@@ -437,25 +720,249 @@ function createStageWindow(): BrowserWindow {
 
 // --- Lifecycle Actions ---
 
-function showWorkspace(targetTab?: string): void {
+function showPanel(targetTab?: string): WorkspaceWindowState {
   const win = createWorkspaceWindow();
-  if (targetTab && !win.isDestroyed()) {
-    win.webContents.send("app:navigate-tab", targetTab);
+  workspaceState.panelVisible = true;
+  if (targetTab && typeof targetTab === "string") {
+    workspaceState.currentTab = targetTab;
+    if (!win.isDestroyed()) {
+      win.webContents.send("app:navigate-tab", targetTab);
+    }
+  }
+  broadcastWorkspaceState();
+  return { ...workspaceState };
+}
+
+function hidePanel(): WorkspaceWindowState {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.hide();
+  }
+  workspaceState.panelVisible = false;
+  broadcastWorkspaceState();
+  return { ...workspaceState };
+}
+
+function togglePanel(visible?: boolean): WorkspaceWindowState {
+  const shouldShow =
+    typeof visible === "boolean"
+      ? visible
+      : !(mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible());
+  return shouldShow ? showPanel() : hidePanel();
+}
+
+function showMenubar(): WorkspaceWindowState {
+  workspaceState.menubarVisible = true;
+  savePersistedConfig();
+  if (isWorkspaceSessionActive()) {
+    createMenubarWindow();
+  }
+  broadcastWorkspaceState();
+  return { ...workspaceState };
+}
+
+function hideMenubar(): WorkspaceWindowState {
+  if (menubarWindow && !menubarWindow.isDestroyed()) {
+    menubarWindow.hide();
+  }
+  workspaceState.menubarVisible = false;
+  savePersistedConfig();
+  broadcastWorkspaceState();
+  return { ...workspaceState };
+}
+
+function toggleMenubar(visible?: boolean): WorkspaceWindowState {
+  const isCurrentlyVisible = !!(
+    menubarWindow &&
+    !menubarWindow.isDestroyed() &&
+    menubarWindow.isVisible()
+  );
+  const shouldShow =
+    typeof visible === "boolean" ? visible : !isCurrentlyVisible;
+  return shouldShow ? showMenubar() : hideMenubar();
+}
+
+function setMenubarCollapsed(collapsed: boolean): WorkspaceWindowState {
+  workspaceState.menubarCollapsed = collapsed;
+  if (menubarWindow && !menubarWindow.isDestroyed()) {
+    const bounds = menubarWindow.getBounds();
+    const nextWidth = collapsed
+      ? MENUBAR_COLLAPSED_WIDTH
+      : Math.max(
+          MENUBAR_EXPANDED_WIDTH,
+          menubarBounds.width || DEFAULT_MENUBAR_BOUNDS.width,
+        );
+    menubarWindow.setBounds({
+      x: bounds.x,
+      y: bounds.y,
+      width: nextWidth,
+      height: bounds.height,
+    });
+  }
+  savePersistedConfig();
+  broadcastWorkspaceState();
+  return { ...workspaceState };
+}
+
+function navigateWorkspaceTab(tab: string): WorkspaceWindowState {
+  workspaceState.currentTab = tab;
+  if (!workspaceState.panelVisible || !mainWindow || !mainWindow.isVisible()) {
+    showPanel(tab);
+    return { ...workspaceState };
+  }
+  broadcastWorkspaceState();
+  return { ...workspaceState };
+}
+
+function resetWorkspaceLayout(): WorkspaceWindowState {
+  const display =
+    mainWindow && !mainWindow.isDestroyed()
+      ? screen.getDisplayMatching(mainWindow.getBounds())
+      : screen.getPrimaryDisplay();
+  const workArea = display.workArea;
+  const menubarW = workspaceState.menubarCollapsed
+    ? MENUBAR_COLLAPSED_WIDTH
+    : MENUBAR_EXPANDED_WIDTH;
+  const gap = 14;
+  const panelW = Math.min(
+    DEFAULT_WORKSPACE_BOUNDS.width,
+    Math.max(540, workArea.width - menubarW - gap - 48),
+  );
+  const height = Math.min(
+    DEFAULT_WORKSPACE_BOUNDS.height,
+    workArea.height - 48,
+  );
+  const totalW = menubarW + gap + panelW;
+  const startX = Math.max(
+    workArea.x + 16,
+    Math.round(workArea.x + (workArea.width - totalW) / 2),
+  );
+  const startY = Math.max(
+    workArea.y + 16,
+    Math.round(workArea.y + (workArea.height - height) / 2),
+  );
+
+  menubarBounds = {
+    x: startX,
+    y: startY,
+    width: MENUBAR_EXPANDED_WIDTH,
+    height,
+  };
+  workspaceBounds = {
+    x: startX + menubarW + gap,
+    y: startY,
+    width: panelW,
+    height,
+    isMaximized: false,
+  };
+
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMaximized()) mainWindow.unmaximize();
+    mainWindow.setBounds({
+      x: workspaceBounds.x!,
+      y: workspaceBounds.y!,
+      width: workspaceBounds.width,
+      height: workspaceBounds.height,
+    });
+    mainWindow.show();
+    workspaceState.panelVisible = true;
+  }
+
+  if (isWorkspaceSessionActive()) {
+    const mb = createMenubarWindow();
+    if (!mb.isDestroyed()) {
+      mb.setBounds({
+        x: startX,
+        y: startY,
+        width: menubarW,
+        height,
+      });
+      mb.show();
+      workspaceState.menubarVisible = true;
+    }
+  }
+
+  savePersistedConfig();
+  broadcastWorkspaceState();
+  return { ...workspaceState };
+}
+
+function syncWorkspaceState(
+  partial: Partial<WorkspaceWindowState>,
+): WorkspaceWindowState {
+  const wasActive = isWorkspaceSessionActive();
+
+  if (typeof partial.isAuthenticated === "boolean") {
+    workspaceState.isAuthenticated = partial.isAuthenticated;
+  }
+  if (typeof partial.isGuest === "boolean") {
+    workspaceState.isGuest = partial.isGuest;
+  }
+  if ("user" in partial) {
+    workspaceState.user = partial.user ?? null;
+  }
+  if (typeof partial.currentTab === "string" && partial.currentTab.trim()) {
+    workspaceState.currentTab = partial.currentTab.trim();
+  }
+  if (
+    partial.theme === "light" ||
+    partial.theme === "dark" ||
+    partial.theme === "system"
+  ) {
+    workspaceState.theme = partial.theme;
+    applyThemeToWorkspaceWindows(partial.theme);
+  }
+  if (typeof partial.menubarCollapsed === "boolean") {
+    setMenubarCollapsed(partial.menubarCollapsed);
+  }
+  if (typeof partial.menubarVisible === "boolean") {
+    workspaceState.menubarVisible = partial.menubarVisible;
+  }
+  if (typeof partial.panelVisible === "boolean") {
+    workspaceState.panelVisible = partial.panelVisible;
+  }
+
+  const isActive = isWorkspaceSessionActive();
+
+  if (isActive) {
+    if (!wasActive && workspaceState.menubarVisible) {
+      createMenubarWindow();
+    } else if (workspaceState.menubarVisible) {
+      if (menubarWindow && !menubarWindow.isDestroyed()) {
+        if (!menubarWindow.isVisible()) menubarWindow.show();
+      } else {
+        createMenubarWindow();
+      }
+    } else if (menubarWindow && !menubarWindow.isDestroyed()) {
+      menubarWindow.hide();
+    }
+  } else {
+    // Unauthenticated Auth Mode: keep independent Menubar window hidden and show Auth panel
+    if (menubarWindow && !menubarWindow.isDestroyed()) {
+      menubarWindow.hide();
+    }
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+      mainWindow.show();
+      workspaceState.panelVisible = true;
+    }
+  }
+
+  broadcastWorkspaceState();
+  return { ...workspaceState };
+}
+
+function showWorkspace(targetTab?: string): void {
+  showPanel(targetTab);
+  if (isWorkspaceSessionActive() && workspaceState.menubarVisible) {
+    createMenubarWindow();
   }
 }
 
 function hideWorkspace(): void {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.hide();
-  }
+  hidePanel();
 }
 
 function toggleWorkspace(): void {
-  if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()) {
-    mainWindow.hide();
-  } else {
-    showWorkspace();
-  }
+  togglePanel();
 }
 
 function showStage(): StageStatus {
@@ -520,6 +1027,18 @@ function quitApplication(): void {
   isQuitting = true;
   stopCursorTracking();
   globalShortcut.unregisterAll();
+  if (menubarWindow && !menubarWindow.isDestroyed()) {
+    menubarWindow.destroy();
+    menubarWindow = null;
+  }
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.destroy();
+    mainWindow = null;
+  }
+  if (stageWindow && !stageWindow.isDestroyed()) {
+    stageWindow.destroy();
+    stageWindow = null;
+  }
   if (tray) {
     tray.destroy();
     tray = null;
@@ -550,12 +1069,39 @@ function updateTrayMenu(): void {
 
   const isStageActive = stageStatus.stageVisible;
   const isPaused = stageStatus.animationPaused;
+  const isPanelVisible = !!(
+    mainWindow &&
+    !mainWindow.isDestroyed() &&
+    mainWindow.isVisible()
+  );
+  const isMenubarVisible = !!(
+    menubarWindow &&
+    !menubarWindow.isDestroyed() &&
+    menubarWindow.isVisible()
+  );
 
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: "Open Workspace",
-      click: () => showWorkspace(),
+      label: isPanelVisible
+        ? "Hide Workspace Panel (Ctrl+Alt+\\)"
+        : "Show Workspace Panel (Ctrl+Alt+\\)",
+      click: () => togglePanel(),
     },
+    ...(isWorkspaceSessionActive()
+      ? [
+          {
+            label: isMenubarVisible
+              ? "Hide Menubar (Ctrl+Alt+B)"
+              : "Show Menubar (Ctrl+Alt+B)",
+            click: () => toggleMenubar(),
+          },
+          {
+            label: "Arrange Menubar & Panel Side-by-Side",
+            click: () => resetWorkspaceLayout(),
+          },
+        ]
+      : []),
+    { type: "separator" as const },
     {
       label: isStageActive ? "Hide Avatar Stage" : "Show Avatar Stage",
       click: () => toggleStage(),
@@ -570,7 +1116,7 @@ function updateTrayMenu(): void {
         : "Enable Click-Through (Ctrl+Shift+M)",
       click: () => setClickThrough(!stageStatus.clickThrough),
     },
-    { type: "separator" },
+    { type: "separator" as const },
     {
       label: "Avatar Settings",
       click: () => showWorkspace("avatar"),
@@ -579,7 +1125,7 @@ function updateTrayMenu(): void {
       label: "Application Settings",
       click: () => showWorkspace("settings"),
     },
-    { type: "separator" },
+    { type: "separator" as const },
     {
       label: "Quit YourCustomWaifu",
       click: () => quitApplication(),
@@ -602,6 +1148,18 @@ function registerGlobalShortcuts(): void {
     globalShortcut.register("CommandOrControl+Shift+M", () => {
       setClickThrough(!stageStatus.clickThrough);
     });
+
+    // Ctrl+Alt+B: Globally Toggle Independent Menubar Window
+    globalShortcut.register("CommandOrControl+Alt+B", () => {
+      if (isWorkspaceSessionActive()) {
+        toggleMenubar();
+      }
+    });
+
+    // Ctrl+Alt+\: Globally Toggle Independent Workspace Panel Window
+    globalShortcut.register("CommandOrControl+Alt+\\", () => {
+      togglePanel();
+    });
   } catch (err) {
     console.warn("Failed to register some global shortcuts:", err);
   }
@@ -610,7 +1168,7 @@ function registerGlobalShortcuts(): void {
 // --- IPC Handlers ---
 
 function registerIpcHandlers(): void {
-  const allowedWindows = () => [mainWindow, stageWindow];
+  const allowedWindows = () => [mainWindow, menubarWindow, stageWindow];
 
   // 1. Version & Diagnostics
   ipcMain.handle(IPC_CHANNELS.GET_VERSION, (event) => {
@@ -1320,6 +1878,162 @@ function registerIpcHandlers(): void {
     }
     toggleWorkspace();
   });
+
+  ipcMain.handle(IPC_CHANNELS.WORKSPACE_SYNC_THEME, (event, theme: unknown) => {
+    if (!validateIpcSender(event.sender, allowedWindows())) {
+      throw new Error("Unauthorized IPC sender");
+    }
+    if (theme !== "light" && theme !== "dark") {
+      return;
+    }
+    applyThemeToWorkspaceWindows(theme);
+  });
+
+  ipcMain.handle(
+    IPC_CHANNELS.WORKSPACE_GET_STATE,
+    (event): WorkspaceWindowState => {
+      if (!validateIpcSender(event.sender, allowedWindows())) {
+        throw new Error("Unauthorized IPC sender");
+      }
+      return { ...workspaceState };
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.WORKSPACE_SYNC_STATE,
+    (event, partial: unknown): WorkspaceWindowState => {
+      if (!validateIpcSender(event.sender, allowedWindows())) {
+        throw new Error("Unauthorized IPC sender");
+      }
+      if (!partial || typeof partial !== "object") {
+        throw new Error("Invalid workspace state payload");
+      }
+      return syncWorkspaceState(partial as Partial<WorkspaceWindowState>);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.WORKSPACE_SHOW_MENUBAR,
+    (event): WorkspaceWindowState => {
+      if (!validateIpcSender(event.sender, allowedWindows())) {
+        throw new Error("Unauthorized IPC sender");
+      }
+      return showMenubar();
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.WORKSPACE_HIDE_MENUBAR,
+    (event): WorkspaceWindowState => {
+      if (!validateIpcSender(event.sender, allowedWindows())) {
+        throw new Error("Unauthorized IPC sender");
+      }
+      return hideMenubar();
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.WORKSPACE_TOGGLE_MENUBAR,
+    (event, visible?: unknown): WorkspaceWindowState => {
+      if (!validateIpcSender(event.sender, allowedWindows())) {
+        throw new Error("Unauthorized IPC sender");
+      }
+      return toggleMenubar(typeof visible === "boolean" ? visible : undefined);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.WORKSPACE_SET_MENUBAR_COLLAPSED,
+    (event, collapsed: unknown): WorkspaceWindowState => {
+      if (!validateIpcSender(event.sender, allowedWindows())) {
+        throw new Error("Unauthorized IPC sender");
+      }
+      if (typeof collapsed !== "boolean") {
+        throw new Error("Invalid collapsed flag");
+      }
+      return setMenubarCollapsed(collapsed);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.WORKSPACE_SHOW_PANEL,
+    (event, tab?: unknown): WorkspaceWindowState => {
+      if (!validateIpcSender(event.sender, allowedWindows())) {
+        throw new Error("Unauthorized IPC sender");
+      }
+      return showPanel(typeof tab === "string" ? tab : undefined);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.WORKSPACE_HIDE_PANEL,
+    (event): WorkspaceWindowState => {
+      if (!validateIpcSender(event.sender, allowedWindows())) {
+        throw new Error("Unauthorized IPC sender");
+      }
+      return hidePanel();
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.WORKSPACE_TOGGLE_PANEL,
+    (event, visible?: unknown): WorkspaceWindowState => {
+      if (!validateIpcSender(event.sender, allowedWindows())) {
+        throw new Error("Unauthorized IPC sender");
+      }
+      return togglePanel(typeof visible === "boolean" ? visible : undefined);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.WORKSPACE_NAVIGATE_TAB,
+    (event, tab: unknown): WorkspaceWindowState => {
+      if (!validateIpcSender(event.sender, allowedWindows())) {
+        throw new Error("Unauthorized IPC sender");
+      }
+      if (typeof tab !== "string" || !tab.trim()) {
+        throw new Error("Invalid tab identifier");
+      }
+      return navigateWorkspaceTab(tab.trim());
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.WORKSPACE_RESET_LAYOUT,
+    (event): WorkspaceWindowState => {
+      if (!validateIpcSender(event.sender, allowedWindows())) {
+        throw new Error("Unauthorized IPC sender");
+      }
+      return resetWorkspaceLayout();
+    },
+  );
+
+  ipcMain.handle(IPC_CHANNELS.WORKSPACE_MINIMIZE_WINDOW, (event): void => {
+    if (!validateIpcSender(event.sender, allowedWindows())) {
+      throw new Error("Unauthorized IPC sender");
+    }
+    const senderWin = BrowserWindow.fromWebContents(event.sender);
+    if (senderWin && !senderWin.isDestroyed()) {
+      senderWin.minimize();
+    }
+  });
+
+  ipcMain.handle(
+    IPC_CHANNELS.WORKSPACE_TOGGLE_MAXIMIZE_WINDOW,
+    (event): void => {
+      if (!validateIpcSender(event.sender, allowedWindows())) {
+        throw new Error("Unauthorized IPC sender");
+      }
+      const senderWin = BrowserWindow.fromWebContents(event.sender);
+      if (senderWin && !senderWin.isDestroyed()) {
+        if (senderWin.isMaximized()) {
+          senderWin.unmaximize();
+        } else {
+          senderWin.maximize();
+        }
+      }
+    },
+  );
 }
 
 let embeddedAuthServer: import("node:http").Server | null = null;

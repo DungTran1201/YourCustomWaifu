@@ -15,7 +15,7 @@ export const PASSWORD_POLICY = {
 } as const;
 
 export const DEFAULT_SETTINGS = {
-  theme: "dark" as const,
+  theme: "light" as const,
   telemetryEnabled: false,
   logLevel: "info" as const,
 };
@@ -43,12 +43,22 @@ export const DEFAULT_AVATAR_CONFIG = {
 };
 
 export const DEFAULT_WORKSPACE_BOUNDS = {
-  width: 1100,
+  width: 920,
   height: 740,
   x: undefined as number | undefined,
   y: undefined as number | undefined,
   isMaximized: false,
 };
+
+export const DEFAULT_MENUBAR_BOUNDS = {
+  width: 228,
+  height: 740,
+  x: undefined as number | undefined,
+  y: undefined as number | undefined,
+};
+
+export const MENUBAR_EXPANDED_WIDTH = 228;
+export const MENUBAR_COLLAPSED_WIDTH = 76;
 
 export const INITIAL_STAGE_STATUS = {
   stageVisible: false,

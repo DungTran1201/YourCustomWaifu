@@ -1,94 +1,193 @@
-:root {
-  /* Dark Minimal Desktop Palette */
-  --bg-primary: #0d0e10;
-  --bg-sidebar: #101114;
-  --bg-secondary: #101114;
-  --bg-main: #121316;
-  --bg-surface: #17191d;
-  --bg-tertiary: #17191d;
-  --bg-elevated: #1d2025;
-  --bg-card: #17191d;
-  --bg-hover: #24272d;
-  --bg-selected: #292c32;
-  --bg-card-hover: #1f2228;
+:root,
+[data-theme="light"] {
+  /* Primary Light Clear Frosted White Glass over OS Desktop Blur (Acrylic) */
+  --canvas-bg: rgba(255, 255, 255, 0.01);
+
+  --bg-primary: rgba(255, 255, 255, 0.14);
+  --bg-sidebar: rgba(255, 255, 255, 0.2);
+  --bg-secondary: rgba(255, 255, 255, 0.22);
+  --bg-main: rgba(255, 255, 255, 0.14);
+  --bg-surface: rgba(255, 255, 255, 0.24);
+  --bg-tertiary: rgba(255, 255, 255, 0.1);
+  --bg-elevated: rgba(255, 255, 255, 0.42);
+  --bg-card: rgba(255, 255, 255, 0.24);
+  --bg-hover: rgba(255, 255, 255, 0.3);
+  --bg-selected: rgba(255, 255, 255, 0.44);
+  --bg-card-hover: rgba(255, 255, 255, 0.36);
+
+  /* Borderless Glass Tokens */
+  --glass-surface: rgba(255, 255, 255, 0.2);
+  --glass-surface-strong: rgba(255, 255, 255, 0.38);
+  --glass-surface-subtle: rgba(255, 255, 255, 0.1);
+  --glass-input: rgba(255, 255, 255, 0.28);
+  --glass-input-focus: rgba(255, 255, 255, 0.64);
+  --glass-blur: blur(14px) saturate(140%);
+  --glass-specular:
+    inset 0 1px 0 rgba(255, 255, 255, 0.68),
+    inset 0 -1px 0 rgba(15, 23, 42, 0.03);
+  --glass-shadow:
+    0 18px 42px rgba(15, 23, 42, 0.08),
+    0 4px 12px rgba(15, 23, 42, 0.03);
+  --glass-shadow-sm:
+    0 8px 20px rgba(15, 23, 42, 0.05),
+    0 2px 6px rgba(15, 23, 42, 0.02);
+
+  /* Hairlines kept subtle/invisible for borderless aesthetic */
+  --border-subtle: rgba(15, 23, 42, 0.06);
+  --border-default: rgba(15, 23, 42, 0.1);
+  --border-focus: rgba(37, 99, 235, 0.5);
+
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+  --focus-ring: rgba(59, 130, 246, 0.45);
+
+  /* Semantic & Interactive Tokens */
+  --accent-primary: #0f172a;
+  --accent-muted: rgba(15, 23, 42, 0.08);
+  --accent-cyan: #0284c7;
+  --accent-cyan-glow: rgba(2, 132, 199, 0.16);
+  --accent-indigo: #6366f1;
+  --accent-success: #059669;
+  --accent-warning: #d97706;
+  --accent-danger: #dc2626;
+
+  --btn-primary-bg: #0f172a;
+  --btn-primary-text: #f8fafc;
+  --alert-error-bg: rgba(239, 68, 68, 0.12);
+  --alert-error-text: #b91c1c;
+  --alert-success-bg: rgba(16, 185, 129, 0.14);
+  --alert-success-text: #047857;
+  --alert-warning-bg: rgba(245, 158, 11, 0.15);
+  --alert-warning-text: #b45309;
+  --status-muted-text: #475569;
+
+  --scrollbar-thumb: rgba(15, 23, 42, 0.16);
+  --scrollbar-thumb-hover: rgba(15, 23, 42, 0.28);
+
+  --font-family-sans:
+    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-family-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+
+  /* Synchronized Asymmetric Glass Radii */
+  --radius-shell-major: 24px;
+  --radius-shell-minor: 12px;
+  --radius-card: 20px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+
+  --shadow-sm: 0 4px 12px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 12px 30px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 22px 54px rgba(15, 23, 42, 0.12);
+
+  --transition-fast: 140ms cubic-bezier(0.22, 1, 0.36, 1);
+  --transition-normal: 220ms cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Auth Frosted Glass Tokens (Light Translucent Default) */
+  --auth-canvas: transparent;
+  --auth-glass: rgba(255, 255, 255, 0.22);
+  --auth-panel: rgba(255, 255, 255, 0.26);
+  --auth-panel-elevated: rgba(255, 255, 255, 0.52);
+  --auth-input-bg: rgba(255, 255, 255, 0.28);
+  --auth-input-hover: rgba(255, 255, 255, 0.44);
+  --auth-input-focus: rgba(255, 255, 255, 0.68);
+  --auth-accent: #5b5bd6;
+  --auth-accent-secondary: #a2598d;
+  --auth-text: #0f172a;
+  --auth-text-secondary: #334155;
+  --auth-text-muted: #64748b;
+  --auth-btn-bg: linear-gradient(135deg, #1e293b 0%, #312e81 58%, #4c1d95 100%);
+  --auth-btn-text: #ffffff;
+  --auth-shadow:
+    0 24px 56px rgba(15, 23, 42, 0.12),
+    0 6px 18px rgba(91, 91, 214, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+[data-theme="dark"] {
+  /* Dark / Black Translucent Frosted Glass over OS Desktop Blur (Acrylic) */
+  --canvas-bg: rgba(8, 12, 22, 0.14);
+
+  --bg-primary: rgba(12, 16, 28, 0.2);
+  --bg-sidebar: rgba(14, 19, 32, 0.26);
+  --bg-secondary: rgba(14, 19, 32, 0.26);
+  --bg-main: rgba(10, 14, 24, 0.18);
+  --bg-surface: rgba(20, 27, 44, 0.3);
+  --bg-tertiary: rgba(12, 17, 30, 0.16);
+  --bg-elevated: rgba(26, 34, 56, 0.46);
+  --bg-card: rgba(16, 22, 38, 0.28);
+  --bg-hover: rgba(255, 255, 255, 0.08);
+  --bg-selected: rgba(255, 255, 255, 0.15);
+  --bg-card-hover: rgba(26, 34, 56, 0.42);
+
+  --glass-surface: rgba(14, 19, 32, 0.26);
+  --glass-surface-strong: rgba(22, 29, 48, 0.44);
+  --glass-surface-subtle: rgba(10, 14, 24, 0.14);
+  --glass-input: rgba(8, 12, 22, 0.3);
+  --glass-input-focus: rgba(16, 22, 38, 0.56);
+  --glass-specular:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+  --glass-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.54),
+    0 6px 20px rgba(0, 0, 0, 0.34);
+  --glass-shadow-sm:
+    0 10px 28px rgba(0, 0, 0, 0.42),
+    0 2px 8px rgba(0, 0, 0, 0.24);
 
   --border-subtle: rgba(255, 255, 255, 0.07);
   --border-default: rgba(255, 255, 255, 0.11);
-  --border-focus: rgba(235, 237, 240, 0.4);
+  --border-focus: rgba(235, 237, 240, 0.45);
 
-  --text-primary: #f0f1f3;
-  --text-secondary: #a4a7ae;
-  --text-muted: #747983;
-  --focus-ring: rgba(235, 237, 240, 0.28);
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --focus-ring: rgba(145, 133, 217, 0.5);
 
-  /* Accents - restrained, monochrome-first, purposeful semantic colors */
-  --accent-primary: #f0f1f3;
-  --accent-muted: #2d3139;
-  --accent-cyan: #e2e8f0;
-  --accent-cyan-glow: rgba(255, 255, 255, 0.06);
-  --accent-indigo: #94a3b8;
+  --accent-primary: #f1f5f9;
+  --accent-muted: rgba(255, 255, 255, 0.1);
+  --accent-cyan: #38bdf8;
+  --accent-cyan-glow: rgba(56, 189, 248, 0.18);
+  --accent-indigo: #a5b4fc;
   --accent-success: #10b981;
   --accent-warning: #f59e0b;
   --accent-danger: #ef4444;
 
-  --font-family-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-family-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+  --btn-primary-bg: #f8fafc;
+  --btn-primary-text: #0b0d12;
+  --alert-error-bg: rgba(239, 68, 68, 0.18);
+  --alert-error-text: #fca5a5;
+  --alert-success-bg: rgba(16, 185, 129, 0.18);
+  --alert-success-text: #86efac;
+  --alert-warning-bg: rgba(245, 158, 11, 0.18);
+  --alert-warning-text: #fcd34d;
+  --status-muted-text: #94a3b8;
 
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 10px;
+  --scrollbar-thumb: rgba(255, 255, 255, 0.16);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.28);
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
+  --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.52);
+  --shadow-lg: 0 18px 46px rgba(0, 0, 0, 0.65);
 
-  --transition-fast: 120ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-normal: 180ms cubic-bezier(0.4, 0, 0.2, 1);
-
-  /* Obsidian Glass Chamber Authentication Tokens */
-  --obsidian-void: #05060a;
-  --obsidian-chamber: #0a0c14;
-  --obsidian-glass: rgba(14, 16, 26, 0.68);
-  --obsidian-panel: #10121c;
-  --obsidian-panel-elevated: #161927;
-  --obsidian-input-bg: #090b12;
-  --obsidian-border: #25283d;
-  --obsidian-border-hover: rgba(145, 133, 217, 0.44);
-  --obsidian-accent: #9185d9;
-  --obsidian-accent-secondary: #b9789b;
-  --obsidian-text: #ececf4;
-  --obsidian-text-secondary: #abaec6;
-  --obsidian-text-muted: #727693;
-  --obsidian-shadow:
-    0 30px 76px rgba(0, 0, 0, 0.88),
-    0 10px 26px rgba(0, 0, 0, 0.7),
-    inset 0 1px 0 rgba(236, 236, 244, 0.06);
-}
-
-[data-theme='light'] {
-  --bg-primary: #f8fafc;
-  --bg-sidebar: #ffffff;
-  --bg-secondary: #ffffff;
-  --bg-main: #f1f5f9;
-  --bg-surface: #ffffff;
-  --bg-tertiary: #f8fafc;
-  --bg-elevated: #ffffff;
-  --bg-card: #ffffff;
-  --bg-hover: #f1f5f9;
-  --bg-selected: #e2e8f0;
-  --bg-card-hover: #f8fafc;
-
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #94a3b8;
-
-  --border-subtle: #e2e8f0;
-  --border-default: #cbd5e1;
-  --border-focus: rgba(15, 23, 42, 0.4);
-  --focus-ring: rgba(15, 23, 42, 0.15);
-
-  --accent-primary: #0f172a;
-  --accent-muted: #e2e8f0;
-  --accent-cyan: #475569;
-  --accent-cyan-glow: rgba(0, 0, 0, 0.05);
+  /* Auth Frosted Glass Tokens (Dark Translucent Glass) */
+  --auth-canvas: transparent;
+  --auth-glass: rgba(12, 16, 28, 0.28);
+  --auth-panel: rgba(16, 22, 38, 0.34);
+  --auth-panel-elevated: rgba(28, 36, 58, 0.56);
+  --auth-input-bg: rgba(8, 12, 22, 0.28);
+  --auth-input-hover: rgba(14, 19, 32, 0.44);
+  --auth-input-focus: rgba(18, 24, 42, 0.64);
+  --auth-accent: #9185d9;
+  --auth-accent-secondary: #b9789b;
+  --auth-text: #ececf4;
+  --auth-text-secondary: #cbd5e1;
+  --auth-text-muted: #94a3b8;
+  --auth-btn-bg: linear-gradient(135deg, #9185d9 0%, #7e72c9 58%, #b9789b 100%);
+  --auth-btn-text: #090b12;
+  --auth-shadow:
+    0 28px 70px rgba(0, 0, 0, 0.68),
+    0 10px 26px rgba(0, 0, 0, 0.48),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }

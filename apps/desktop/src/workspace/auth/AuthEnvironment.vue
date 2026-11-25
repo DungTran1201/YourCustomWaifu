@@ -2,6 +2,7 @@
 import { ref, computed, watch, provide, onBeforeUnmount } from "vue";
 import { useAppStore } from "@vrm/app-core";
 import { prefersReducedMotion } from "../../vrm/index.js";
+import AppIcon from "../../components/AppIcon.vue";
 import AuthVrmStage from "./AuthVrmStage.vue";
 import SignInView from "../views/SignInView.vue";
 import SignUpView from "../views/SignUpView.vue";
@@ -103,37 +104,28 @@ onBeforeUnmount(() => {
   }
 });
 
-const statusLabel = computed(() => {
-  switch (sceneState.value) {
-    case "loading-vrm":
-      return "Summoning Companion…";
-    case "ready":
-      return "Obsidian Chamber Ready";
-    case "static-fallback":
-      return "Obsidian Chamber Static";
-    default:
-      return "Entering Chamber…";
-  }
-});
+const propsSafeSceneState = sceneState;
+void propsSafeSceneState;
 </script>
 
 <template>
   <section
     class="obsidian-auth-environment"
     data-testid="auth-3d-environment"
-    aria-label="Obsidian Glass Chamber Authentication"
+    aria-label="Authentication Workspace"
   >
     <!-- Invisible Native Window Drag Region (Leaves top-right 144px clear for titleBarOverlay controls) -->
     <div class="obsidian-window-drag-strip" aria-hidden="true"></div>
 
-    <!-- Single-Instance 3D Obsidian Glass Chamber & VRM Companion -->
+    <!-- Pattern-free Translucent Glass Shader Sheen (No 3D room, No VRM) -->
     <AuthVrmStage
       :thinking="isThinking"
       :panel-switch-tick="panelSwitchTick"
+      :theme="store.resolvedTheme.value"
       @state-change="sceneState = $event"
     />
 
-    <!-- Centered 2D Floating Authentication Panel Layer -->
+    <!-- Centered 2D Floating Glass Authentication Panel Layer -->
     <div class="obsidian-foreground-layer">
       <div
         class="obsidian-entrance-shell"
@@ -150,19 +142,31 @@ const statusLabel = computed(() => {
         </div>
       </div>
 
-      <!-- Minimal Companion Chamber Indicator -->
-      <div class="chamber-status-pill" aria-live="polite">
-        <span
-          class="presence-dot"
-          :class="{
-            'dot-ready': sceneState === 'ready',
-            'dot-loading':
-              sceneState === 'loading-vrm' || sceneState === 'initializing',
-            'dot-fallback': sceneState === 'static-fallback',
-          }"
-        ></span>
-        <span class="presence-text">{{ statusLabel }}</span>
-      </div>
+      <!-- Borderless Floating Theme Switcher Pill (Light Glass <-> Dark Glass) -->
+      <button
+        id="auth-theme-toggle-btn"
+        type="button"
+        class="auth-theme-pill"
+        :title="
+          store.resolvedTheme.value === 'dark'
+            ? 'Switch to Light Glass Theme'
+            : 'Switch to Dark Glass Theme'
+        "
+        :aria-label="
+          store.resolvedTheme.value === 'dark'
+            ? 'Switch to Light Glass Theme'
+            : 'Switch to Dark Glass Theme'
+        "
+        @click="store.toggleTheme()"
+      >
+        <AppIcon
+          :name="store.resolvedTheme.value === 'dark' ? 'sun' : 'moon'"
+          size="14"
+        />
+        <span>{{
+          store.resolvedTheme.value === "dark" ? "Light Glass" : "Dark Glass"
+        }}</span>
+      </button>
     </div>
   </section>
 </template>
@@ -176,11 +180,14 @@ const statusLabel = computed(() => {
   margin: 0;
   padding: 0;
   border: none;
-  background-color: var(--obsidian-void, #05060a);
-  color: var(--obsidian-text, #ececf4);
+  background: var(--canvas-bg);
+  color: var(--auth-text);
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  transition:
+    background 260ms ease,
+    color 200ms ease;
 }
 
 .obsidian-window-drag-strip {
@@ -253,73 +260,54 @@ const statusLabel = computed(() => {
   }
 }
 
-.chamber-status-pill {
+.auth-theme-pill {
   position: fixed;
-  right: 18px;
+  left: 18px;
   bottom: 14px;
-  z-index: 3;
+  z-index: 5;
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 5px 11px;
+  padding: 7px 14px;
+  border: none;
   border-radius: 9999px;
-  background: rgba(12, 14, 22, 0.9);
-  border: 1px solid var(--obsidian-border, #25283d);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.65);
-  color: rgba(236, 236, 244, 0.72);
-  font-size: 0.71rem;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  pointer-events: none;
-  user-select: none;
+  background: var(--glass-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-specular), var(--glass-shadow-sm);
+  color: var(--auth-text-secondary);
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast),
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
-.presence-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--obsidian-accent, #9185d9);
-}
-
-.presence-dot.dot-ready {
-  background: var(--obsidian-accent, #9185d9);
-  box-shadow: 0 0 8px rgba(145, 133, 217, 0.65);
-}
-
-.presence-dot.dot-loading {
-  background: var(--obsidian-accent-secondary, #b9789b);
-  animation: pulseChamberDot 1.4s ease-in-out infinite;
-}
-
-.presence-dot.dot-fallback {
-  background: rgba(236, 236, 244, 0.42);
-}
-
-@keyframes pulseChamberDot {
-  0%,
-  100% {
-    opacity: 0.45;
-  }
-  50% {
-    opacity: 1;
-  }
+.auth-theme-pill:hover {
+  background: var(--bg-hover);
+  color: var(--auth-text);
+  transform: translateY(-1px);
 }
 
 @media (max-width: 720px) {
   .obsidian-entrance-shell {
     max-width: 360px;
   }
-  .chamber-status-pill {
-    right: 12px;
+  .auth-theme-pill {
+    left: 12px;
     bottom: 10px;
-    font-size: 0.67rem;
+    font-size: 0.69rem;
+    padding: 5px 11px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .obsidian-entrance-shell.entrance-animate,
-  .auth-panel-slot.form-swap-animate,
-  .presence-dot.dot-loading {
+  .auth-panel-slot.form-swap-animate {
     animation: none;
   }
 }

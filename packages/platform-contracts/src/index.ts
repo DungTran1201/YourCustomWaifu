@@ -128,6 +128,26 @@ export interface WorkspaceBounds {
   isMaximized?: boolean;
 }
 
+export interface MenubarBounds {
+  x?: number;
+  y?: number;
+  width: number;
+  height: number;
+}
+
+export type WorkspaceWindowMode = "combined" | "panel" | "menubar";
+
+export interface WorkspaceWindowState {
+  menubarVisible: boolean;
+  panelVisible: boolean;
+  menubarCollapsed: boolean;
+  currentTab: string;
+  theme: "light" | "dark" | "system";
+  isAuthenticated: boolean;
+  isGuest: boolean;
+  user: UserProfile | null;
+}
+
 export interface GazeData {
   screenX: number;
   screenY: number;
@@ -354,6 +374,25 @@ export interface DesktopWorkspaceAPI {
   show: (tab?: string) => Promise<void>;
   hide: () => Promise<void>;
   toggle: () => Promise<void>;
+  syncTheme?: (theme: "light" | "dark") => Promise<void>;
+  getState?: () => Promise<WorkspaceWindowState>;
+  syncState?: (
+    partial: Partial<WorkspaceWindowState>,
+  ) => Promise<WorkspaceWindowState>;
+  showMenubar?: () => Promise<WorkspaceWindowState>;
+  hideMenubar?: () => Promise<WorkspaceWindowState>;
+  toggleMenubar?: (visible?: boolean) => Promise<WorkspaceWindowState>;
+  setMenubarCollapsed?: (collapsed: boolean) => Promise<WorkspaceWindowState>;
+  showPanel?: (tab?: string) => Promise<WorkspaceWindowState>;
+  hidePanel?: () => Promise<WorkspaceWindowState>;
+  togglePanel?: (visible?: boolean) => Promise<WorkspaceWindowState>;
+  navigateTab?: (tab: string) => Promise<WorkspaceWindowState>;
+  resetLayout?: () => Promise<WorkspaceWindowState>;
+  minimizeWindow?: () => Promise<void>;
+  toggleMaximizeWindow?: () => Promise<void>;
+  onStateChanged?: (
+    callback: (state: WorkspaceWindowState) => void,
+  ) => () => void;
 }
 
 export interface DesktopAPI {
@@ -406,6 +445,21 @@ export const IPC_CHANNELS = {
   WORKSPACE_SHOW: "workspace:show",
   WORKSPACE_HIDE: "workspace:hide",
   WORKSPACE_TOGGLE: "workspace:toggle",
+  WORKSPACE_SYNC_THEME: "workspace:sync-theme",
+  WORKSPACE_GET_STATE: "workspace:get-state",
+  WORKSPACE_SYNC_STATE: "workspace:sync-state",
+  WORKSPACE_STATE_CHANGED: "workspace:state-changed",
+  WORKSPACE_SHOW_MENUBAR: "workspace:show-menubar",
+  WORKSPACE_HIDE_MENUBAR: "workspace:hide-menubar",
+  WORKSPACE_TOGGLE_MENUBAR: "workspace:toggle-menubar",
+  WORKSPACE_SET_MENUBAR_COLLAPSED: "workspace:set-menubar-collapsed",
+  WORKSPACE_SHOW_PANEL: "workspace:show-panel",
+  WORKSPACE_HIDE_PANEL: "workspace:hide-panel",
+  WORKSPACE_TOGGLE_PANEL: "workspace:toggle-panel",
+  WORKSPACE_NAVIGATE_TAB: "workspace:navigate-tab",
+  WORKSPACE_RESET_LAYOUT: "workspace:reset-layout",
+  WORKSPACE_MINIMIZE_WINDOW: "workspace:minimize-window",
+  WORKSPACE_TOGGLE_MAXIMIZE_WINDOW: "workspace:toggle-maximize-window",
 } as const;
 
 export type IPCChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
