@@ -9,6 +9,7 @@ import {
   type WorkspaceWindowState,
   type MenubarDockPosition,
   type MenubarDragInput,
+  type DesktopBackdropInfo,
 } from "@vrm/platform-contracts";
 
 const desktopAPI: DesktopAPI = {
@@ -159,6 +160,20 @@ const desktopAPI: DesktopAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_GET_WINDOW_BOUNDS),
     setWindowBounds: (bounds: Partial<WindowBounds>): Promise<WindowBounds> =>
       ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_SET_WINDOW_BOUNDS, bounds),
+    getDesktopBackdrop: (): Promise<DesktopBackdropInfo | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_GET_BACKDROP),
+    onDesktopBackdropChanged: (
+      callback: (info: DesktopBackdropInfo) => void,
+    ) => {
+      const handler = (_: any, info: DesktopBackdropInfo) => callback(info);
+      ipcRenderer.on(IPC_CHANNELS.WORKSPACE_BACKDROP_CHANGED, handler);
+      return () => {
+        ipcRenderer.removeListener(
+          IPC_CHANNELS.WORKSPACE_BACKDROP_CHANGED,
+          handler,
+        );
+      };
+    },
     onStateChanged: (callback: (state: WorkspaceWindowState) => void) => {
       const handler = (_: any, state: WorkspaceWindowState) => callback(state);
       ipcRenderer.on(IPC_CHANNELS.WORKSPACE_STATE_CHANGED, handler);

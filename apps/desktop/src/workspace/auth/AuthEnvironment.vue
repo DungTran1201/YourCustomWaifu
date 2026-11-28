@@ -110,7 +110,10 @@ void propsSafeSceneState;
 
 <template>
   <section
-    class="obsidian-auth-environment"
+    :class="[
+      'obsidian-auth-environment',
+      { 'backdrop-active': Boolean(store.state.desktopBackdrop?.imageUrl) },
+    ]"
     data-testid="auth-3d-environment"
     aria-label="Authentication Workspace"
   >
@@ -174,6 +177,7 @@ void propsSafeSceneState;
 <style scoped>
 .obsidian-auth-environment {
   position: relative;
+  z-index: 1;
   width: 100%;
   height: 100%;
   min-height: 100%;
@@ -191,6 +195,12 @@ void propsSafeSceneState;
   transition:
     background 260ms ease,
     color 200ms ease;
+}
+
+.obsidian-auth-environment.backdrop-active {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .obsidian-window-drag-strip {

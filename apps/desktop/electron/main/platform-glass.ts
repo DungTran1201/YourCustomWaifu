@@ -299,25 +299,16 @@ while (($line = [Console]::In.ReadLine()) -ne $null) {
 }
 `;
 
-// ACCENT_ENABLE_ACRYLICBLURBEHIND (4): Real GPU Gaussian desktop blur (~30px)
-const ACCENT_ENABLE_ACRYLICBLURBEHIND = 4;
-
-// GradientColor format is 0xAABBGGRR
-// ~39% frosted pure white + OS Acrylic GPU desktop blur (slightly clearer background)
-const ACRYLIC_LIGHT_TINT_ABGR = "64FFFFFF";
-// ~47% frosted pure black + OS Acrylic GPU desktop blur
-const ACRYLIC_DARK_TINT_ABGR = "78000000";
-
 let win32Helper: ChildProcessWithoutNullStreams | null = null;
 let win32HelperReady = false;
 let win32HelperFailed = false;
 let win32TransparencyEnabled = true;
 const pendingWin32Commands: string[] = [];
 
-let activeGlassMode: GlassBackdropMode =
-  process.platform === "win32" || process.platform === "darwin"
-    ? "native-blur"
-    : "frosted-fallback";
+// Windows & macOS borderless 24px rounded / concave-notch windows use per-pixel
+// alpha CSS frosted glass rather than rectangular OS Acrylic/Vibrancy so outer
+// corner cutouts remain 100% transparent everywhere.
+let activeGlassMode: GlassBackdropMode = "frosted-fallback";
 
 type ModeChangeListener = (mode: GlassBackdropMode) => void;
 const modeListeners = new Set<ModeChangeListener>();
@@ -596,7 +587,7 @@ function contourToWin32PathSpec(contour: NotchContour): string {
  */
 export function applyPlatformGlass(
   win: BrowserWindow | null,
-  theme: "light" | "dark",
+  _theme: "light" | "dark",
   radiusDip = 24,
   dock: MenubarDockPosition = "floating",
 ): void {
@@ -605,28 +596,25 @@ export function applyPlatformGlass(
   if (process.platform === "win32") {
     const hwnd = getWindowHwndString(win);
     if (!hwnd) return;
-    if (dock === "floating") {
-      const tintHex =
-        theme === "dark" ? ACRYLIC_DARK_TINT_ABGR : ACRYLIC_LIGHT_TINT_ABGR;
-      sendWin32Command(
-        `BLUR ${hwnd} ${ACCENT_ENABLE_ACRYLICBLURBEHIND} ${tintHex}`,
-      );
-    } else {
-      // Docked Edge/Corner Notch uses a concave SVG silhouette; disabling Win32 DWM
-      // Acrylic keeps the outer cutout pockets 100% crystal-clear transparent.
-      sendWin32Command(`CLEAR_BLUR ${hwnd}`);
-    }
+    // Windows DWM AccentPolicy (ACCENT_ENABLE_ACRYLICBLURBEHIND) blurs out to
+    // DWM's ~8px frame regardless of SetWindowRgn, creating visible dark/light
+    // rectangular corner wedges outside 24px CSS rounded corners and concave notches.
+    // Disabling DWM AccentPolicy keeps all pixels outside CSS border-radius / SVG
+    // clipPath 100% transparent while preserving DWMWA_BORDER_COLOR = NONE and
+    // SetWindowRgn click-through clipping.
+    sendWin32Command(`CLEAR_BLUR ${hwnd}`);
+    setGlassMode("frosted-fallback");
     updatePlatformGlassRegion(win, radiusDip, dock);
     return;
   }
 
   if (process.platform === "darwin") {
     try {
-      win.setVibrancy(dock === "floating" ? "under-window" : null);
-      setGlassMode(dock === "floating" ? "native-blur" : "frosted-fallback");
+      win.setVibrancy(null);
     } catch {
-      setGlassMode("frosted-fallback");
+      // Ignore if unsupported
     }
+    setGlassMode("frosted-fallback");
     return;
   }
 

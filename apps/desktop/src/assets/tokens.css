@@ -18,6 +18,7 @@
 
   /* Borderless Frosted Glass Tokens (Slightly More Transparent + Lighter Soft Blur) */
   --glass-surface: rgba(255, 255, 255, 0.42);
+  --window-backdrop-tint: rgba(255, 255, 255, 0.54);
   --notch-surface: rgba(255, 255, 255, 0.9);
   --glass-surface-strong: rgba(255, 255, 255, 0.64);
   --glass-surface-subtle: rgba(255, 255, 255, 0.32);
@@ -132,6 +133,7 @@
   --bg-card-hover: rgba(24, 24, 28, 0.68);
 
   --glass-surface: rgba(0, 0, 0, 0.46);
+  --window-backdrop-tint: rgba(8, 8, 12, 0.56);
   --notch-surface: rgba(10, 10, 12, 0.92);
   --glass-surface-strong: rgba(12, 12, 14, 0.68);
   --glass-surface-subtle: rgba(0, 0, 0, 0.34);
@@ -216,37 +218,39 @@
  */
 :root[data-glass-backdrop="frosted-fallback"],
 :root[data-glass-backdrop="frosted-fallback"][data-theme="light"] {
-  --window-glass-bg: rgba(255, 255, 255, 0.76);
-  --bg-primary: rgba(255, 255, 255, 0.72);
-  --bg-sidebar: rgba(255, 255, 255, 0.78);
-  --bg-main: rgba(255, 255, 255, 0.76);
-  --bg-surface: rgba(255, 255, 255, 0.82);
-  --bg-card: rgba(255, 255, 255, 0.8);
-  --glass-surface: rgba(255, 255, 255, 0.78);
-  --notch-surface: rgba(255, 255, 255, 0.86);
-  --glass-surface-strong: rgba(255, 255, 255, 0.88);
-  --glass-surface-subtle: rgba(255, 255, 255, 0.62);
-  --glass-blur: blur(20px) saturate(145%);
-  --glass-blur-subtle: blur(14px) saturate(130%);
-  --auth-glass: rgba(255, 255, 255, 0.84);
-  --auth-panel: rgba(255, 255, 255, 0.88);
-  --auth-input-bg: rgba(255, 255, 255, 0.82);
+  --window-glass-bg: rgba(255, 255, 255, 0.64);
+  --bg-primary: rgba(255, 255, 255, 0.64);
+  --bg-sidebar: rgba(255, 255, 255, 0.68);
+  --bg-main: rgba(255, 255, 255, 0.66);
+  --bg-surface: rgba(255, 255, 255, 0.74);
+  --bg-card: rgba(255, 255, 255, 0.72);
+  --glass-surface: rgba(255, 255, 255, 0.68);
+  --window-backdrop-tint: rgba(255, 255, 255, 0.54);
+  --notch-surface: rgba(255, 255, 255, 0.9);
+  --glass-surface-strong: rgba(255, 255, 255, 0.84);
+  --glass-surface-subtle: rgba(255, 255, 255, 0.56);
+  --glass-blur: blur(18px) saturate(140%);
+  --glass-blur-subtle: blur(13px) saturate(128%);
+  --auth-glass: rgba(255, 255, 255, 0.76);
+  --auth-panel: rgba(255, 255, 255, 0.82);
+  --auth-input-bg: rgba(255, 255, 255, 0.76);
 }
 
 :root[data-glass-backdrop="frosted-fallback"][data-theme="dark"] {
-  --window-glass-bg: rgba(0, 0, 0, 0.78);
-  --bg-primary: rgba(0, 0, 0, 0.74);
-  --bg-sidebar: rgba(0, 0, 0, 0.8);
-  --bg-main: rgba(0, 0, 0, 0.78);
-  --bg-surface: rgba(12, 12, 14, 0.84);
-  --bg-card: rgba(10, 10, 12, 0.82);
-  --glass-surface: rgba(0, 0, 0, 0.8);
-  --notch-surface: rgba(6, 6, 8, 0.88);
-  --glass-surface-strong: rgba(16, 16, 18, 0.9);
-  --glass-surface-subtle: rgba(0, 0, 0, 0.64);
-  --glass-blur: blur(20px) saturate(145%);
-  --glass-blur-subtle: blur(14px) saturate(130%);
-  --auth-glass: rgba(0, 0, 0, 0.84);
-  --auth-panel: rgba(10, 10, 12, 0.88);
-  --auth-input-bg: rgba(12, 12, 14, 0.8);
+  --window-glass-bg: rgba(10, 10, 12, 0.7);
+  --bg-primary: rgba(10, 10, 12, 0.68);
+  --bg-sidebar: rgba(12, 12, 14, 0.74);
+  --bg-main: rgba(10, 10, 12, 0.72);
+  --bg-surface: rgba(16, 16, 18, 0.78);
+  --bg-card: rgba(14, 14, 16, 0.76);
+  --glass-surface: rgba(12, 12, 14, 0.72);
+  --window-backdrop-tint: rgba(8, 8, 12, 0.58);
+  --notch-surface: rgba(10, 10, 12, 0.92);
+  --glass-surface-strong: rgba(20, 20, 24, 0.86);
+  --glass-surface-subtle: rgba(10, 10, 12, 0.58);
+  --glass-blur: blur(18px) saturate(140%);
+  --glass-blur-subtle: blur(13px) saturate(128%);
+  --auth-glass: rgba(10, 10, 12, 0.78);
+  --auth-panel: rgba(14, 14, 16, 0.84);
+  --auth-input-bg: rgba(16, 16, 18, 0.76);
 }

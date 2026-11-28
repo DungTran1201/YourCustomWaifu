@@ -12,6 +12,7 @@ import {
   contourToSvgPath,
 } from "@vrm/shared";
 import AppIcon from "./AppIcon.vue";
+import DesktopBlurBackdrop from "./DesktopBlurBackdrop.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -571,11 +572,14 @@ onUnmounted(() => {
       {
         collapsed: isEffectivelyCollapsed,
         detached: isDetachedWindow,
+        'backdrop-active':
+          isDetachedWindow && Boolean(store.state.desktopBackdrop?.imageUrl),
       },
     ]"
     role="navigation"
     aria-label="Sidebar Navigation"
   >
+    <DesktopBlurBackdrop v-if="isDetachedWindow" />
     <!-- Interactive Drag Handle (Drag to any screen edge to morph into Dynamic Notch!) -->
     <div
       class="sidebar-drag-bar"
@@ -1087,11 +1091,25 @@ onUnmounted(() => {
 }
 
 .workspace-sidebar.detached {
+  position: relative;
   width: 100%;
   height: 100%;
   border: none;
   border-radius: var(--radius-window, 24px);
   box-shadow: none;
+}
+
+.workspace-sidebar.detached.backdrop-active {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.workspace-sidebar.detached > .sidebar-drag-bar,
+.workspace-sidebar.detached > .sidebar-scroll,
+.workspace-sidebar.detached > .sidebar-footer {
+  position: relative;
+  z-index: 1;
 }
 
 .workspace-sidebar.collapsed:not(.detached) {

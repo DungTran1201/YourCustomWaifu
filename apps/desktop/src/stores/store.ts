@@ -21,6 +21,7 @@ import type {
   WorkspaceWindowState,
   MenubarDockPosition,
   MenubarDragInput,
+  DesktopBackdropInfo,
 } from "@vrm/platform-contracts";
 import {
   DEFAULT_SETTINGS,
@@ -95,6 +96,7 @@ export interface AppState {
   menubarVisible: boolean;
   panelVisible: boolean;
   menubarDock: MenubarDockPosition;
+  desktopBackdrop: DesktopBackdropInfo | null;
   // Guest Preview state
   isGuest: boolean;
   isGuestPreviewAvailable: boolean;
@@ -121,6 +123,7 @@ const state = reactive<AppState>({
   menubarVisible: true,
   panelVisible: true,
   menubarDock: "floating",
+  desktopBackdrop: null,
   settings: { ...DEFAULT_SETTINGS },
   diagnostics: null,
   isLoading: false,
@@ -541,6 +544,34 @@ export function useAppStore() {
       workspaceSyncCleanup = wsApi.onStateChanged((remote) => {
         applyRemoteWorkspaceState(remote);
       });
+    }
+
+    if (typeof wsApi.onDesktopBackdropChanged === "function") {
+      wsApi.onDesktopBackdropChanged((incoming) => {
+        if (!incoming) return;
+        const nextImage =
+          incoming.imageUrl !== undefined
+            ? incoming.imageUrl
+            : state.desktopBackdrop &&
+                state.desktopBackdrop.imageRevision === incoming.imageRevision
+              ? state.desktopBackdrop.imageUrl
+              : null;
+        state.desktopBackdrop = {
+          ...incoming,
+          imageUrl: nextImage,
+        };
+      });
+    }
+
+    if (typeof wsApi.getDesktopBackdrop === "function") {
+      wsApi
+        .getDesktopBackdrop()
+        .then((initial) => {
+          if (initial) {
+            state.desktopBackdrop = initial;
+          }
+        })
+        .catch(() => {});
     }
 
     if (typeof wsApi.getState === "function") {

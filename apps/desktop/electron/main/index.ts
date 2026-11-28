@@ -63,6 +63,11 @@ import {
   resolveMenubarPerimeterDrag,
   isCornerDock,
 } from "./menubar-notch.js";
+import {
+  refreshDesktopWallpaperCache,
+  buildWindowBackdropInfo,
+  sendWindowBackdropUpdate,
+} from "./desktop-backdrop.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -433,6 +438,20 @@ function createWorkspaceWindow(): BrowserWindow {
     if (!mainWindow || mainWindow.isDestroyed()) return;
     workspaceState.panelVisible = true;
     applyPlatformGlass(mainWindow, resolveWorkspaceGlassTheme(), 24);
+    sendWindowBackdropUpdate(
+      mainWindow,
+      IPC_CHANNELS.WORKSPACE_BACKDROP_CHANGED,
+      true,
+    );
+    void refreshDesktopWallpaperCache().then((changed) => {
+      if (changed) {
+        sendWindowBackdropUpdate(
+          mainWindow,
+          IPC_CHANNELS.WORKSPACE_BACKDROP_CHANGED,
+          true,
+        );
+      }
+    });
     mainWindow.show();
     if (workspaceBounds.isMaximized) {
       mainWindow.maximize();
@@ -443,6 +462,19 @@ function createWorkspaceWindow(): BrowserWindow {
   mainWindow.on("show", () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       applyPlatformGlass(mainWindow, resolveWorkspaceGlassTheme(), 24);
+      sendWindowBackdropUpdate(
+        mainWindow,
+        IPC_CHANNELS.WORKSPACE_BACKDROP_CHANGED,
+      );
+      void refreshDesktopWallpaperCache().then((changed) => {
+        if (changed) {
+          sendWindowBackdropUpdate(
+            mainWindow,
+            IPC_CHANNELS.WORKSPACE_BACKDROP_CHANGED,
+            true,
+          );
+        }
+      });
     }
   });
 
@@ -463,6 +495,10 @@ function createWorkspaceWindow(): BrowserWindow {
   mainWindow.on("resize", () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       updatePlatformGlassRegion(mainWindow, 24);
+      sendWindowBackdropUpdate(
+        mainWindow,
+        IPC_CHANNELS.WORKSPACE_BACKDROP_CHANGED,
+      );
       if (!mainWindow.isMaximized()) {
         const size = mainWindow.getSize();
         if (typeof size[0] === "number") workspaceBounds.width = size[0];
@@ -473,12 +509,18 @@ function createWorkspaceWindow(): BrowserWindow {
   });
 
   mainWindow.on("move", () => {
-    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isMaximized()) {
-      const pos = mainWindow.getPosition();
-      if (typeof pos[0] === "number" && typeof pos[1] === "number") {
-        workspaceBounds.x = pos[0];
-        workspaceBounds.y = pos[1];
-        savePersistedConfig();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      sendWindowBackdropUpdate(
+        mainWindow,
+        IPC_CHANNELS.WORKSPACE_BACKDROP_CHANGED,
+      );
+      if (!mainWindow.isMaximized()) {
+        const pos = mainWindow.getPosition();
+        if (typeof pos[0] === "number" && typeof pos[1] === "number") {
+          workspaceBounds.x = pos[0];
+          workspaceBounds.y = pos[1];
+          savePersistedConfig();
+        }
       }
     }
   });
@@ -486,12 +528,20 @@ function createWorkspaceWindow(): BrowserWindow {
   mainWindow.on("maximize", () => {
     workspaceBounds.isMaximized = true;
     updatePlatformGlassRegion(mainWindow, 24);
+    sendWindowBackdropUpdate(
+      mainWindow,
+      IPC_CHANNELS.WORKSPACE_BACKDROP_CHANGED,
+    );
     savePersistedConfig();
   });
 
   mainWindow.on("unmaximize", () => {
     workspaceBounds.isMaximized = false;
     updatePlatformGlassRegion(mainWindow, 24);
+    sendWindowBackdropUpdate(
+      mainWindow,
+      IPC_CHANNELS.WORKSPACE_BACKDROP_CHANGED,
+    );
     savePersistedConfig();
   });
 
@@ -628,6 +678,11 @@ function createMenubarWindow(): BrowserWindow {
       24,
       activeDock,
     );
+    sendWindowBackdropUpdate(
+      menubarWindow,
+      IPC_CHANNELS.WORKSPACE_BACKDROP_CHANGED,
+      true,
+    );
     menubarWindow.setAlwaysOnTop(true, "floating");
     menubarWindow.webContents.send(IPC_CHANNELS.WORKSPACE_STATE_CHANGED, {
       ...workspaceState,
@@ -651,6 +706,10 @@ function createMenubarWindow(): BrowserWindow {
         24,
         activeDock,
       );
+      sendWindowBackdropUpdate(
+        menubarWindow,
+        IPC_CHANNELS.WORKSPACE_BACKDROP_CHANGED,
+      );
       menubarWindow.setAlwaysOnTop(true, "floating");
     }
   });
@@ -673,6 +732,10 @@ function createMenubarWindow(): BrowserWindow {
     if (menubarWindow && !menubarWindow.isDestroyed()) {
       const activeDock = workspaceState.menubarDock || "floating";
       updatePlatformGlassRegion(menubarWindow, 24, activeDock);
+      sendWindowBackdropUpdate(
+        menubarWindow,
+        IPC_CHANNELS.WORKSPACE_BACKDROP_CHANGED,
+      );
       if (activeDock === "floating") {
         const size = menubarWindow.getSize();
         if (typeof size[0] === "number" && !workspaceState.menubarCollapsed) {
@@ -688,6 +751,10 @@ function createMenubarWindow(): BrowserWindow {
 
   menubarWindow.on("move", () => {
     if (menubarWindow && !menubarWindow.isDestroyed()) {
+      sendWindowBackdropUpdate(
+        menubarWindow,
+        IPC_CHANNELS.WORKSPACE_BACKDROP_CHANGED,
+      );
       if ((workspaceState.menubarDock || "floating") === "floating") {
         const pos = menubarWindow.getPosition();
         if (typeof pos[0] === "number" && typeof pos[1] === "number") {
@@ -2410,9 +2477,25 @@ function registerIpcHandlers(): void {
       };
       senderWin.setBounds(nextBounds);
       updatePlatformGlassRegion(senderWin, 24);
+      sendWindowBackdropUpdate(
+        senderWin,
+        IPC_CHANNELS.WORKSPACE_BACKDROP_CHANGED,
+      );
       return nextBounds;
     },
   );
+
+  ipcMain.handle(IPC_CHANNELS.WORKSPACE_GET_BACKDROP, async (event) => {
+    if (!validateIpcSender(event.sender, allowedWindows())) {
+      throw new Error("Unauthorized IPC sender");
+    }
+    const senderWin = BrowserWindow.fromWebContents(event.sender);
+    if (!senderWin || senderWin.isDestroyed()) {
+      return null;
+    }
+    await refreshDesktopWallpaperCache();
+    return buildWindowBackdropInfo(senderWin, true);
+  });
 }
 
 let embeddedAuthServer: import("node:http").Server | null = null;
@@ -2541,6 +2624,7 @@ if (!gotSingleInstanceLock) {
   app.whenReady().then(async () => {
     configureSessionSecurity();
     await loadPersistedConfig();
+    await refreshDesktopWallpaperCache(true);
     await startEmbeddedAuthServer();
     registerIpcHandlers();
     createSystemTray();
@@ -2556,6 +2640,14 @@ if (!gotSingleInstanceLock) {
         menubarWindow,
         24,
         workspaceState.menubarDock || "floating",
+      );
+      sendWindowBackdropUpdate(
+        mainWindow,
+        IPC_CHANNELS.WORKSPACE_BACKDROP_CHANGED,
+      );
+      sendWindowBackdropUpdate(
+        menubarWindow,
+        IPC_CHANNELS.WORKSPACE_BACKDROP_CHANGED,
       );
     });
 
