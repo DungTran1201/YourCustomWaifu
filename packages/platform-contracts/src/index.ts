@@ -157,19 +157,6 @@ export interface MenubarDragInput {
   grabOffsetY: number;
 }
 
-export type DesktopWallpaperStyle =
-  "fill" | "fit" | "stretch" | "center" | "tile";
-
-export interface DesktopBackdropInfo {
-  imageUrl?: string | null;
-  imageRevision: number;
-  style: DesktopWallpaperStyle;
-  backgroundColor: string;
-  displayBounds: WindowBounds;
-  windowBounds: WindowBounds;
-  isMaximized: boolean;
-}
-
 export interface WorkspaceWindowState {
   menubarVisible: boolean;
   panelVisible: boolean;
@@ -429,10 +416,6 @@ export interface DesktopWorkspaceAPI {
   toggleMaximizeWindow?: () => Promise<void>;
   getWindowBounds?: () => Promise<WindowBounds>;
   setWindowBounds?: (bounds: Partial<WindowBounds>) => Promise<WindowBounds>;
-  getDesktopBackdrop?: () => Promise<DesktopBackdropInfo | null>;
-  onDesktopBackdropChanged?: (
-    callback: (info: DesktopBackdropInfo) => void,
-  ) => () => void;
   onStateChanged?: (
     callback: (state: WorkspaceWindowState) => void,
   ) => () => void;
@@ -507,8 +490,6 @@ export const IPC_CHANNELS = {
   WORKSPACE_TOGGLE_MAXIMIZE_WINDOW: "workspace:toggle-maximize-window",
   WORKSPACE_GET_WINDOW_BOUNDS: "workspace:get-window-bounds",
   WORKSPACE_SET_WINDOW_BOUNDS: "workspace:set-window-bounds",
-  WORKSPACE_GET_BACKDROP: "workspace:get-backdrop",
-  WORKSPACE_BACKDROP_CHANGED: "workspace:backdrop-changed",
 } as const;
 
 export type IPCChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

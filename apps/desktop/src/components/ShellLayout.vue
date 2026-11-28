@@ -4,7 +4,6 @@ import { useAppStore } from "@vrm/app-core";
 import NavigationBar from "./NavigationBar.vue";
 import AppIcon from "./AppIcon.vue";
 import WindowResizeHandles from "./WindowResizeHandles.vue";
-import DesktopBlurBackdrop from "./DesktopBlurBackdrop.vue";
 import SettingsView from "../workspace/views/SettingsView.vue";
 import DiagnosticsView from "../workspace/views/DiagnosticsView.vue";
 import AuthEnvironment from "../workspace/auth/AuthEnvironment.vue";
@@ -35,10 +34,6 @@ const isMenubarOnlyWindow = computed(
 );
 
 const isPanelOnlyWindow = computed(() => store.state.windowMode === "panel");
-
-const hasDesktopBackdrop = computed(() =>
-  Boolean(store.state.desktopBackdrop?.imageUrl),
-);
 
 const isAuthenticationMode = computed(
   () =>
@@ -130,7 +125,6 @@ onBeforeUnmount(() => {
 
     <!-- 2. Borderless Rounded Glass Authentication Mode -->
     <template v-else-if="isAuthenticationMode">
-      <DesktopBlurBackdrop />
       <WindowResizeHandles
         v-if="store.platform.value === 'electron'"
         :min-width="540"
@@ -170,7 +164,6 @@ onBeforeUnmount(() => {
 
     <!-- 3. Headerless Independent Functional Panel Window Mode (?window=panel in Electron) -->
     <template v-else-if="isPanelOnlyWindow">
-      <DesktopBlurBackdrop />
       <WindowResizeHandles
         v-if="store.platform.value === 'electron'"
         :min-width="540"
@@ -223,7 +216,6 @@ onBeforeUnmount(() => {
           'glass-panel-surface',
           'detached-panel-surface',
           {
-            'backdrop-active': hasDesktopBackdrop,
             'chat-view-active': store.state.currentTab === 'chat',
           },
         ]"
@@ -501,13 +493,6 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-window, 24px);
   box-shadow: none;
   padding-top: 6px;
-  z-index: 1;
-}
-
-.shell-main.detached-panel-surface.backdrop-active {
-  background: transparent;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
 }
 
 .shell-main.chat-view-active {

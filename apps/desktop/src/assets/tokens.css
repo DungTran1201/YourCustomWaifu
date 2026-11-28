@@ -2,7 +2,7 @@
 [data-theme="light"] {
   /* Default Pure White Frosted Translucent Glass over Real OS Desktop Blur (Zero Borders) */
   --canvas-bg: transparent;
-  --window-glass-bg: rgba(255, 255, 255, 0.36);
+  --window-glass-bg: rgba(255, 255, 255, 0.54);
 
   --bg-primary: rgba(255, 255, 255, 0.38);
   --bg-sidebar: rgba(255, 255, 255, 0.42);
@@ -17,8 +17,7 @@
   --bg-card-hover: rgba(255, 255, 255, 0.66);
 
   /* Borderless Frosted Glass Tokens (Slightly More Transparent + Lighter Soft Blur) */
-  --glass-surface: rgba(255, 255, 255, 0.42);
-  --window-backdrop-tint: rgba(255, 255, 255, 0.54);
+  --glass-surface: rgba(255, 255, 255, 0.56);
   --notch-surface: rgba(255, 255, 255, 0.9);
   --glass-surface-strong: rgba(255, 255, 255, 0.64);
   --glass-surface-subtle: rgba(255, 255, 255, 0.32);
@@ -118,7 +117,7 @@
 [data-theme="dark"] {
   /* Switchable Pure Black Frosted Translucent Glass over Real OS Desktop Blur (Zero Borders) */
   --canvas-bg: transparent;
-  --window-glass-bg: rgba(0, 0, 0, 0.42);
+  --window-glass-bg: rgba(8, 8, 10, 0.56);
 
   --bg-primary: rgba(0, 0, 0, 0.44);
   --bg-sidebar: rgba(0, 0, 0, 0.46);
@@ -132,8 +131,7 @@
   --bg-selected: rgba(255, 255, 255, 0.2);
   --bg-card-hover: rgba(24, 24, 28, 0.68);
 
-  --glass-surface: rgba(0, 0, 0, 0.46);
-  --window-backdrop-tint: rgba(8, 8, 12, 0.56);
+  --glass-surface: rgba(8, 8, 10, 0.6);
   --notch-surface: rgba(10, 10, 12, 0.92);
   --glass-surface-strong: rgba(12, 12, 14, 0.68);
   --glass-surface-subtle: rgba(0, 0, 0, 0.34);
@@ -225,7 +223,6 @@
   --bg-surface: rgba(255, 255, 255, 0.74);
   --bg-card: rgba(255, 255, 255, 0.72);
   --glass-surface: rgba(255, 255, 255, 0.68);
-  --window-backdrop-tint: rgba(255, 255, 255, 0.54);
   --notch-surface: rgba(255, 255, 255, 0.9);
   --glass-surface-strong: rgba(255, 255, 255, 0.84);
   --glass-surface-subtle: rgba(255, 255, 255, 0.56);
@@ -244,7 +241,6 @@
   --bg-surface: rgba(16, 16, 18, 0.78);
   --bg-card: rgba(14, 14, 16, 0.76);
   --glass-surface: rgba(12, 12, 14, 0.72);
-  --window-backdrop-tint: rgba(8, 8, 12, 0.58);
   --notch-surface: rgba(10, 10, 12, 0.92);
   --glass-surface-strong: rgba(20, 20, 24, 0.86);
   --glass-surface-subtle: rgba(10, 10, 12, 0.58);

@@ -4,7 +4,7 @@ import { useAppStore } from "@vrm/app-core";
 import { IPC_CHANNELS } from "@vrm/platform-contracts";
 import { buildNotchContour, contourToSvgPath } from "@vrm/shared";
 import NavigationBar from "../src/components/NavigationBar.vue";
-import DesktopBlurBackdrop from "../src/components/DesktopBlurBackdrop.vue";
+import { getGlassBrowserWindowOptions } from "../electron/main/platform-glass.js";
 import {
   resolveMenubarPerimeterDrag,
   NOTCH_HORIZONTAL_WIDTH,
@@ -325,37 +325,16 @@ describe("Menubar Dynamic Edge Notch & 90-Degree Corner Folding", () => {
     });
   });
 
-  describe("3. Screen-Aligned Blurred Desktop Backdrop", () => {
-    it("renders screen-aligned blurred wallpaper inside rounded glass container without corner bleed", async () => {
-      const store = useAppStore();
-      store.state.desktopBackdrop = null;
-      const wrapper = mount(DesktopBlurBackdrop);
-      expect(wrapper.find(".desktop-blur-backdrop").exists()).toBe(false);
+  describe("3. Live Underlying Window & Video Blur Backdrop Contract", () => {
+    it("configures borderless transparent BrowserWindows so live WinRT HostBackdropBlur shows underlying apps/video without corner bleed", () => {
+      const winOpts = getGlassBrowserWindowOptions("win32");
+      expect(winOpts.transparent).toBe(true);
+      expect(winOpts.frame).toBe(false);
+      expect(winOpts.backgroundColor).toBe("#00000000");
 
-      store.state.desktopBackdrop = {
-        imageUrl: "data:image/jpeg;base64,/9j/4AAQSkZJRg==",
-        imageRevision: 1,
-        style: "fill",
-        backgroundColor: "rgb(0, 0, 0)",
-        displayBounds: { x: 0, y: 0, width: 1920, height: 1080 },
-        windowBounds: { x: 420, y: 140, width: 1080, height: 760 },
-        isMaximized: false,
-      };
-      await wrapper.vm.$nextTick();
-
-      const container = wrapper.find(".desktop-blur-backdrop");
-      const img = wrapper.find("img.desktop-blur-layer");
-      expect(container.exists()).toBe(true);
-      expect(img.exists()).toBe(true);
-      expect(img.attributes("style")).toContain("left: -420px");
-      expect(img.attributes("style")).toContain("top: -140px");
-      expect(img.attributes("style")).toContain("width: 1920px");
-      expect(img.attributes("style")).toContain("height: 1080px");
-      expect(container.attributes("style")).toContain(
-        "border-radius: var(--radius-window, 24px)",
-      );
-
-      store.state.desktopBackdrop = null;
+      const macOpts = getGlassBrowserWindowOptions("darwin");
+      expect(macOpts.vibrancy).toBe("under-window");
+      expect(macOpts.transparent).toBe(true);
     });
   });
 });

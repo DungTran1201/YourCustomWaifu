@@ -25,22 +25,25 @@ import { isCornerDock } from "./menubar-notch.js";
  * Design goals:
  * - Zero native C++/node-gyp dependencies: works immediately after `git clone && pnpm install`
  *   on any Windows 10, Windows 11, macOS (Intel / Apple Silicon), or Linux machine.
- * - Real OS-level desktop blur wherever the host OS compositor supports it:
- *   - Windows 10 & 11: Win32 `SetWindowCompositionAttribute(ACCENT_ENABLE_ACRYLICBLURBEHIND)`
- *     + DPI-aware `CreateRoundRectRgn`/`SetWindowRgn` + Win11 `DWMWA_BORDER_COLOR = NONE`.
- *   - macOS: Native `NSVisualEffectView` (`vibrancy: "under-window"`, `visualEffectState: "active"`).
+ * - Real OS-level live backdrop blur of underlying apps/video wherever supported:
+ *   - Windows 10 & 11: WinRT `Windows.UI.Composition` `HostBackdropBrush` clipped via
+ *     hardware vector `CompositionRoundedRectangleGeometry` (`24px` corners, `0px` when maximized)
+ *     + Win32 `SetWinEventHook` lockstep tracking + `SetWindowRgn` click-through clipping
+ *     (eliminates DWM rectangular corner wedges completely while blurring live video/apps!).
+ *   - macOS: Native `NSVisualEffectView` (`vibrancy: "under-window"` when floating).
  *   - Linux (X11/KDE KWin): Standard `_KDE_NET_WM_BLUR_BEHIND_REGION` property via `xprop` when available.
  * - Deterministic self-adapting fallback (`frosted-fallback`):
  *   - If the host machine has OS transparency disabled, runs on Linux GNOME/Wayland without
- *     compositor blur, runs inside a VM/RDP session, or lacks native blur support, the engine
- *     automatically reports `"frosted-fallback"` so the renderer seamlessly boosts frosted opacity
- *     and CSS blur to preserve identical borderless rounded aesthetics everywhere.
+ *     compositor blur, runs inside a VM/RDP session, or lacks WinRT HostBackdrop support,
+ *     automatically reports `"frosted-fallback"` so CSS preserves clean borderless glass everywhere.
  */
 
 const PS_WIN32_BRIDGE_SCRIPT = `
 Add-Type -TypeDefinition @"
 using System;
+using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
+using System.Threading;
 using Microsoft.Win32;
 
 public static class PlatformWin32Glass {
@@ -60,6 +63,13 @@ public static class PlatformWin32Glass {
   }
 
   [StructLayout(LayoutKind.Sequential)]
+  public struct DispatcherQueueOptions {
+    public int dwSize;
+    public int threadType;
+    public int apartmentType;
+  }
+
+  [StructLayout(LayoutKind.Sequential)]
   public struct RECT {
     public int Left;
     public int Top;
@@ -72,6 +82,70 @@ public static class PlatformWin32Glass {
     public int X;
     public int Y;
   }
+
+  [StructLayout(LayoutKind.Sequential)]
+  public struct MSG {
+    public IntPtr hwnd;
+    public uint message;
+    public IntPtr wParam;
+    public IntPtr lParam;
+    public uint time;
+    public POINT pt;
+  }
+
+  public delegate void WinEventDelegate(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, int idObject, int idChild, uint dwEventThread, uint dwmsEventTime);
+  public delegate void CommandHandler(string cmd);
+
+  [DllImport("CoreMessaging.dll")]
+  public static extern int CreateDispatcherQueueController(DispatcherQueueOptions options, out IntPtr controller);
+
+  [DllImport("kernel32.dll")]
+  public static extern uint GetCurrentThreadId();
+
+  [DllImport("user32.dll")]
+  public static extern bool PostThreadMessage(uint idThread, uint Msg, IntPtr wParam, IntPtr lParam);
+
+  [DllImport("user32.dll")]
+  public static extern int GetMessage(out MSG lpMsg, IntPtr hWnd, uint wMsgFilterMin, uint wMsgFilterMax);
+
+  [DllImport("user32.dll")]
+  public static extern bool TranslateMessage(ref MSG lpMsg);
+
+  [DllImport("user32.dll")]
+  public static extern IntPtr DispatchMessage(ref MSG lpMsg);
+
+  [DllImport("user32.dll", SetLastError = true)]
+  public static extern IntPtr CreateWindowEx(int exStyle, string cls, string name, int style, int x, int y, int w, int h, IntPtr parent, IntPtr menu, IntPtr inst, IntPtr param);
+
+  [DllImport("user32.dll")]
+  public static extern bool DestroyWindow(IntPtr hwnd);
+
+  [DllImport("user32.dll")]
+  public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+  [DllImport("user32.dll")]
+  public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+  [DllImport("user32.dll")]
+  public static extern bool IsWindow(IntPtr hWnd);
+
+  [DllImport("user32.dll")]
+  public static extern bool IsWindowVisible(IntPtr hWnd);
+
+  [DllImport("user32.dll")]
+  public static extern bool IsIconic(IntPtr hWnd);
+
+  [DllImport("user32.dll")]
+  public static extern bool IsZoomed(IntPtr hWnd);
+
+  [DllImport("user32.dll")]
+  public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
+
+  [DllImport("user32.dll")]
+  public static extern IntPtr SetWinEventHook(uint eventMin, uint eventMax, IntPtr hmodWinEventProc, WinEventDelegate lpfnWinEventProc, uint idProcess, uint idThread, uint dwFlags);
+
+  [DllImport("user32.dll")]
+  public static extern bool UnhookWinEvent(IntPtr hWinEventHook);
 
   [DllImport("user32.dll")]
   public static extern int SetWindowCompositionAttribute(IntPtr hwnd, ref WindowCompositionAttributeData data);
@@ -136,6 +210,124 @@ public static class PlatformWin32Glass {
   [DllImport("user32.dll")]
   private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
 
+  [ComImport, Guid("29E691FA-4567-4DCA-B319-D0F207EB6807"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+  public interface ICompositorDesktopInterop {
+    [PreserveSig] int CreateDesktopWindowTarget(IntPtr hwndTarget, [MarshalAs(UnmanagedType.Bool)] bool isTopmost, out IntPtr result);
+  }
+
+  public static object AttachDesktopTarget(object comp, IntPtr hwnd) {
+    IntPtr unk = Marshal.GetIUnknownForObject(comp);
+    Guid iid = new Guid("29E691FA-4567-4DCA-B319-D0F207EB6807");
+    IntPtr pInterop;
+    Marshal.QueryInterface(unk, ref iid, out pInterop);
+    Marshal.Release(unk);
+    var interop = (ICompositorDesktopInterop)Marshal.GetObjectForIUnknown(pInterop);
+    IntPtr pTarget;
+    int hr = interop.CreateDesktopWindowTarget(hwnd, false, out pTarget);
+    if (hr != 0 || pTarget == IntPtr.Zero) throw new Exception("CreateDesktopWindowTarget HR=0x" + hr.ToString("X8"));
+    return Marshal.GetObjectForIUnknown(pTarget);
+  }
+
+  private static bool IsTopmostWindow(IntPtr hwnd) {
+    const int GWL_EXSTYLE = -20;
+    const long WS_EX_TOPMOST = 0x00000008L;
+    long style = IntPtr.Size == 8 ? GetWindowLongPtr64(hwnd, GWL_EXSTYLE).ToInt64() : GetWindowLong32(hwnd, GWL_EXSTYLE);
+    return (style & WS_EX_TOPMOST) != 0;
+  }
+
+  public static IntPtr CreateBackdropPopup(int x, int y, int w, int h) {
+    // WS_EX_NOREDIRECTIONBITMAP | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE
+    // Omit WS_EX_LAYERED so DWM HostBackdropBrush compositing works on Windows 11+.
+    const int exStyle = 0x00200000 | 0x00000020 | 0x00000080 | 0x08000000;
+    const int style = unchecked((int)0x80000000);
+    return CreateWindowEx(exStyle, "Static", "", style, x, y, Math.Max(1, w), Math.Max(1, h), IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
+  }
+
+  public static int SyncBackdropPos(long targetVal, long backdropVal, out int outW, out int outH, out int isMax) {
+    IntPtr target = new IntPtr(targetVal);
+    IntPtr backdrop = new IntPtr(backdropVal);
+    outW = 0; outH = 0; isMax = 0;
+    if (!IsWindow(target)) return -1;
+    if (!IsWindowVisible(target) || IsIconic(target)) {
+      ShowWindow(backdrop, 0);
+      return 0;
+    }
+    RECT rc;
+    if (!GetWindowRect(target, out rc)) return 0;
+    outW = Math.Max(1, rc.Right - rc.Left);
+    outH = Math.Max(1, rc.Bottom - rc.Top);
+    isMax = IsZoomed(target) ? 1 : 0;
+    bool targetTopmost = IsTopmostWindow(target);
+    bool backdropTopmost = IsTopmostWindow(backdrop);
+    if (targetTopmost != backdropTopmost) {
+      SetWindowPos(backdrop, targetTopmost ? new IntPtr(-1) : new IntPtr(-2), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010);
+    }
+    uint flags = 0x0010; // SWP_NOACTIVATE
+    if (!IsWindowVisible(backdrop)) {
+      flags |= 0x0040; // SWP_SHOWWINDOW
+    }
+    SetWindowPos(backdrop, target, rc.Left, rc.Top, outW, outH, flags);
+    return 1;
+  }
+
+  private static readonly ConcurrentQueue<string> CmdQueue = new ConcurrentQueue<string>();
+  private static uint MainThreadId = 0;
+  private const uint WM_APP_CMD = 0x8001;
+  private const uint WM_QUIT = 0x0012;
+  private static WinEventDelegate HookProcRef = null;
+  private static IntPtr HookHandle = IntPtr.Zero;
+  private static uint HookedPid = 0;
+
+  public static void EnsureHookForWindow(long targetVal, Action<long> onTargetEvent) {
+    uint pid;
+    GetWindowThreadProcessId(new IntPtr(targetVal), out pid);
+    if (pid == 0 || pid == HookedPid) return;
+    if (HookHandle != IntPtr.Zero) {
+      UnhookWinEvent(HookHandle);
+      HookHandle = IntPtr.Zero;
+    }
+    HookedPid = pid;
+    HookProcRef = delegate(IntPtr hHook, uint evt, IntPtr hwnd, int idObj, int idChild, uint thr, uint time) {
+      if (idObj != 0 || hwnd == IntPtr.Zero) return;
+      onTargetEvent(hwnd.ToInt64());
+    };
+    HookHandle = SetWinEventHook(0x0003, 0x800B, IntPtr.Zero, HookProcRef, pid, 0, 0);
+  }
+
+  public static void RunLoop(CommandHandler handler, Action cleanup) {
+    MainThreadId = GetCurrentThreadId();
+    Thread reader = new Thread(delegate() {
+      try {
+        string line;
+        while ((line = Console.In.ReadLine()) != null) {
+          CmdQueue.Enqueue(line);
+          PostThreadMessage(MainThreadId, WM_APP_CMD, IntPtr.Zero, IntPtr.Zero);
+        }
+      } catch {}
+      PostThreadMessage(MainThreadId, WM_QUIT, IntPtr.Zero, IntPtr.Zero);
+    });
+    reader.IsBackground = true;
+    reader.Start();
+
+    MSG msg;
+    while (GetMessage(out msg, IntPtr.Zero, 0, 0) > 0) {
+      if (msg.message == WM_APP_CMD) {
+        string cmd;
+        while (CmdQueue.TryDequeue(out cmd)) {
+          handler(cmd);
+        }
+      } else {
+        TranslateMessage(ref msg);
+        DispatchMessage(ref msg);
+      }
+    }
+    if (HookHandle != IntPtr.Zero) {
+      UnhookWinEvent(HookHandle);
+      HookHandle = IntPtr.Zero;
+    }
+    if (cleanup != null) cleanup();
+  }
+
   public static void EnableNoActivateToolWindow(long hwndVal) {
     IntPtr hwnd = new IntPtr(hwndVal);
     const int GWL_EXSTYLE = -20;
@@ -172,13 +364,25 @@ public static class PlatformWin32Glass {
     return true;
   }
 
-  public static int ApplyAcrylic(long hwndVal, int accentState, uint gradientColor) {
-    IntPtr hwnd = new IntPtr(hwndVal);
-    // Best-effort remove 1px DWM border on Windows 11 (DWMWA_BORDER_COLOR = 34, DWMWA_COLOR_NONE = 0xFFFFFFFE)
+  public static void RemoveWin11Border(long hwndVal) {
     try {
       uint borderNone = 0xFFFFFFFE;
-      DwmSetWindowAttribute(hwnd, 34, ref borderNone, sizeof(uint));
+      DwmSetWindowAttribute(new IntPtr(hwndVal), 34, ref borderNone, sizeof(uint));
     } catch {}
+  }
+
+  public static int EnableHostBackdropAttr(long hwndVal) {
+    try {
+      uint enable = 1;
+      return DwmSetWindowAttribute(new IntPtr(hwndVal), 17, ref enable, sizeof(uint));
+    } catch {
+      return unchecked((int)0x80070057);
+    }
+  }
+
+  public static int ApplyAcrylic(long hwndVal, int accentState, uint gradientColor) {
+    IntPtr hwnd = new IntPtr(hwndVal);
+    RemoveWin11Border(hwndVal);
 
     var accent = new AccentPolicy {
       AccentState = accentState,
@@ -274,16 +478,124 @@ public static class PlatformWin32Glass {
   }
 }
 "@
+
 $trans = [PlatformWin32Glass]::IsTransparencyEnabled()
-Write-Output ("READY:" + $(if ($trans) { "1" } else { "0" }))
-while (($line = [Console]::In.ReadLine()) -ne $null) {
+$comp = $null
+$hostBrush = $null
+$hostBlurAvailable = $false
+
+if ($trans) {
+  try {
+    # Probe DWMWA_USE_HOSTBACKDROPBRUSH (17): succeeds (hr == 0) on Windows 11+,
+    # returns E_INVALIDARG (0x80070057) on Windows 10 where HostBackdropBrush renders black.
+    $probeHwnd = [PlatformWin32Glass]::CreateBackdropPopup(0, 0, 1, 1)
+    $hr17 = -1
+    if ($probeHwnd -ne [IntPtr]::Zero) {
+      $hr17 = [PlatformWin32Glass]::EnableHostBackdropAttr($probeHwnd.ToInt64())
+      [void][PlatformWin32Glass]::DestroyWindow($probeHwnd)
+    }
+    if ($hr17 -eq 0) {
+      $dqOpt = New-Object PlatformWin32Glass+DispatcherQueueOptions
+      $dqOpt.dwSize = [System.Runtime.InteropServices.Marshal]::SizeOf($dqOpt)
+      $dqOpt.threadType = 2
+      $dqOpt.apartmentType = 0
+      $dq = [IntPtr]::Zero
+      [void][PlatformWin32Glass]::CreateDispatcherQueueController($dqOpt, [ref]$dq)
+      $null = [Windows.UI.Composition.Compositor, Windows.UI.Composition, ContentType=WindowsRuntime]
+      $null = [Windows.UI.Composition.Desktop.DesktopWindowTarget, Windows.UI.Composition.Desktop, ContentType=WindowsRuntime]
+      $comp = [Windows.UI.Composition.Compositor]::new()
+      $hostBrush = $comp.CreateHostBackdropBrush()
+      if ($null -ne $hostBrush) { $hostBlurAvailable = $true }
+    }
+  } catch {
+    $hostBlurAvailable = $false
+  }
+}
+
+$entries = @{}
+$syncEntry = {
+  param([long]$t)
+  if (-not $entries.ContainsKey($t)) { return }
+  $e = $entries[$t]
+  if (-not $e.Active) {
+    [void][PlatformWin32Glass]::ShowWindow($e.Backdrop, 0)
+    return
+  }
+  $w = 0; $h = 0; $isMax = 0
+  $state = [PlatformWin32Glass]::SyncBackdropPos($t, $e.Backdrop.ToInt64(), [ref]$w, [ref]$h, [ref]$isMax)
+  if ($state -eq -1) {
+    [void][PlatformWin32Glass]::DestroyWindow($e.Backdrop)
+    $entries.Remove($t)
+    return
+  }
+  if ($state -eq 1) {
+    $r = if ($isMax -eq 1) { 0 } else { $e.Radius }
+    if ($e.W -ne $w -or $e.H -ne $h -or $e.LastR -ne $r) {
+      $e.W = $w; $e.H = $h; $e.LastR = $r
+      $sz = $e.Geo.Size; $sz.X = $w; $sz.Y = $h; $e.Geo.Size = $sz
+      $cr = $e.Geo.CornerRadius; $cr.X = $r; $cr.Y = $r; $e.Geo.CornerRadius = $cr
+      $e.Vis.Size = $sz
+    }
+  }
+}
+
+[Console]::Out.WriteLine("READY:" + $(if ($trans) { "1" } else { "0" }))
+[Console]::Out.Flush()
+
+[PlatformWin32Glass]::RunLoop([PlatformWin32Glass+CommandHandler]{
+  param([string]$line)
   try {
     $parts = $line.Trim().Split(" ")
-    if ($parts.Length -ge 4 -and $parts[0] -eq "BLUR") {
-      $res = [PlatformWin32Glass]::ApplyAcrylic([long]$parts[1], [int]$parts[2], [Convert]::ToUInt32($parts[3], 16))
-      Write-Output "BLUR_RES:$res"
+    if ($parts.Length -ge 3 -and $parts[0] -eq "HOST_BLUR") {
+      $t = [long]$parts[1]
+      $rad = [int]$parts[2]
+      $tintHex = if ($parts.Length -ge 4) { $parts[3] } else { "04000000" }
+      [PlatformWin32Glass]::RemoveWin11Border($t)
+      if (-not $trans) {
+        [Console]::Out.WriteLine("HOST_BLUR_RES:0")
+        [Console]::Out.Flush()
+        return
+      }
+      if (-not $hostBlurAvailable) {
+        $res = [PlatformWin32Glass]::ApplyAcrylic($t, 4, [Convert]::ToUInt32($tintHex, 16))
+        [Console]::Out.WriteLine("HOST_BLUR_RES:" + $(if ($res -ne 0) { "1" } else { "0" }))
+        [Console]::Out.Flush()
+        return
+      }
+      [void][PlatformWin32Glass]::ApplyAcrylic($t, 0, [uint32]0)
+      [PlatformWin32Glass]::EnsureHookForWindow($t, [Action[long]]{ param($h) & $syncEntry $h })
+      if (-not $entries.ContainsKey($t)) {
+        $b = [PlatformWin32Glass]::CreateBackdropPopup(0, 0, 100, 100)
+        [void][PlatformWin32Glass]::EnableHostBackdropAttr($b.ToInt64())
+        $tgt = [Windows.UI.Composition.Desktop.DesktopWindowTarget][PlatformWin32Glass]::AttachDesktopTarget($comp, $b)
+        $geo = $comp.CreateRoundedRectangleGeometry()
+        $clip = $comp.CreateGeometricClip($geo)
+        $vis = $comp.CreateSpriteVisual()
+        $vis.Brush = $hostBrush
+        $vis.Clip = $clip
+        $tgt.Root = $vis
+        $entries[$t] = @{ Backdrop = $b; Target = $tgt; Geo = $geo; Vis = $vis; Radius = $rad; Active = $true; W = 0; H = 0; LastR = -1 }
+      } else {
+        $entries[$t].Radius = $rad
+        $entries[$t].Active = $true
+      }
+      & $syncEntry $t
+      [Console]::Out.WriteLine("HOST_BLUR_RES:1")
+      [Console]::Out.Flush()
+    } elseif ($parts.Length -ge 3 -and $parts[0] -eq "SYNC_HOST_BLUR") {
+      $t = [long]$parts[1]
+      $rad = [int]$parts[2]
+      if ($entries.ContainsKey($t) -and $entries[$t].Active) {
+        $entries[$t].Radius = $rad
+        & $syncEntry $t
+      }
     } elseif ($parts.Length -ge 2 -and $parts[0] -eq "CLEAR_BLUR") {
-      [void][PlatformWin32Glass]::ApplyAcrylic([long]$parts[1], 0, [uint32]0)
+      $t = [long]$parts[1]
+      if ($entries.ContainsKey($t)) {
+        $entries[$t].Active = $false
+        [void][PlatformWin32Glass]::ShowWindow($entries[$t].Backdrop, 0)
+      }
+      [void][PlatformWin32Glass]::ApplyAcrylic($t, 0, [uint32]0)
     } elseif ($parts.Length -ge 3 -and $parts[0] -eq "RGN") {
       [void][PlatformWin32Glass]::ApplyRoundRegion([long]$parts[1], [int]$parts[2])
     } elseif ($parts.Length -ge 3 -and $parts[0] -eq "RGN_PATH") {
@@ -296,7 +608,12 @@ while (($line = [Console]::In.ReadLine()) -ne $null) {
   } catch {
     # Ignore transient window destruction errors
   }
-}
+}, [Action]{
+  foreach ($e in @($entries.Values)) {
+    try { [void][PlatformWin32Glass]::DestroyWindow($e.Backdrop) } catch {}
+  }
+  $entries.Clear()
+})
 `;
 
 let win32Helper: ChildProcessWithoutNullStreams | null = null;
@@ -305,10 +622,10 @@ let win32HelperFailed = false;
 let win32TransparencyEnabled = true;
 const pendingWin32Commands: string[] = [];
 
-// Windows & macOS borderless 24px rounded / concave-notch windows use per-pixel
-// alpha CSS frosted glass rather than rectangular OS Acrylic/Vibrancy so outer
-// corner cutouts remain 100% transparent everywhere.
-let activeGlassMode: GlassBackdropMode = "frosted-fallback";
+let activeGlassMode: GlassBackdropMode =
+  process.platform === "win32" || process.platform === "darwin"
+    ? "native-blur"
+    : "frosted-fallback";
 
 type ModeChangeListener = (mode: GlassBackdropMode) => void;
 const modeListeners = new Set<ModeChangeListener>();
@@ -440,8 +757,13 @@ function ensureWin32Helper(): void {
             setGlassMode("frosted-fallback");
           }
           flushPendingWin32();
-        } else if (line.startsWith("BLUR_RES:")) {
-          const ok = line === "BLUR_RES:1" && win32TransparencyEnabled;
+        } else if (
+          line.startsWith("HOST_BLUR_RES:") ||
+          line.startsWith("BLUR_RES:")
+        ) {
+          const ok =
+            (line === "HOST_BLUR_RES:1" || line === "BLUR_RES:1") &&
+            win32TransparencyEnabled;
           setGlassMode(ok ? "native-blur" : "frosted-fallback");
         }
       }
@@ -580,6 +902,9 @@ function contourToWin32PathSpec(contour: NotchContour): string {
   return parts.join("|");
 }
 
+const ACRYLIC_MINIMAL_LIGHT_ABGR = "04FFFFFF";
+const ACRYLIC_MINIMAL_DARK_ABGR = "04000000";
+
 /**
  * Applies OS-native desktop backdrop blur and rounded corner clipping across
  * Windows 10/11, macOS, and Linux, automatically falling back to `frosted-fallback`
@@ -587,7 +912,7 @@ function contourToWin32PathSpec(contour: NotchContour): string {
  */
 export function applyPlatformGlass(
   win: BrowserWindow | null,
-  _theme: "light" | "dark",
+  theme: "light" | "dark",
   radiusDip = 24,
   dock: MenubarDockPosition = "floating",
 ): void {
@@ -596,25 +921,32 @@ export function applyPlatformGlass(
   if (process.platform === "win32") {
     const hwnd = getWindowHwndString(win);
     if (!hwnd) return;
-    // Windows DWM AccentPolicy (ACCENT_ENABLE_ACRYLICBLURBEHIND) blurs out to
-    // DWM's ~8px frame regardless of SetWindowRgn, creating visible dark/light
-    // rectangular corner wedges outside 24px CSS rounded corners and concave notches.
-    // Disabling DWM AccentPolicy keeps all pixels outside CSS border-radius / SVG
-    // clipPath 100% transparent while preserving DWMWA_BORDER_COLOR = NONE and
-    // SetWindowRgn click-through clipping.
-    sendWin32Command(`CLEAR_BLUR ${hwnd}`);
-    setGlassMode("frosted-fallback");
+    if (dock === "floating") {
+      // Win11+: live GPU HostBackdropBrush clipped with vector RoundedRectangleGeometry(radiusPx).
+      // Win10 (where DWMWA_USE_HOSTBACKDROPBRUSH=17 is unsupported): bridge applies Acrylic
+      // (ACCENT_ENABLE_ACRYLICBLURBEHIND) with minimal tint so underlying videos blur cleanly.
+      const radiusPx = getPhysicalRadius(win, radiusDip);
+      const minimalTint =
+        theme === "dark"
+          ? ACRYLIC_MINIMAL_DARK_ABGR
+          : ACRYLIC_MINIMAL_LIGHT_ABGR;
+      sendWin32Command(`HOST_BLUR ${hwnd} ${radiusPx} ${minimalTint}`);
+    } else {
+      // Docked Edge/Corner Notch uses a concave SVG silhouette; hide rectangular
+      // HostBackdrop so the outer concave pockets remain 100% transparent.
+      sendWin32Command(`CLEAR_BLUR ${hwnd}`);
+    }
     updatePlatformGlassRegion(win, radiusDip, dock);
     return;
   }
 
   if (process.platform === "darwin") {
     try {
-      win.setVibrancy(null);
+      win.setVibrancy(dock === "floating" ? "under-window" : null);
+      setGlassMode(dock === "floating" ? "native-blur" : "frosted-fallback");
     } catch {
-      // Ignore if unsupported
+      setGlassMode("frosted-fallback");
     }
-    setGlassMode("frosted-fallback");
     return;
   }
 
@@ -627,10 +959,20 @@ export function applyPlatformGlass(
 }
 
 /**
+ * Hides any Win32 HostBackdrop companion layer immediately when the target
+ * Electron window is hidden or minimized.
+ */
+export function hidePlatformGlass(win: BrowserWindow | null): void {
+  if (process.platform !== "win32" || !win || win.isDestroyed()) return;
+  const hwnd = getWindowHwndString(win);
+  if (hwnd) {
+    sendWin32Command(`CLEAR_BLUR ${hwnd}`);
+  }
+}
+
+/**
  * Updates rounded clipping region on resize / maximize / display DPI change.
- * When Menubar is docked to an edge or 90-degree corner, cuts the exact
- * iPhone-notch Bezier silhouette via Win32 `PathToRegion` so OS Acrylic blur
- * and click-through areas match the CSS `<clipPath>` without rectangular bleed.
+ * Keeps `SetWindowRgn` click-through and `SYNC_HOST_BLUR` radius synchronized.
  */
 export function updatePlatformGlassRegion(
   win: BrowserWindow | null,
@@ -661,6 +1003,7 @@ export function updatePlatformGlassRegion(
 
   const radiusPx = getPhysicalRadius(win, radiusDip);
   sendWin32Command(`RGN ${hwnd} ${radiusPx}`);
+  sendWin32Command(`SYNC_HOST_BLUR ${hwnd} ${radiusPx}`);
 }
 
 /**
